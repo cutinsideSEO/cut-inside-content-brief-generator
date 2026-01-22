@@ -49,9 +49,14 @@ const findDefaultColumn = (headers: string[], keywords: string[]): string => {
   return headers.length > 0 ? headers[0] : '';
 };
 
+// Check if DataForSEO credentials are configured via environment variables
+const dfsEnvLogin = import.meta.env.VITE_DATAFORSEO_LOGIN || '';
+const dfsEnvPassword = import.meta.env.VITE_DATAFORSEO_PASSWORD || '';
+const hasDfsEnvCredentials = Boolean(dfsEnvLogin && dfsEnvPassword);
+
 const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis, isLoading, error, onStartUpload }) => {
-  const [login, setLogin] = useState('');
-  const [password, setPassword] = useState('');
+  const [login, setLogin] = useState(dfsEnvLogin);
+  const [password, setPassword] = useState(dfsEnvPassword);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [keywordColumn, setKeywordColumn] = useState('');
@@ -310,17 +315,21 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
             )}
 
 
-            <div>
-              <h2 className="text-lg font-heading font-semibold text-grey mb-1">2. Enter Credentials</h2>
-              <p className="text-sm text-grey/60">Your DataForSEO API credentials.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input type="text" placeholder="DataForSEO Login" value={login} onChange={(e) => setLogin(e.target.value)} className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal" />
-              <input type="password" placeholder="DataForSEO Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal" />
-            </div>
+            {!hasDfsEnvCredentials && (
+              <>
+                <div>
+                  <h2 className="text-lg font-heading font-semibold text-grey mb-1">2. Enter Credentials</h2>
+                  <p className="text-sm text-grey/60">Your DataForSEO API credentials.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input type="text" placeholder="DataForSEO Login" value={login} onChange={(e) => setLogin(e.target.value)} className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal" />
+                  <input type="password" placeholder="DataForSEO Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal" />
+                </div>
+              </>
+            )}
              
              <div>
-                <h2 className="text-lg font-heading font-semibold text-grey mb-1">3. Configure Analysis Settings</h2>
+                <h2 className="text-lg font-heading font-semibold text-grey mb-1">{hasDfsEnvCredentials ? '2' : '3'}. Configure Analysis Settings</h2>
                 <p className="text-sm text-grey/60">Define the target market and the language for the final brief.</p>
             </div>
             <div className="space-y-4">

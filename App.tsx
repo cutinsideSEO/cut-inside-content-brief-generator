@@ -21,7 +21,7 @@ import BriefUploadScreen from './components/screens/BriefUploadScreen';
 import SaveStatusIndicator from './components/SaveStatusIndicator';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
-import { saveBriefState, updateBriefProgress, updateBriefStatus } from './services/briefService';
+import { saveBriefState, updateBriefProgress, updateBriefStatus, updateBrief } from './services/briefService';
 import { saveCompetitors } from './services/competitorService';
 import { createArticle } from './services/articleService';
 import { uploadContextFile, addContextUrl as addContextUrlToDb, deleteContextFile, deleteContextUrl } from './services/contextService';
@@ -373,6 +373,14 @@ const App: React.FC<AppProps> = ({
     if (!hasCompletedFirstBrief) {
       addToast("Accolade Unlocked!", "First Strike: You've initiated your first strategic analysis.");
       setHasCompletedFirstBrief(true);
+    }
+
+    // Update brief name to primary keyword (makes it meaningful in the dashboard)
+    if (briefId && isSupabaseMode && keywords.length > 0) {
+      const primaryKeyword = keywords.sort((a, b) => b.volume - a.volume)[0].kw;
+      updateBrief(briefId, { name: primaryKeyword }).catch(err => {
+        console.error('Failed to update brief name:', err);
+      });
     }
 
     // Notify parent that competitor analysis is starting

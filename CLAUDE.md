@@ -141,6 +141,29 @@ index.tsx → AppWrapper.tsx → AuthProvider
 
 Auto-save is handled by `useAutoSave` hook which debounces updates to Supabase.
 
+### Parallel Background Generation
+
+Users can run multiple brief generations simultaneously. Architecture in `AppWrapper.tsx`:
+
+```typescript
+// Track multiple generating briefs in a map
+generatingBriefs: Record<string, {
+  clientId: string;
+  clientName: string;
+  status: 'analyzing_competitors' | 'generating_brief' | 'generating_content';
+  step: number | null;  // Step 1-7 for brief generation
+}>;
+```
+
+How it works:
+1. When user starts "I'm Feeling Lucky" or content generation, brief is added to `generatingBriefs` map
+2. Hidden `<App>` components are rendered for each generating brief to maintain React state
+3. User can navigate away (to brief list or client selection) while generation continues
+4. Floating indicator panel shows all active generations with "View" buttons
+5. When generation completes, brief is removed from map and status updated in Supabase
+
+Limits: No code cap, but API rate limits (Gemini, DataForSEO) will throttle 10+ parallel generations.
+
 ## Key Patterns
 
 ### Authentication Flow

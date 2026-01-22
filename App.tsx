@@ -39,6 +39,11 @@ interface AppProps {
   saveStatus?: SaveStatus;
   lastSavedAt?: Date | null;
   isSupabaseMode?: boolean;
+  // Background generation callbacks
+  onGenerationStart?: (type: 'brief' | 'content', briefId: string) => void;
+  onGenerationProgress?: (step: number) => void;
+  onGenerationComplete?: (briefId: string, success: boolean) => void;
+  isBackgroundMode?: boolean;
 }
 
 const MAX_FILE_SIZE_MB = 10;
@@ -139,6 +144,10 @@ const App: React.FC<AppProps> = ({
   saveStatus: externalSaveStatus,
   lastSavedAt: externalLastSavedAt,
   isSupabaseMode = false,
+  onGenerationStart,
+  onGenerationProgress,
+  onGenerationComplete,
+  isBackgroundMode = false,
 }) => {
   const [currentView, setCurrentView] = useState<AppView>('initial_input');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -635,6 +644,10 @@ const App: React.FC<AppProps> = ({
     if (nextUiStep > 7) {
       setCurrentView('dashboard');
       setIsFeelingLuckyFlow(false);
+      // Notify parent that brief generation completed
+      if (briefId && onGenerationComplete) {
+        onGenerationComplete(briefId, true);
+      }
       return;
     }
 
@@ -668,11 +681,15 @@ const App: React.FC<AppProps> = ({
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
       setBriefingStep(prev => prev - 1); // Revert on error
       setIsFeelingLuckyFlow(false); // Stop lucky flow on error
+      // Notify parent that brief generation failed
+      if (briefId && onGenerationComplete && isFeelingLuckyFlow) {
+        onGenerationComplete(briefId, false);
+      }
     } finally {
       setIsLoading(false);
       setLoadingStep(null);
     }
-  }, [briefingStep, competitorData, subjectInfo, brandInfo, briefData, keywordVolumeMap, outputLanguage, extractedTemplate, lengthConstraints, paaQuestions]);
+  }, [briefingStep, competitorData, subjectInfo, brandInfo, briefData, keywordVolumeMap, outputLanguage, extractedTemplate, lengthConstraints, paaQuestions, briefId, onGenerationComplete, isFeelingLuckyFlow]);
 
   const handleProceedToBriefing = useCallback(async () => {
     setCurrentView('briefing');
@@ -721,12 +738,20 @@ const App: React.FC<AppProps> = ({
   
   const handleFeelingLucky = useCallback(() => {
     setIsFeelingLuckyFlow(true);
+    // Notify parent that brief generation is starting
+    if (briefId && onGenerationStart) {
+      onGenerationStart('brief', briefId);
+    }
     handleProceedToBriefing();
-  }, [handleProceedToBriefing]);
+  }, [handleProceedToBriefing, briefId, onGenerationStart]);
 
   useEffect(() => {
     // This effect drives the "I'm Feeling Lucky" flow forward.
     if (isFeelingLuckyFlow && currentView === 'briefing' && !isLoading && !error) {
+        // Report progress to parent
+        if (onGenerationProgress) {
+          onGenerationProgress(briefingStep);
+        }
         // When a step completes, isLoading becomes false, and this effect triggers.
         // We call handleNextStep, which will either generate the next step
         // or, if all steps are complete (briefingStep will be 7), it will transition to the dashboard.
@@ -734,7 +759,7 @@ const App: React.FC<AppProps> = ({
             handleNextStep();
         }
     }
-  }, [isFeelingLuckyFlow, currentView, isLoading, error, briefingStep, briefData, handleNextStep]);
+  }, [isFeelingLuckyFlow, currentView, isLoading, error, briefingStep, briefData, handleNextStep, onGenerationProgress]);
   
   const handleRegenerateStep = useCallback(async (logicalStepToRegen: number, feedback?: string) => {
     setError(null);
@@ -806,6 +831,11 @@ const App: React.FC<AppProps> = ({
     setError(null);
     setCurrentView('content_generation');
     setIsLoading(true);
+
+    // Notify parent that content generation is starting
+    if (briefId && onGenerationStart) {
+      onGenerationStart('content', briefId);
+    }
 
     const flattenOutline = (items: OutlineItem[]): OutlineItem[] => {
       const flatList: OutlineItem[] = [];
@@ -919,8 +949,16 @@ const App: React.FC<AppProps> = ({
         }
       }
 
+      // Content generation completed successfully
+      if (briefId && onGenerationComplete) {
+        onGenerationComplete(briefId, true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred during content generation.");
+      // Notify parent that content generation failed
+      if (briefId && onGenerationComplete) {
+        onGenerationComplete(briefId, false);
+      }
     } finally {
       setIsLoading(false);
       setGenerationProgress(null);

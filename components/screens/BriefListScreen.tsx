@@ -6,6 +6,9 @@ import BriefListCard from '../briefs/BriefListCard';
 import Button from '../Button';
 import Spinner from '../Spinner';
 
+// Generation status type (matches AppWrapper)
+type GenerationStatus = 'idle' | 'generating_brief' | 'generating_content';
+
 interface BriefListScreenProps {
   clientId: string;
   clientName: string;
@@ -14,6 +17,10 @@ interface BriefListScreenProps {
   onContinueBrief: (briefId: string) => void;
   onEditBrief: (briefId: string) => void;
   onUseAsTemplate: (briefId: string) => void;
+  // Background generation props
+  generatingBriefId?: string | null;
+  generationStatus?: GenerationStatus;
+  generationStep?: number | null;
 }
 
 const BriefListScreen: React.FC<BriefListScreenProps> = ({
@@ -24,6 +31,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   onContinueBrief,
   onEditBrief,
   onUseAsTemplate,
+  generatingBriefId,
+  generationStatus,
+  generationStep,
 }) => {
   const [briefs, setBriefs] = useState<BriefWithClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -250,6 +260,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                     onEdit={onEditBrief}
                     onUseAsTemplate={onUseAsTemplate}
                     onArchive={handleArchive}
+                    isGenerating={brief.id === generatingBriefId}
+                    generationStatus={generationStatus}
+                    generationStep={generationStep}
                   />
                 ))}
               </div>
@@ -272,6 +285,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                     onEdit={onEditBrief}
                     onUseAsTemplate={onUseAsTemplate}
                     onArchive={handleArchive}
+                    isGenerating={brief.id === generatingBriefId}
+                    generationStatus={generationStatus}
+                    generationStep={generationStep}
                   />
                 ))}
               </div>
@@ -294,6 +310,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                     onEdit={onEditBrief}
                     onUseAsTemplate={onUseAsTemplate}
                     onArchive={handleArchive}
+                    isGenerating={brief.id === generatingBriefId}
+                    generationStatus={generationStatus}
+                    generationStep={generationStep}
                   />
                 ))}
               </div>

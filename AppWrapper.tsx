@@ -18,6 +18,9 @@ import BriefListScreen from './components/screens/BriefListScreen';
 // Import the original App component
 import OriginalApp from './App';
 
+// Generation status type
+type GenerationStatus = 'idle' | 'generating_brief' | 'generating_content';
+
 // Types for the wrapper state
 interface WrapperState {
   // Navigation mode
@@ -31,6 +34,11 @@ interface WrapperState {
   // Save status for auto-save
   saveStatus: SaveStatus;
   lastSavedAt: Date | null;
+
+  // Background generation tracking
+  generatingBriefId: string | null;
+  generationStatus: GenerationStatus;
+  generationStep: number | null;
 }
 
 // Inner component that uses auth context
@@ -45,6 +53,9 @@ const AppWrapperInner: React.FC = () => {
     currentBriefId: null,
     saveStatus: 'saved',
     lastSavedAt: null,
+    generatingBriefId: null,
+    generationStatus: 'idle',
+    generationStep: null,
   });
 
   // Brief data for auto-save (will be populated when loading a brief)
@@ -82,8 +93,45 @@ const AppWrapperInner: React.FC = () => {
       currentBriefId: null,
       saveStatus: 'saved',
       lastSavedAt: null,
+      generatingBriefId: null,
+      generationStatus: 'idle',
+      generationStep: null,
     });
   }, [logout]);
+
+  // Handle generation start (from App)
+  const handleGenerationStart = useCallback((type: 'brief' | 'content', briefId: string) => {
+    setState((prev) => ({
+      ...prev,
+      generatingBriefId: briefId,
+      generationStatus: type === 'brief' ? 'generating_brief' : 'generating_content',
+      generationStep: type === 'brief' ? 1 : null,
+    }));
+    // Update brief status in Supabase
+    updateBriefStatus(briefId, 'in_progress');
+  }, []);
+
+  // Handle generation progress (step updates)
+  const handleGenerationProgress = useCallback((step: number) => {
+    setState((prev) => ({
+      ...prev,
+      generationStep: step,
+    }));
+  }, []);
+
+  // Handle generation complete
+  const handleGenerationComplete = useCallback((briefId: string, success: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      generatingBriefId: null,
+      generationStatus: 'idle',
+      generationStep: null,
+    }));
+    // Update brief status in Supabase
+    if (success) {
+      updateBriefStatus(briefId, 'complete');
+    }
+  }, []);
 
   // Handle client selection
   const handleSelectClient = useCallback((clientId: string, clientName: string) => {
@@ -207,22 +255,48 @@ const AppWrapperInner: React.FC = () => {
       );
 
     case 'brief_list':
+      // If there's background generation, keep App mounted but hidden
+      const isGenerating = state.generationStatus !== 'idle' && state.generatingBriefId;
       return (
-        <div className="min-h-screen bg-black text-grey font-sans">
-          <div className="container mx-auto p-4 md:p-6 lg:p-8">
-            <div className="bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
-              <BriefListScreen
-                clientId={state.selectedClientId!}
-                clientName={state.selectedClientName!}
-                onBack={handleBackToClients}
-                onCreateBrief={handleCreateBrief}
-                onContinueBrief={handleContinueBrief}
-                onEditBrief={handleEditBrief}
-                onUseAsTemplate={handleUseAsTemplate}
-              />
+        <>
+          <div className="min-h-screen bg-black text-grey font-sans">
+            <div className="container mx-auto p-4 md:p-6 lg:p-8">
+              <div className="bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
+                <BriefListScreen
+                  clientId={state.selectedClientId!}
+                  clientName={state.selectedClientName!}
+                  onBack={handleBackToClients}
+                  onCreateBrief={handleCreateBrief}
+                  onContinueBrief={handleContinueBrief}
+                  onEditBrief={handleEditBrief}
+                  onUseAsTemplate={handleUseAsTemplate}
+                  generatingBriefId={state.generatingBriefId}
+                  generationStatus={state.generationStatus}
+                  generationStep={state.generationStep}
+                />
+              </div>
             </div>
           </div>
-        </div>
+          {/* Keep App mounted but hidden during background generation */}
+          {isGenerating && (
+            <div className="hidden">
+              <OriginalApp
+                briefId={state.generatingBriefId}
+                clientId={state.selectedClientId}
+                clientName={state.selectedClientName}
+                onBackToBriefList={() => {}} // No-op since we're in background
+                onSaveStatusChange={handleSaveStatusChange}
+                saveStatus={state.saveStatus}
+                lastSavedAt={state.lastSavedAt}
+                isSupabaseMode={true}
+                onGenerationStart={handleGenerationStart}
+                onGenerationProgress={handleGenerationProgress}
+                onGenerationComplete={handleGenerationComplete}
+                isBackgroundMode={true}
+              />
+            </div>
+          )}
+        </>
       );
 
     case 'brief_editor':
@@ -232,11 +306,21 @@ const AppWrapperInner: React.FC = () => {
           briefId={state.currentBriefId}
           clientId={state.selectedClientId}
           clientName={state.selectedClientName}
-          onBackToBriefList={() => setState((prev) => ({ ...prev, mode: 'brief_list', currentBriefId: null }))}
+          onBackToBriefList={() => setState((prev) => ({
+            ...prev,
+            mode: 'brief_list',
+            currentBriefId: null,
+            // Keep generatingBriefId if generation is in progress
+            generatingBriefId: prev.generationStatus !== 'idle' ? prev.currentBriefId : null,
+          }))}
           onSaveStatusChange={handleSaveStatusChange}
           saveStatus={state.saveStatus}
           lastSavedAt={state.lastSavedAt}
           isSupabaseMode={true}
+          onGenerationStart={handleGenerationStart}
+          onGenerationProgress={handleGenerationProgress}
+          onGenerationComplete={handleGenerationComplete}
+          isBackgroundMode={false}
         />
       );
 

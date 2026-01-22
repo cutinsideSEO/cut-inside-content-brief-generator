@@ -1,4 +1,4 @@
-// Supabase Client Configuration
+// Supabase Client Configuration - Build: 2026-01-22
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Get environment variables

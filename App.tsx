@@ -40,7 +40,7 @@ interface AppProps {
   lastSavedAt?: Date | null;
   isSupabaseMode?: boolean;
   // Background generation callbacks
-  onGenerationStart?: (type: 'brief' | 'content', briefId: string) => void;
+  onGenerationStart?: (type: 'competitors' | 'brief' | 'content', briefId: string) => void;
   onGenerationProgress?: (step: number) => void;
   onGenerationComplete?: (briefId: string, success: boolean) => void;
   isBackgroundMode?: boolean;
@@ -374,6 +374,11 @@ const App: React.FC<AppProps> = ({
       setHasCompletedFirstBrief(true);
     }
 
+    // Notify parent that competitor analysis is starting
+    if (briefId && onGenerationStart) {
+      onGenerationStart('competitors', briefId);
+    }
+
     try {
       if (keywords.length === 0) {
         throw new Error("No keywords provided or parsed. Please check your input.");
@@ -456,15 +461,25 @@ const App: React.FC<AppProps> = ({
       addLog("Analysis complete! You may now add context below or proceed.");
       setCompetitorData(finalCompetitorData);
 
+      // Notify parent that competitor analysis completed successfully
+      if (briefId && onGenerationComplete) {
+        onGenerationComplete(briefId, true);
+      }
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown analysis error occurred.';
       setError(errorMessage);
       addLog(`Error: ${errorMessage}`);
       setCurrentView('initial_input');
+
+      // Notify parent that competitor analysis failed
+      if (briefId && onGenerationComplete) {
+        onGenerationComplete(briefId, false);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [hasCompletedFirstBrief, addToast]);
+  }, [hasCompletedFirstBrief, addToast, briefId, onGenerationStart, onGenerationComplete]);
 
   const handleBriefUpload = useCallback(async (briefFile: File) => {
     setError(null);

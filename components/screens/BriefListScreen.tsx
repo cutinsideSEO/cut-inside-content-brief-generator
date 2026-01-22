@@ -7,7 +7,7 @@ import Button from '../Button';
 import Spinner from '../Spinner';
 
 // Generation status type (matches AppWrapper)
-type GenerationStatus = 'idle' | 'generating_brief' | 'generating_content';
+type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
 
 interface BriefListScreenProps {
   clientId: string;

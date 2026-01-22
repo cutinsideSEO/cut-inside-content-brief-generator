@@ -19,7 +19,7 @@ import BriefListScreen from './components/screens/BriefListScreen';
 import OriginalApp from './App';
 
 // Generation status type
-type GenerationStatus = 'idle' | 'generating_brief' | 'generating_content';
+type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
 
 // Types for the wrapper state
 interface WrapperState {
@@ -100,11 +100,16 @@ const AppWrapperInner: React.FC = () => {
   }, [logout]);
 
   // Handle generation start (from App)
-  const handleGenerationStart = useCallback((type: 'brief' | 'content', briefId: string) => {
+  const handleGenerationStart = useCallback((type: 'competitors' | 'brief' | 'content', briefId: string) => {
+    const statusMap: Record<typeof type, GenerationStatus> = {
+      'competitors': 'analyzing_competitors',
+      'brief': 'generating_brief',
+      'content': 'generating_content',
+    };
     setState((prev) => ({
       ...prev,
       generatingBriefId: briefId,
-      generationStatus: type === 'brief' ? 'generating_brief' : 'generating_content',
+      generationStatus: statusMap[type],
       generationStep: type === 'brief' ? 1 : null,
     }));
     // Update brief status in Supabase

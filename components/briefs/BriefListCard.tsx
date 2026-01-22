@@ -5,7 +5,7 @@ import BriefStatusBadge from './BriefStatusBadge';
 import Button from '../Button';
 
 // Generation status type
-type GenerationStatus = 'idle' | 'generating_brief' | 'generating_content';
+type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
 
 interface BriefListCardProps {
   brief: BriefWithClient;
@@ -51,7 +51,9 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   const getProgressText = () => {
     // Show generation status if actively generating
     if (isGenerating) {
-      if (generationStatus === 'generating_brief') {
+      if (generationStatus === 'analyzing_competitors') {
+        return 'Analyzing Competitors...';
+      } else if (generationStatus === 'generating_brief') {
         return `Generating Brief... Step ${generationStep || 1}/7`;
       } else if (generationStatus === 'generating_content') {
         return 'Generating Content...';
@@ -97,7 +99,8 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
             <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow"></span>
           </span>
           <span className="text-xs text-yellow font-medium">
-            {generationStatus === 'generating_brief' ? 'Generating Brief' : 'Generating Content'}
+            {generationStatus === 'analyzing_competitors' ? 'Analyzing Competitors' :
+             generationStatus === 'generating_brief' ? 'Generating Brief' : 'Generating Content'}
           </span>
         </div>
       )}

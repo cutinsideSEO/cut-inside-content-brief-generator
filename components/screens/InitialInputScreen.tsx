@@ -246,11 +246,11 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
             {/* Input method toggle */}
             <Tabs
               variant="pills"
-              tabs={[
+              items={[
                 { id: 'csv', label: 'Upload CSV' },
                 { id: 'manual', label: 'Manual Input' }
               ]}
-              activeTab={inputMethod}
+              activeId={inputMethod}
               onChange={(id) => setInputMethod(id as 'csv' | 'manual')}
               className="mb-4"
             />

@@ -24,6 +24,7 @@ import { useAutoSave } from './hooks/useAutoSave';
 import { saveBriefState, updateBriefProgress, updateBriefStatus } from './services/briefService';
 import { saveCompetitors } from './services/competitorService';
 import { createArticle } from './services/articleService';
+import { uploadContextFile, addContextUrl as addContextUrlToDb, deleteContextFile, deleteContextUrl } from './services/contextService';
 import type { SaveStatus } from './types/appState';
 
 type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_upload';
@@ -584,13 +585,22 @@ const App: React.FC<AppProps> = ({
 
     setContextFiles(newFilesMap);
     if(newContentsMap.size > fileContents.size) setFileContents(newContentsMap);
-    
+
     filesToParse.forEach(async (file) => {
         setFileContents(prev => new Map(prev).set(file.name, { content: null, error: null, status: 'parsing' }));
         const result = await parseFile(file);
         setFileContents(prev => new Map(prev).set(file.name, { ...result, status: 'done' }));
+
+        // Save to database if in Supabase mode
+        if (briefId && isSupabaseMode) {
+            try {
+                await uploadContextFile(briefId, file, result.content || undefined);
+            } catch (err) {
+                console.error('Failed to save context file to database:', err);
+            }
+        }
     });
-  }, [contextFiles, fileContents, parseFile, addToast, hasAchievedDataMaven]);
+  }, [contextFiles, fileContents, parseFile, addToast, hasAchievedDataMaven, briefId, isSupabaseMode]);
 
   const removeContextFile = useCallback((fileName: string) => {
     setContextFiles(prev => {
@@ -622,7 +632,16 @@ const App: React.FC<AppProps> = ({
     try {
         const onpageData = await dataforseoService.getDetailedOnpageElements(url, apiLogin, apiPassword);
         if (onpageData.Full_Text && onpageData.Full_Text !== "Could not parse the JSON response." && onpageData.H1s[0] !== "PARSE_FAILED") {
-             setUrlContents(prev => new Map(prev).set(url, { content: onpageData.Full_Text, error: null, status: 'done' }));
+            setUrlContents(prev => new Map(prev).set(url, { content: onpageData.Full_Text, error: null, status: 'done' }));
+
+            // Save to database if in Supabase mode
+            if (briefId && isSupabaseMode) {
+                try {
+                    await addContextUrlToDb(briefId, url, onpageData.Full_Text);
+                } catch (err) {
+                    console.error('Failed to save context URL to database:', err);
+                }
+            }
         } else {
             throw new Error(onpageData.Full_Text || "Scraping returned no text content or failed.");
         }
@@ -630,7 +649,7 @@ const App: React.FC<AppProps> = ({
         const errorMessage = err instanceof Error ? err.message : 'An unknown scraping error occurred.';
         setUrlContents(prev => new Map(prev).set(url, { content: null, error: errorMessage, status: 'done' }));
     }
-  }, [urlContents, apiLogin, apiPassword]);
+  }, [urlContents, apiLogin, apiPassword, briefId, isSupabaseMode]);
 
   const removeContextUrl = useCallback((url: string) => {
     setUrlContents(prev => {

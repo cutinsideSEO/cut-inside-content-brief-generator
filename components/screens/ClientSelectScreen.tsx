@@ -10,22 +10,26 @@ import Spinner from '../Spinner';
 // Generation status type (matches AppWrapper)
 type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
 
+// Type for tracking individual generation (matches AppWrapper)
+interface GeneratingBrief {
+  clientId: string;
+  clientName: string;
+  status: GenerationStatus;
+  step: number | null;
+}
+
 interface ClientSelectScreenProps {
   onSelectClient: (clientId: string, clientName: string) => void;
   onLogout: () => void;
-  // Background generation props
-  generatingBriefId?: string | null;
-  generationStatus?: GenerationStatus;
-  generatingClientId?: string | null;
-  onViewGeneratingBrief?: () => void;
+  // Background generation props - now supports multiple parallel generations
+  generatingBriefs?: Record<string, GeneratingBrief>;
+  onViewGeneratingBrief?: (briefId: string) => void;
 }
 
 const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   onSelectClient,
   onLogout,
-  generatingBriefId,
-  generationStatus = 'idle',
-  generatingClientId,
+  generatingBriefs = {},
   onViewGeneratingBrief,
 }) => {
   const { userName, isAdmin } = useAuth();
@@ -40,17 +44,18 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Check if there's a background generation in progress
-  const isGenerating = generationStatus !== 'idle' && generatingBriefId;
+  // Get list of generating brief IDs
+  const generatingBriefIds = Object.keys(generatingBriefs);
+  const hasGeneratingBriefs = generatingBriefIds.length > 0;
 
-  // Get the generating client name
-  const generatingClientName = generatingClientId
-    ? clients.find(c => c.id === generatingClientId)?.name
-    : null;
+  // Check if a specific client has any generating briefs
+  const getGeneratingBriefsForClient = (clientId: string) => {
+    return generatingBriefIds.filter(briefId => generatingBriefs[briefId].clientId === clientId);
+  };
 
-  // Get generation status text
-  const getGenerationStatusText = () => {
-    switch (generationStatus) {
+  // Get generation status text for a brief
+  const getGenerationStatusText = (status: GenerationStatus) => {
+    switch (status) {
       case 'analyzing_competitors':
         return 'Analyzing competitors...';
       case 'generating_brief':
@@ -202,48 +207,62 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
               key={client.id}
               client={client}
               onClick={() => onSelectClient(client.id, client.name)}
-              isGenerating={client.id === generatingClientId && generationStatus !== 'idle'}
+              isGenerating={getGeneratingBriefsForClient(client.id).length > 0}
+              generatingCount={getGeneratingBriefsForClient(client.id).length}
             />
           ))}
         </div>
       )}
 
-      {/* Background Generation Indicator */}
-      {isGenerating && (
-        <div className="fixed bottom-6 right-6 z-40">
+      {/* Background Generation Indicator - supports multiple parallel generations */}
+      {hasGeneratingBriefs && (
+        <div className="fixed bottom-6 right-6 z-40 max-h-[60vh] overflow-y-auto">
           <div className="bg-black/90 border border-yellow/50 rounded-lg p-4 shadow-2xl backdrop-blur-sm max-w-sm">
-            <div className="flex items-start gap-3">
-              {/* Pulsing indicator */}
-              <span className="relative flex h-3 w-3 mt-1 flex-shrink-0">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="relative flex h-3 w-3 flex-shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow"></span>
               </span>
-
-              <div className="flex-1">
-                <p className="text-yellow font-medium text-sm">
-                  {getGenerationStatusText()}
-                </p>
-                {generatingClientName && (
-                  <p className="text-grey text-xs mt-0.5">
-                    Client: {generatingClientName}
-                  </p>
-                )}
-                <p className="text-grey/70 text-xs mt-1">
-                  Keep this tab open to continue
-                </p>
-              </div>
-
-              {onViewGeneratingBrief && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={onViewGeneratingBrief}
-                  className="flex-shrink-0"
-                >
-                  View
-                </Button>
-              )}
+              <p className="text-yellow font-medium text-sm">
+                {generatingBriefIds.length} {generatingBriefIds.length === 1 ? 'brief' : 'briefs'} generating
+              </p>
             </div>
+
+            <div className="space-y-2">
+              {generatingBriefIds.map((briefId) => {
+                const brief = generatingBriefs[briefId];
+                return (
+                  <div
+                    key={briefId}
+                    className="flex items-center justify-between gap-2 p-2 bg-black/50 rounded border border-white/10"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-brand-white truncate">
+                        {brief.clientName}
+                      </p>
+                      <p className="text-xs text-grey">
+                        {getGenerationStatusText(brief.status)}
+                        {brief.status === 'generating_brief' && brief.step && ` (${brief.step}/7)`}
+                      </p>
+                    </div>
+                    {onViewGeneratingBrief && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onViewGeneratingBrief(briefId)}
+                        className="flex-shrink-0 text-xs px-2 py-1"
+                      >
+                        View
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="text-grey/70 text-xs mt-3">
+              Keep this tab open to continue
+            </p>
           </div>
         </div>
       )}

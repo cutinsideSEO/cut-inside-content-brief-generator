@@ -9,6 +9,14 @@ import Spinner from '../Spinner';
 // Generation status type (matches AppWrapper)
 type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
 
+// Type for tracking individual generation (matches AppWrapper)
+interface GeneratingBrief {
+  clientId: string;
+  clientName: string;
+  status: GenerationStatus;
+  step: number | null;
+}
+
 interface BriefListScreenProps {
   clientId: string;
   clientName: string;
@@ -17,10 +25,8 @@ interface BriefListScreenProps {
   onContinueBrief: (briefId: string) => void;
   onEditBrief: (briefId: string) => void;
   onUseAsTemplate: (briefId: string) => void;
-  // Background generation props
-  generatingBriefId?: string | null;
-  generationStatus?: GenerationStatus;
-  generationStep?: number | null;
+  // Background generation props - now supports multiple parallel generations
+  generatingBriefs?: Record<string, GeneratingBrief>;
 }
 
 const BriefListScreen: React.FC<BriefListScreenProps> = ({
@@ -31,9 +37,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   onContinueBrief,
   onEditBrief,
   onUseAsTemplate,
-  generatingBriefId,
-  generationStatus,
-  generationStep,
+  generatingBriefs = {},
 }) => {
   const [briefs, setBriefs] = useState<BriefWithClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -252,19 +256,22 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                 In Progress ({inProgressBriefs.length})
               </h2>
               <div className="space-y-3">
-                {inProgressBriefs.map((brief) => (
-                  <BriefListCard
-                    key={brief.id}
-                    brief={brief}
-                    onContinue={onContinueBrief}
-                    onEdit={onEditBrief}
-                    onUseAsTemplate={onUseAsTemplate}
-                    onArchive={handleArchive}
-                    isGenerating={brief.id === generatingBriefId}
-                    generationStatus={generationStatus}
-                    generationStep={generationStep}
-                  />
-                ))}
+                {inProgressBriefs.map((brief) => {
+                  const generating = generatingBriefs[brief.id];
+                  return (
+                    <BriefListCard
+                      key={brief.id}
+                      brief={brief}
+                      onContinue={onContinueBrief}
+                      onEdit={onEditBrief}
+                      onUseAsTemplate={onUseAsTemplate}
+                      onArchive={handleArchive}
+                      isGenerating={!!generating}
+                      generationStatus={generating?.status}
+                      generationStep={generating?.step}
+                    />
+                  );
+                })}
               </div>
             </section>
           )}
@@ -277,19 +284,22 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                 Drafts ({draftBriefs.length})
               </h2>
               <div className="space-y-3">
-                {draftBriefs.map((brief) => (
-                  <BriefListCard
-                    key={brief.id}
-                    brief={brief}
-                    onContinue={onContinueBrief}
-                    onEdit={onEditBrief}
-                    onUseAsTemplate={onUseAsTemplate}
-                    onArchive={handleArchive}
-                    isGenerating={brief.id === generatingBriefId}
-                    generationStatus={generationStatus}
-                    generationStep={generationStep}
-                  />
-                ))}
+                {draftBriefs.map((brief) => {
+                  const generating = generatingBriefs[brief.id];
+                  return (
+                    <BriefListCard
+                      key={brief.id}
+                      brief={brief}
+                      onContinue={onContinueBrief}
+                      onEdit={onEditBrief}
+                      onUseAsTemplate={onUseAsTemplate}
+                      onArchive={handleArchive}
+                      isGenerating={!!generating}
+                      generationStatus={generating?.status}
+                      generationStep={generating?.step}
+                    />
+                  );
+                })}
               </div>
             </section>
           )}
@@ -302,19 +312,22 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                 Complete ({completeBriefs.length})
               </h2>
               <div className="space-y-3">
-                {completeBriefs.map((brief) => (
-                  <BriefListCard
-                    key={brief.id}
-                    brief={brief}
-                    onContinue={onContinueBrief}
-                    onEdit={onEditBrief}
-                    onUseAsTemplate={onUseAsTemplate}
-                    onArchive={handleArchive}
-                    isGenerating={brief.id === generatingBriefId}
-                    generationStatus={generationStatus}
-                    generationStep={generationStep}
-                  />
-                ))}
+                {completeBriefs.map((brief) => {
+                  const generating = generatingBriefs[brief.id];
+                  return (
+                    <BriefListCard
+                      key={brief.id}
+                      brief={brief}
+                      onContinue={onContinueBrief}
+                      onEdit={onEditBrief}
+                      onUseAsTemplate={onUseAsTemplate}
+                      onArchive={handleArchive}
+                      isGenerating={!!generating}
+                      generationStatus={generating?.status}
+                      generationStep={generating?.step}
+                    />
+                  );
+                })}
               </div>
             </section>
           )}

@@ -7,6 +7,7 @@ interface ClientCardProps {
   onClick: (clientId: string) => void;
   isSelected?: boolean;
   isGenerating?: boolean;
+  generatingCount?: number;
 }
 
 const ClientCard: React.FC<ClientCardProps> = ({
@@ -14,6 +15,7 @@ const ClientCard: React.FC<ClientCardProps> = ({
   onClick,
   isSelected = false,
   isGenerating = false,
+  generatingCount = 0,
 }) => {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -45,7 +47,9 @@ const ClientCard: React.FC<ClientCardProps> = ({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow"></span>
           </span>
-          <span className="text-xs text-yellow font-medium">Generating</span>
+          <span className="text-xs text-yellow font-medium">
+            {generatingCount > 1 ? `${generatingCount} Generating` : 'Generating'}
+          </span>
         </div>
       )}
 

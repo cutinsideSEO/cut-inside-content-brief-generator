@@ -5,7 +5,19 @@ import { getAccessibleClients, createClient } from '../../services/clientService
 import type { ClientWithBriefCount } from '../../types/database';
 import ClientCard from '../clients/ClientCard';
 import Button from '../Button';
-import Spinner from '../Spinner';
+import {
+  Card,
+  Input,
+  Textarea,
+  Alert,
+  Modal,
+  Skeleton,
+  FloatingPanel,
+  FloatingPanelHeader,
+  FloatingPanelItem,
+  FloatingPanelFooter,
+  Progress,
+} from '../ui';
 
 // Generation status type (matches AppWrapper)
 type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
@@ -36,6 +48,7 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   const [clients, setClients] = useState<ClientWithBriefCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Create client modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -54,18 +67,36 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   };
 
   // Get generation status text for a brief
-  const getGenerationStatusText = (status: GenerationStatus) => {
+  const getGenerationStatusText = (status: GenerationStatus, step: number | null) => {
     switch (status) {
       case 'analyzing_competitors':
         return 'Analyzing competitors...';
       case 'generating_brief':
-        return 'Generating brief...';
+        return `Generating brief... ${step ? `(${step}/7)` : ''}`;
       case 'generating_content':
         return 'Generating content...';
       default:
         return '';
     }
   };
+
+  // Get progress value for generation
+  const getGenerationProgress = (status: GenerationStatus, step: number | null) => {
+    if (status === 'analyzing_competitors') return 15;
+    if (status === 'generating_brief' && step) return 20 + (step / 7) * 60;
+    if (status === 'generating_content') return 85;
+    return 0;
+  };
+
+  // Filter clients by search
+  const filteredClients = clients.filter((client) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      client.name.toLowerCase().includes(query) ||
+      client.description?.toLowerCase().includes(query)
+    );
+  });
 
   // Fetch clients on mount
   useEffect(() => {
@@ -131,16 +162,21 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-brand-white">
+          <h1 className="text-2xl font-heading font-bold text-text-primary">
             Welcome back, {userName || 'User'}
           </h1>
-          <p className="text-grey mt-1">Select a client folder to view or create briefs</p>
+          <p className="text-text-secondary mt-1">Select a client folder to view or create briefs</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="primary" onClick={() => setShowCreateModal(true)}>
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+          <Button
+            variant="primary"
+            onClick={() => setShowCreateModal(true)}
+            icon={
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            }
+          >
             New Client
           </Button>
           <Button variant="ghost" onClick={onLogout}>
@@ -149,60 +185,94 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
         </div>
       </div>
 
+      {/* Search */}
+      {clients.length > 0 && (
+        <div className="mb-6">
+          <Input
+            placeholder="Search clients..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            icon={
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            }
+          />
+        </div>
+      )}
+
       {/* Error state */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 mb-6">
-          <p className="text-red-400 text-sm">{error}</p>
-          <Button variant="secondary" size="sm" onClick={loadClients} className="mt-2">
+        <Alert variant="error" title="Failed to load clients" dismissible onDismiss={() => setError(null)}>
+          {error}
+          <Button variant="secondary" size="sm" onClick={loadClients} className="mt-3">
             Try Again
           </Button>
-        </div>
+        </Alert>
       )}
 
       {/* Loading state */}
       {isLoading && (
-        <div className="flex flex-col items-center justify-center py-16">
-          <Spinner size="lg" />
-          <p className="text-grey mt-4">Loading clients...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i} padding="md">
+              <div className="flex items-start">
+                <Skeleton variant="rectangular" width={48} height={48} className="rounded-radius-lg mr-4" />
+                <div className="flex-1">
+                  <Skeleton variant="text" width="70%" height={24} className="mb-2" />
+                  <Skeleton variant="text" width="90%" height={16} />
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-border-subtle flex justify-between">
+                <Skeleton variant="text" width={60} height={16} />
+                <Skeleton variant="text" width={100} height={16} />
+              </div>
+            </Card>
+          ))}
         </div>
       )}
 
       {/* Empty state */}
       {!isLoading && !error && clients.length === 0 && (
-        <div className="text-center py-16 bg-black/20 rounded-lg border border-white/5">
-          <svg
-            className="mx-auto h-12 w-12 text-grey/50"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-            />
-          </svg>
-          <h3 className="mt-4 text-lg font-heading font-semibold text-brand-white">
-            No client folders yet
-          </h3>
-          <p className="mt-2 text-grey">
-            Create your first client folder to start organizing your briefs.
-          </p>
-          <Button
-            variant="primary"
-            onClick={() => setShowCreateModal(true)}
-            className="mt-6"
-          >
-            Create First Client
-          </Button>
-        </div>
+        <Card variant="default" padding="lg" className="text-center">
+          <div className="py-8">
+            <div className="mx-auto w-16 h-16 bg-teal/10 rounded-full flex items-center justify-center mb-4">
+              <svg
+                className="w-8 h-8 text-teal"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-heading font-semibold text-text-primary mb-2">
+              No client folders yet
+            </h3>
+            <p className="text-text-secondary mb-6 max-w-sm mx-auto">
+              Create your first client folder to start organizing your briefs.
+            </p>
+            <Button variant="primary" onClick={() => setShowCreateModal(true)} glow>
+              Create First Client
+            </Button>
+          </div>
+        </Card>
       )}
 
       {/* Client grid */}
-      {!isLoading && !error && clients.length > 0 && (
+      {!isLoading && !error && filteredClients.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clients.map((client) => (
+          {filteredClients.map((client) => (
             <ClientCard
               key={client.id}
               client={client}
@@ -214,132 +284,112 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
         </div>
       )}
 
-      {/* Background Generation Indicator - supports multiple parallel generations */}
+      {/* No search results */}
+      {!isLoading && !error && clients.length > 0 && filteredClients.length === 0 && (
+        <Card variant="default" padding="lg" className="text-center">
+          <p className="text-text-secondary">No clients match your search.</p>
+          <Button variant="secondary" onClick={() => setSearchQuery('')} className="mt-4">
+            Clear Search
+          </Button>
+        </Card>
+      )}
+
+      {/* Background Generation Indicator */}
       {hasGeneratingBriefs && (
-        <div className="fixed bottom-6 right-6 z-40 max-h-[60vh] overflow-y-auto">
-          <div className="bg-black/90 border border-yellow/50 rounded-lg p-4 shadow-2xl backdrop-blur-sm max-w-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="relative flex h-3 w-3 flex-shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow"></span>
+        <FloatingPanel position="bottom-right" variant="warning">
+          <FloatingPanelHeader
+            icon={
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-generating opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-status-generating"></span>
               </span>
-              <p className="text-yellow font-medium text-sm">
-                {generatingBriefIds.length} {generatingBriefIds.length === 1 ? 'brief' : 'briefs'} generating
-              </p>
-            </div>
+            }
+          >
+            {generatingBriefIds.length} {generatingBriefIds.length === 1 ? 'brief' : 'briefs'} generating
+          </FloatingPanelHeader>
 
-            <div className="space-y-2">
-              {generatingBriefIds.map((briefId) => {
-                const brief = generatingBriefs[briefId];
-                return (
-                  <div
-                    key={briefId}
-                    className="flex items-center justify-between gap-2 p-2 bg-black/50 rounded border border-white/10"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-brand-white truncate">
-                        {brief.clientName}
-                      </p>
-                      <p className="text-xs text-grey">
-                        {getGenerationStatusText(brief.status)}
-                        {brief.status === 'generating_brief' && brief.step && ` (${brief.step}/7)`}
-                      </p>
-                    </div>
-                    {onViewGeneratingBrief && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onViewGeneratingBrief(briefId)}
-                        className="flex-shrink-0 text-xs px-2 py-1"
-                      >
-                        View
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+          {generatingBriefIds.map((briefId) => {
+            const brief = generatingBriefs[briefId];
+            return (
+              <FloatingPanelItem
+                key={briefId}
+                title={brief.clientName}
+                status={getGenerationStatusText(brief.status, brief.step)}
+                progress={
+                  <Progress
+                    value={getGenerationProgress(brief.status, brief.step)}
+                    size="sm"
+                    color="yellow"
+                  />
+                }
+                action={
+                  onViewGeneratingBrief && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onViewGeneratingBrief(briefId)}
+                    >
+                      View
+                    </Button>
+                  )
+                }
+              />
+            );
+          })}
 
-            <p className="text-grey/70 text-xs mt-3">
-              Keep this tab open to continue
-            </p>
-          </div>
-        </div>
+          <FloatingPanelFooter>
+            Keep this tab open to continue
+          </FloatingPanelFooter>
+        </FloatingPanel>
       )}
 
       {/* Create Client Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-black/90 border border-white/10 rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <h2 className="text-xl font-heading font-bold text-brand-white mb-4">
-              Create New Client
-            </h2>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={handleCloseModal}
+        title="Create New Client"
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleCloseModal} disabled={isCreating}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleCreateClient}
+              loading={isCreating}
+              disabled={!newClientName.trim()}
+            >
+              Create Client
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Client Name"
+            value={newClientName}
+            onChange={(e) => setNewClientName(e.target.value)}
+            placeholder="e.g., Acme Corp"
+            disabled={isCreating}
+            error={createError && !newClientName.trim() ? 'Client name is required' : undefined}
+          />
 
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="clientName" className="block text-sm font-medium text-grey mb-1">
-                  Client Name <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="clientName"
-                  type="text"
-                  value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
-                  placeholder="e.g., Acme Corp"
-                  className="w-full px-3 py-2 bg-black/50 border border-white/20 rounded-lg text-brand-white placeholder-grey/50 focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal"
-                  autoFocus
-                  disabled={isCreating}
-                />
-              </div>
+          <Textarea
+            label="Description"
+            hint="Optional"
+            value={newClientDescription}
+            onChange={(e) => setNewClientDescription(e.target.value)}
+            placeholder="Brief description of the client"
+            rows={3}
+            disabled={isCreating}
+          />
 
-              <div>
-                <label htmlFor="clientDescription" className="block text-sm font-medium text-grey mb-1">
-                  Description <span className="text-grey/50">(optional)</span>
-                </label>
-                <textarea
-                  id="clientDescription"
-                  value={newClientDescription}
-                  onChange={(e) => setNewClientDescription(e.target.value)}
-                  placeholder="Brief description of the client"
-                  rows={3}
-                  className="w-full px-3 py-2 bg-black/50 border border-white/20 rounded-lg text-brand-white placeholder-grey/50 focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal resize-none"
-                  disabled={isCreating}
-                />
-              </div>
-
-              {createError && (
-                <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3">
-                  <p className="text-red-400 text-sm">{createError}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <Button
-                variant="secondary"
-                onClick={handleCloseModal}
-                disabled={isCreating}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleCreateClient}
-                disabled={isCreating || !newClientName.trim()}
-              >
-                {isCreating ? (
-                  <span className="flex items-center">
-                    <Spinner size="sm" className="mr-2" />
-                    Creating...
-                  </span>
-                ) : (
-                  'Create Client'
-                )}
-              </Button>
-            </div>
-          </div>
+          {createError && newClientName.trim() && (
+            <Alert variant="error">{createError}</Alert>
+          )}
         </div>
-      )}
+      </Modal>
     </div>
   );
 };

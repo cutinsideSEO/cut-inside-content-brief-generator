@@ -4,6 +4,7 @@ import { AlertTriangleIcon, UploadCloudIcon, XIcon, FileCodeIcon, BrainCircuitIc
 import ModelSelector from '../ModelSelector';
 import LengthSettings from '../LengthSettings';
 import KeywordTableInput from '../KeywordTableInput';
+import { Card, Input, Textarea, Alert, Badge, Tabs } from '../ui';
 import type { ModelSettings, LengthConstraints, ExtractedTemplate } from '../../types';
 
 interface KeywordRow {
@@ -113,7 +114,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
       resetFileState();
     }
   };
-  
+
   useEffect(() => {
     if (csvHeaders.length > 0) {
       const defaultKwCol = findDefaultColumn(csvHeaders, ['kw', 'keyword', 'keywords', 'query']);
@@ -141,7 +142,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
             setLocalError("Please select the keyword and volume columns.");
             return;
         }
-        
+
         try {
             keywords = await new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -218,7 +219,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
       templateUrl || undefined
     );
   };
-  
+
   const formatBytes = (bytes: number, decimals = 2) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -230,79 +231,83 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
 
   const renderCreateFlow = () => (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-        <div className="bg-black/30 p-6 md:p-8 rounded-lg border border-white/10 space-y-6">
-            <div>
-              <h2 className="text-lg font-heading font-semibold text-grey mb-1">1. Provide Keywords</h2>
-              <p className="text-sm text-grey/60">Choose your preferred method to input keywords and their search volumes.</p>
-              <div className="flex bg-black/50 rounded-lg p-1 mt-3">
-                  <button
-                      onClick={() => setInputMethod('csv')}
-                      className={`w-1/2 rounded-md py-2 text-sm font-heading font-semibold transition-colors ${inputMethod === 'csv' ? 'bg-teal text-white' : 'text-grey/60 hover:bg-white/5'}`}
-                  >
-                      Upload CSV
-                  </button>
-                  <button
-                      onClick={() => setInputMethod('manual')}
-                      className={`w-1/2 rounded-md py-2 text-sm font-heading font-semibold transition-colors ${inputMethod === 'manual' ? 'bg-teal text-white' : 'text-grey/60 hover:bg-white/5'}`}
-                  >
-                      Manual Input
-                  </button>
+        {/* Left Panel: Form */}
+        <div className="space-y-6">
+          {/* Step 1: Keywords */}
+          <Card variant="default" padding="lg">
+            <div className="flex items-center gap-3 mb-4">
+              <Badge variant="teal" size="md">1</Badge>
+              <div>
+                <h2 className="text-lg font-heading font-semibold text-text-primary">Provide Keywords</h2>
+                <p className="text-sm text-text-muted">Choose your preferred method to input keywords</p>
               </div>
             </div>
+
+            {/* Input method toggle */}
+            <Tabs
+              variant="pills"
+              tabs={[
+                { id: 'csv', label: 'Upload CSV' },
+                { id: 'manual', label: 'Manual Input' }
+              ]}
+              activeTab={inputMethod}
+              onChange={(id) => setInputMethod(id as 'csv' | 'manual')}
+              className="mb-4"
+            />
 
             {inputMethod === 'csv' && (
               <>
                 {!csvFile ? (
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-white/20 border-dashed rounded-lg cursor-pointer bg-black/50 hover:bg-white/5 transition-colors">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <UploadCloudIcon className="w-10 h-10 mb-2 text-grey/40" />
-                      <p className="text-sm text-grey/60">
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-radius-lg cursor-pointer bg-surface-hover hover:bg-surface-active transition-colors">
+                    <div className="flex flex-col items-center justify-center py-6">
+                      <UploadCloudIcon className="w-10 h-10 mb-2 text-text-muted" />
+                      <p className="text-sm text-text-secondary">
                         <span className="font-semibold text-teal">Click to upload</span> or drag and drop
                       </p>
                     </div>
                     <input type="file" className="hidden" accept=".csv" onChange={handleFileChange} />
                   </label>
                 ) : (
-                  <div className="bg-black/50 p-4 rounded-lg border border-white/10">
+                  <Card variant="outline" padding="md">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <FileCodeIcon className="h-8 w-8 text-teal"/>
-                            <div>
-                                <p className="font-semibold text-grey">{csvFile.name}</p>
-                                <p className="text-xs text-grey/60">{formatBytes(csvFile.size)}</p>
-                            </div>
-                        </div>
-                        <button onClick={resetFileState} className="p-1 text-grey/50 hover:text-white rounded-full hover:bg-white/10">
-                            <XIcon className="h-5 w-5"/>
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-white/10">
-                        <div>
-                            <label className="block text-sm font-medium text-grey/80 mb-1">Keyword Column</label>
-                            <select 
-                              value={keywordColumn} 
-                              onChange={(e) => setKeywordColumn(e.target.value)} 
-                              className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal appearance-none bg-no-repeat"
-                              style={{backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em'}}
-                            >
-                                <option value="" disabled>Select column...</option>
-                                {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                            </select>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                          <FileCodeIcon className="h-5 w-5 text-teal"/>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-grey/80 mb-1">Volume Column</label>
-                            <select 
-                              value={volumeColumn} 
-                              onChange={(e) => setVolumeColumn(e.target.value)} 
-                              className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal appearance-none bg-no-repeat"
-                              style={{backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em'}}
-                            >
-                                <option value="" disabled>Select column...</option>
-                                {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                            </select>
+                          <p className="font-semibold text-text-primary">{csvFile.name}</p>
+                          <p className="text-xs text-text-muted">{formatBytes(csvFile.size)}</p>
                         </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={resetFileState}>
+                        <XIcon className="h-4 w-4"/>
+                      </Button>
                     </div>
-                  </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-border-subtle">
+                      <div>
+                        <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Keyword Column</label>
+                        <select
+                          value={keywordColumn}
+                          onChange={(e) => setKeywordColumn(e.target.value)}
+                          className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                        >
+                          <option value="" disabled>Select column...</option>
+                          {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Volume Column</label>
+                        <select
+                          value={volumeColumn}
+                          onChange={(e) => setVolumeColumn(e.target.value)}
+                          className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                        >
+                          <option value="" disabled>Select column...</option>
+                          {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </Card>
                 )}
               </>
             )}
@@ -313,185 +318,226 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
                 onChange={setManualKeywordRows}
               />
             )}
+          </Card>
 
-
-            {!hasDfsEnvCredentials && (
-              <>
+          {/* Step 2: Credentials (if not env configured) */}
+          {!hasDfsEnvCredentials && (
+            <Card variant="default" padding="lg">
+              <div className="flex items-center gap-3 mb-4">
+                <Badge variant="teal" size="md">2</Badge>
                 <div>
-                  <h2 className="text-lg font-heading font-semibold text-grey mb-1">2. Enter Credentials</h2>
-                  <p className="text-sm text-grey/60">Your DataForSEO API credentials.</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input type="text" placeholder="DataForSEO Login" value={login} onChange={(e) => setLogin(e.target.value)} className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal" />
-                  <input type="password" placeholder="DataForSEO Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal" />
-                </div>
-              </>
-            )}
-             
-             <div>
-                <h2 className="text-lg font-heading font-semibold text-grey mb-1">{hasDfsEnvCredentials ? '2' : '3'}. Configure Analysis Settings</h2>
-                <p className="text-sm text-grey/60">Define the target market and the language for the final brief.</p>
-            </div>
-            <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-grey/80 mb-1">SERP Country</label>
-                    <select 
-                      value={country} 
-                      onChange={(e) => setCountry(e.target.value)} 
-                      className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal appearance-none bg-no-repeat"
-                      style={{backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em'}}
-                    >
-                        {countries.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                </div>
-                 <div>
-                    <label className="block text-sm font-medium text-grey/80 mb-1">SERP Language</label>
-                    <select 
-                      value={serpLanguage} 
-                      onChange={(e) => setSerpLanguage(e.target.value)} 
-                      className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal appearance-none bg-no-repeat"
-                      style={{backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em'}}
-                    >
-                        {languages.map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
-                </div>
-                 <div>
-                    <label className="block text-sm font-medium text-grey/80 mb-1">Brief Output Language</label>
-                    <select 
-                      value={outputLanguage} 
-                      onChange={(e) => setOutputLanguage(e.target.value)} 
-                      className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal appearance-none bg-no-repeat"
-                      style={{backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em'}}
-                    >
-                        {languages.map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
-                </div>
-            </div>
-
-            {/* Feature 1: Template URL */}
-            <div className="bg-black/30 rounded-lg border border-white/10 p-4">
-              <div className="flex items-center space-x-3 mb-3">
-                <LinkIcon className="h-5 w-5 text-teal" />
-                <div>
-                  <h3 className="font-heading font-semibold text-grey">Use Content as Template (Optional)</h3>
-                  <p className="text-xs text-grey/60">Extract heading structure from existing content to pre-populate your brief outline</p>
+                  <h2 className="text-lg font-heading font-semibold text-text-primary">Enter Credentials</h2>
+                  <p className="text-sm text-text-muted">Your DataForSEO API credentials</p>
                 </div>
               </div>
-              <input
-                type="url"
-                placeholder="https://example.com/article-to-use-as-template"
-                value={templateUrl}
-                onChange={(e) => setTemplateUrl(e.target.value)}
-                className="w-full p-3 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal"
-              />
-            </div>
-
-            {/* Feature 3: Length Constraints */}
-            <LengthSettings
-              constraints={lengthConstraints}
-              onChange={setLengthConstraints}
-            />
-
-            {/* Feature 6: Advanced Settings (Model Selector) */}
-            <div className="bg-black/30 rounded-lg border border-white/10">
-              <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition-colors rounded-lg"
-              >
-                <div className="flex items-center space-x-3">
-                  <SettingsIcon className="h-5 w-5 text-teal" />
-                  <div>
-                    <h3 className="font-heading font-semibold text-grey">Advanced Settings</h3>
-                    <p className="text-sm text-grey/60">AI model selection & configuration</p>
-                  </div>
-                </div>
-                <ChevronDownIcon
-                  className={`h-5 w-5 text-grey/50 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label="DataForSEO Login"
+                  value={login}
+                  onChange={(e) => setLogin(e.target.value)}
+                  placeholder="Enter login..."
                 />
-              </button>
-              {showAdvanced && (
-                <div className="p-4 pt-0">
-                  <ModelSelector
-                    settings={modelSettings}
-                    onChange={setModelSettings}
-                  />
-                </div>
-              )}
-            </div>
+                <Input
+                  type="password"
+                  label="DataForSEO Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password..."
+                />
+              </div>
+            </Card>
+          )}
 
-            <div className="pt-2">
-                <Button onClick={handleSubmit} disabled={isLoading}>
-                    {isLoading ? 'Starting...' : 'Start Analysis'}
-                </Button>
+          {/* Step 3: Analysis Settings */}
+          <Card variant="default" padding="lg">
+            <div className="flex items-center gap-3 mb-4">
+              <Badge variant="teal" size="md">{hasDfsEnvCredentials ? '2' : '3'}</Badge>
+              <div>
+                <h2 className="text-lg font-heading font-semibold text-text-primary">Configure Analysis</h2>
+                <p className="text-sm text-text-muted">Define the target market and output language</p>
+              </div>
             </div>
-
-            {(error || localError) && (
-                <div className="mt-4 p-3 bg-red-900/50 border border-red-700 text-red-300 rounded-md flex items-start space-x-2">
-                    <AlertTriangleIcon className="h-5 w-5 mt-0.5 flex-shrink-0"/>
-                    <p className="text-sm">{error || localError}</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">SERP Country</label>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                >
+                  {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">SERP Language</label>
+                  <select
+                    value={serpLanguage}
+                    onChange={(e) => setSerpLanguage(e.target.value)}
+                    className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                  >
+                    {languages.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Brief Output Language</label>
+                  <select
+                    value={outputLanguage}
+                    onChange={(e) => setOutputLanguage(e.target.value)}
+                    className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                  >
+                    {languages.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Template URL */}
+          <Card variant="outline" padding="md">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                <LinkIcon className="h-4 w-4 text-teal" />
+              </div>
+              <div>
+                <h3 className="font-heading font-semibold text-text-primary">Use Content as Template</h3>
+                <p className="text-xs text-text-muted">Extract heading structure from existing content</p>
+              </div>
+            </div>
+            <Input
+              type="url"
+              placeholder="https://example.com/article-to-use-as-template"
+              value={templateUrl}
+              onChange={(e) => setTemplateUrl(e.target.value)}
+            />
+          </Card>
+
+          {/* Length Constraints */}
+          <LengthSettings
+            constraints={lengthConstraints}
+            onChange={setLengthConstraints}
+          />
+
+          {/* Advanced Settings */}
+          <Card variant="outline" padding="none">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-hover transition-colors rounded-radius-lg"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                  <SettingsIcon className="h-4 w-4 text-teal" />
+                </div>
+                <div>
+                  <h3 className="font-heading font-semibold text-text-primary">Advanced Settings</h3>
+                  <p className="text-sm text-text-muted">AI model selection & configuration</p>
+                </div>
+              </div>
+              <ChevronDownIcon className={`h-5 w-5 text-text-muted transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+            </button>
+            {showAdvanced && (
+              <div className="px-4 pb-4">
+                <ModelSelector settings={modelSettings} onChange={setModelSettings} />
+              </div>
             )}
+          </Card>
+
+          {/* Submit Button */}
+          <Button onClick={handleSubmit} disabled={isLoading} fullWidth glow size="lg">
+            {isLoading ? 'Starting Analysis...' : 'Start Analysis'}
+          </Button>
+
+          {(error || localError) && (
+            <Alert variant="error" title="Error">
+              {error || localError}
+            </Alert>
+          )}
         </div>
 
-        <div className="bg-black/20 p-8 rounded-lg border border-white/5 flex flex-col justify-center">
-            <h2 className="text-2xl font-heading font-bold text-grey">The Strategist's Studio</h2>
-            <p className="text-grey/70 mt-4">This tool transforms raw keyword data into a comprehensive, actionable content brief designed to dominate search rankings.</p>
-            <div className="mt-6 space-y-4">
-                <div className="flex items-start">
-                    <span className="bg-teal text-black font-bold font-heading rounded-full h-6 w-6 flex items-center justify-center mr-3 mt-1">1</span>
-                    <div>
-                        <h3 className="font-heading font-semibold text-grey">Analyze & Strategize</h3>
-                        <p className="text-sm text-grey/60">We analyze the top 10 SERP results for your keywords, identifying what top-ranking content does right and where the strategic gaps are.</p>
-                    </div>
+        {/* Right Panel: Info */}
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <Card variant="elevated" padding="lg">
+            <h2 className="text-2xl font-heading font-bold text-text-primary mb-4">The Strategist's Studio</h2>
+            <p className="text-text-secondary mb-6">
+              This tool transforms raw keyword data into a comprehensive, actionable content brief designed to dominate search rankings.
+            </p>
+            <div className="space-y-5">
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-full bg-teal flex items-center justify-center flex-shrink-0">
+                  <span className="text-surface-primary font-heading font-bold text-sm">1</span>
                 </div>
-                 <div className="flex items-start">
-                    <span className="bg-teal text-black font-bold font-heading rounded-full h-6 w-6 flex items-center justify-center mr-3 mt-1">2</span>
-                    <div>
-                        <h3 className="font-heading font-semibold text-grey">Build Your Brief</h3>
-                        <p className="text-sm text-grey/60">Collaborate with the AI to build a hierarchical article structure, define on-page SEO, and generate FAQs based on the data.</p>
-                    </div>
+                <div>
+                  <h3 className="font-heading font-semibold text-text-primary">Analyze & Strategize</h3>
+                  <p className="text-sm text-text-muted mt-1">We analyze the top 10 SERP results for your keywords, identifying what top-ranking content does right and where the strategic gaps are.</p>
                 </div>
-                 <div className="flex items-start">
-                    <span className="bg-teal text-black font-bold font-heading rounded-full h-6 w-6 flex items-center justify-center mr-3 mt-1">3</span>
-                    <div>
-                        <h3 className="font-heading font-semibold text-grey">Generate Content</h3>
-                        <p className="text-sm text-grey/60">Once the brief is finalized, the AI will write a full-length, SEO-optimized article based on your strategic blueprint.</p>
-                    </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-full bg-teal flex items-center justify-center flex-shrink-0">
+                  <span className="text-surface-primary font-heading font-bold text-sm">2</span>
                 </div>
+                <div>
+                  <h3 className="font-heading font-semibold text-text-primary">Build Your Brief</h3>
+                  <p className="text-sm text-text-muted mt-1">Collaborate with the AI to build a hierarchical article structure, define on-page SEO, and generate FAQs based on the data.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-full bg-teal flex items-center justify-center flex-shrink-0">
+                  <span className="text-surface-primary font-heading font-bold text-sm">3</span>
+                </div>
+                <div>
+                  <h3 className="font-heading font-semibold text-text-primary">Generate Content</h3>
+                  <p className="text-sm text-text-muted mt-1">Once the brief is finalized, the AI will write a full-length, SEO-optimized article based on your strategic blueprint.</p>
+                </div>
+              </div>
             </div>
+          </Card>
         </div>
     </div>
   );
 
   return (
     <div className="animate-fade-in">
-        <div className="text-center mb-8">
-            <h1 className="text-3xl font-heading font-bold text-grey">Start Your Content Project</h1>
-            <p className="text-lg text-grey/70 mt-2">Choose your starting point.</p>
+      {/* Header */}
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-heading font-bold text-text-primary">Start Your Content Project</h1>
+        <p className="text-lg text-text-secondary mt-2">Choose your starting point.</p>
+      </div>
+
+      {/* Flow Selection */}
+      {!flow && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <Card
+            variant="interactive"
+            padding="lg"
+            hover
+            glow="teal"
+            onClick={() => setFlow('create')}
+            className="text-center cursor-pointer"
+          >
+            <div className="w-14 h-14 mx-auto mb-4 rounded-radius-lg bg-teal/10 flex items-center justify-center">
+              <FileCodeIcon className="h-7 w-7 text-teal" />
+            </div>
+            <h2 className="text-lg font-heading font-semibold text-text-primary">Create New Brief</h2>
+            <p className="text-sm text-text-muted mt-2">Start with keywords to generate a data-driven brief from scratch.</p>
+          </Card>
+          <Card
+            variant="interactive"
+            padding="lg"
+            hover
+            glow="teal"
+            onClick={onStartUpload}
+            className="text-center cursor-pointer"
+          >
+            <div className="w-14 h-14 mx-auto mb-4 rounded-radius-lg bg-teal/10 flex items-center justify-center">
+              <BrainCircuitIcon className="h-7 w-7 text-teal" />
+            </div>
+            <h2 className="text-lg font-heading font-semibold text-text-primary">Use Existing Brief</h2>
+            <p className="text-sm text-text-muted mt-2">Upload a pre-made brief in Markdown to generate the article content.</p>
+          </Card>
         </div>
+      )}
 
-        {!flow && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            <button 
-              onClick={() => setFlow('create')}
-              className="p-8 bg-black/30 rounded-lg border border-white/10 text-center hover:border-teal hover:bg-teal/10 transition-all duration-200"
-            >
-              <FileCodeIcon className="h-10 w-10 mx-auto text-teal mb-3" />
-              <h2 className="text-lg font-heading font-semibold text-grey">Create New Brief</h2>
-              <p className="text-sm text-grey/60 mt-1">Start with keywords to generate a data-driven brief from scratch.</p>
-            </button>
-            <button 
-              onClick={onStartUpload}
-              className="p-8 bg-black/30 rounded-lg border border-white/10 text-center hover:border-teal hover:bg-teal/10 transition-all duration-200"
-            >
-              <BrainCircuitIcon className="h-10 w-10 mx-auto text-teal mb-3" />
-              <h2 className="text-lg font-heading font-semibold text-grey">Use Existing Brief</h2>
-              <p className="text-sm text-grey/60 mt-1">Upload a pre-made brief in Markdown to generate the article content.</p>
-            </button>
-          </div>
-        )}
-
-        {flow === 'create' && renderCreateFlow()}
+      {flow === 'create' && renderCreateFlow()}
     </div>
   );
 };

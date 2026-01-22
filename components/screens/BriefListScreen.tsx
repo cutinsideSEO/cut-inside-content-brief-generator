@@ -4,7 +4,7 @@ import { getBriefsForClient, archiveBrief, createBrief } from '../../services/br
 import type { BriefWithClient } from '../../types/database';
 import BriefListCard from '../briefs/BriefListCard';
 import Button from '../Button';
-import Spinner from '../Spinner';
+import { Card, Input, Alert, Tabs, Skeleton } from '../ui';
 
 // Generation status type (matches AppWrapper)
 type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
@@ -29,6 +29,8 @@ interface BriefListScreenProps {
   generatingBriefs?: Record<string, GeneratingBrief>;
 }
 
+type FilterStatus = 'all' | 'draft' | 'in_progress' | 'complete';
+
 const BriefListScreen: React.FC<BriefListScreenProps> = ({
   clientId,
   clientName,
@@ -43,7 +45,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'in_progress' | 'complete'>('all');
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
 
   // Fetch briefs on mount and when clientId changes
   useEffect(() => {
@@ -100,10 +102,26 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     return true;
   });
 
+  // Count briefs by status
+  const counts = {
+    all: briefs.length,
+    draft: briefs.filter((b) => b.status === 'draft').length,
+    in_progress: briefs.filter((b) => b.status === 'in_progress').length,
+    complete: briefs.filter((b) => b.status === 'complete').length,
+  };
+
   // Group briefs by status for better organization
   const draftBriefs = filteredBriefs.filter((b) => b.status === 'draft');
   const inProgressBriefs = filteredBriefs.filter((b) => b.status === 'in_progress');
   const completeBriefs = filteredBriefs.filter((b) => b.status === 'complete');
+
+  // Tab items with counts
+  const tabItems = [
+    { id: 'all', label: 'All', count: counts.all },
+    { id: 'draft', label: 'Draft', count: counts.draft },
+    { id: 'in_progress', label: 'In Progress', count: counts.in_progress },
+    { id: 'complete', label: 'Complete', count: counts.complete },
+  ];
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -112,126 +130,135 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         <div className="flex items-center">
           <button
             onClick={onBack}
-            className="mr-4 p-2 rounded-lg text-grey hover:text-brand-white hover:bg-white/5 transition-colors"
+            className="mr-4 p-2 rounded-radius-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-heading font-bold text-brand-white">
+            <h1 className="text-2xl font-heading font-bold text-text-primary">
               {clientName}
             </h1>
-            <p className="text-grey mt-0.5">
+            <p className="text-text-secondary mt-0.5">
               {briefs.length} {briefs.length === 1 ? 'brief' : 'briefs'}
             </p>
           </div>
         </div>
-        <Button variant="primary" onClick={onCreateBrief}>
-          <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+        <Button
+          variant="primary"
+          onClick={onCreateBrief}
+          icon={
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          }
+        >
           New Brief
         </Button>
       </div>
 
       {/* Search and Filter */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="flex-1 relative">
-          <svg
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-grey"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          <input
-            type="text"
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="flex-1">
+          <Input
+            placeholder="Search briefs by name or keywords..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search briefs by name or keywords..."
-            className="w-full pl-10 pr-4 py-2 bg-black/50 border border-white/20 rounded-lg text-brand-white placeholder-grey/50 focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal"
+            icon={
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            }
           />
         </div>
-        <div className="flex gap-2">
-          {(['all', 'draft', 'in_progress', 'complete'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`
-                px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                ${filterStatus === status
-                  ? 'bg-teal/20 text-teal border border-teal/30'
-                  : 'bg-black/30 text-grey border border-white/10 hover:border-white/20'
-                }
-              `}
-            >
-              {status === 'all' ? 'All' : status === 'in_progress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          items={tabItems}
+          activeId={filterStatus}
+          onChange={(id) => setFilterStatus(id as FilterStatus)}
+          variant="pills"
+          size="sm"
+        />
       </div>
 
       {/* Error state */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 mb-6">
-          <p className="text-red-400 text-sm">{error}</p>
-          <Button variant="secondary" size="sm" onClick={loadBriefs} className="mt-2">
+        <Alert variant="error" title="Error" dismissible onDismiss={() => setError(null)} className="mb-6">
+          {error}
+          <Button variant="secondary" size="sm" onClick={loadBriefs} className="mt-3">
             Try Again
           </Button>
-        </div>
+        </Alert>
       )}
 
       {/* Loading state */}
       {isLoading && (
-        <div className="flex flex-col items-center justify-center py-16">
-          <Spinner size="lg" />
-          <p className="text-grey mt-4">Loading briefs...</p>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} padding="md">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <Skeleton variant="text" width="60%" height={24} className="mb-2" />
+                  <Skeleton variant="text" width="30%" height={16} />
+                </div>
+                <Skeleton variant="rectangular" width={80} height={24} className="rounded-radius-sm" />
+              </div>
+              <div className="flex gap-2 mb-4">
+                <Skeleton variant="rectangular" width={70} height={22} className="rounded-radius-sm" />
+                <Skeleton variant="rectangular" width={90} height={22} className="rounded-radius-sm" />
+                <Skeleton variant="rectangular" width={60} height={22} className="rounded-radius-sm" />
+              </div>
+              <Skeleton variant="text" width="50%" height={16} className="mb-4" />
+              <div className="flex gap-2 pt-3 border-t border-border-subtle">
+                <Skeleton variant="rectangular" width={80} height={32} className="rounded-radius-md" />
+                <Skeleton variant="rectangular" width={100} height={32} className="rounded-radius-md" />
+              </div>
+            </Card>
+          ))}
         </div>
       )}
 
       {/* Empty state */}
       {!isLoading && !error && briefs.length === 0 && (
-        <div className="text-center py-16 bg-black/20 rounded-lg border border-white/5">
-          <svg
-            className="mx-auto h-12 w-12 text-grey/50"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          <h3 className="mt-4 text-lg font-heading font-semibold text-brand-white">
-            No briefs yet
-          </h3>
-          <p className="mt-2 text-grey">
-            Create your first content brief for {clientName}.
-          </p>
-          <Button
-            variant="primary"
-            onClick={onCreateBrief}
-            className="mt-6"
-          >
-            Create First Brief
-          </Button>
-        </div>
+        <Card variant="default" padding="lg" className="text-center">
+          <div className="py-8">
+            <div className="mx-auto w-16 h-16 bg-teal/10 rounded-full flex items-center justify-center mb-4">
+              <svg
+                className="w-8 h-8 text-teal"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-heading font-semibold text-text-primary mb-2">
+              No briefs yet
+            </h3>
+            <p className="text-text-secondary mb-6 max-w-sm mx-auto">
+              Create your first content brief for {clientName}.
+            </p>
+            <Button variant="primary" onClick={onCreateBrief} glow>
+              Create First Brief
+            </Button>
+          </div>
+        </Card>
       )}
 
       {/* No results from filter */}
       {!isLoading && !error && briefs.length > 0 && filteredBriefs.length === 0 && (
-        <div className="text-center py-12 bg-black/20 rounded-lg border border-white/5">
-          <p className="text-grey">No briefs match your search or filter.</p>
+        <Card variant="default" padding="lg" className="text-center">
+          <p className="text-text-secondary">No briefs match your search or filter.</p>
           <Button
             variant="secondary"
             onClick={() => {
@@ -242,7 +269,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           >
             Clear Filters
           </Button>
-        </div>
+        </Card>
       )}
 
       {/* Brief list */}
@@ -251,8 +278,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           {/* In Progress Section */}
           {inProgressBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'in_progress') && (
             <section>
-              <h2 className="text-lg font-heading font-semibold text-brand-white mb-4 flex items-center">
-                <span className="w-2 h-2 bg-yellow rounded-full mr-2" />
+              <h2 className="text-lg font-heading font-semibold text-text-primary mb-4 flex items-center">
+                <span className="w-3 h-3 bg-status-generating rounded-full mr-3" />
                 In Progress ({inProgressBriefs.length})
               </h2>
               <div className="space-y-3">
@@ -279,8 +306,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           {/* Draft Section */}
           {draftBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'draft') && (
             <section>
-              <h2 className="text-lg font-heading font-semibold text-brand-white mb-4 flex items-center">
-                <span className="w-2 h-2 bg-grey rounded-full mr-2" />
+              <h2 className="text-lg font-heading font-semibold text-text-primary mb-4 flex items-center">
+                <span className="w-3 h-3 bg-status-draft rounded-full mr-3" />
                 Drafts ({draftBriefs.length})
               </h2>
               <div className="space-y-3">
@@ -307,8 +334,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           {/* Complete Section */}
           {completeBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'complete') && (
             <section>
-              <h2 className="text-lg font-heading font-semibold text-brand-white mb-4 flex items-center">
-                <span className="w-2 h-2 bg-teal rounded-full mr-2" />
+              <h2 className="text-lg font-heading font-semibold text-text-primary mb-4 flex items-center">
+                <span className="w-3 h-3 bg-status-complete rounded-full mr-3" />
                 Complete ({completeBriefs.length})
               </h2>
               <div className="space-y-3">

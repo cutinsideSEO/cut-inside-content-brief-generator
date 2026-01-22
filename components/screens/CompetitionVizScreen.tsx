@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { CompetitorPage } from '../../types';
 import Button from '../Button';
 import { BarChartIcon, StarIcon } from '../Icon';
+import { Card, Badge } from '../ui';
 
 interface CompetitionVizScreenProps {
   competitorData: CompetitorPage[];
@@ -13,16 +14,16 @@ interface CompetitionVizScreenProps {
 
 type SortKey = 'Weighted_Score' | 'Word_Count' | string; // string for dynamic keyword keys
 
-const StatCard: React.FC<{ title: string; value: string | number }> = ({ title, value }) => (
-    <div className="bg-black/50 p-4 rounded-lg border border-white/10">
-        <p className="text-sm text-grey/60 font-heading">{title}</p>
-        <p className="text-2xl font-bold font-heading text-grey">{value}</p>
-    </div>
+const StatCard: React.FC<{ title: string; value: string | number; highlight?: boolean }> = ({ title, value, highlight }) => (
+    <Card variant="default" padding="md" className={highlight ? 'border-teal/30' : ''}>
+        <p className="text-sm text-text-muted font-heading">{title}</p>
+        <p className={`text-2xl font-bold font-heading ${highlight ? 'text-teal' : 'text-text-primary'}`}>{value}</p>
+    </Card>
 );
 
 const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorData, topKeywords, onProceed, onToggleStar, onFeelingLucky }) => {
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' }>({ key: 'Weighted_Score', direction: 'descending' });
-  
+
   const { sortedCompetitors, maxScore, maxWordCount, avgScore, avgWordCount } = useMemo(() => {
     if (competitorData.length === 0) {
         return { sortedCompetitors: [], maxScore: 0, maxWordCount: 0, avgScore: 0, avgWordCount: 0 };
@@ -33,7 +34,7 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
       sortableItems.sort((a, b) => {
         let aValue: number | string;
         let bValue: number | string;
-        
+
         if (sortConfig.key === 'Weighted_Score' || sortConfig.key === 'Word_Count') {
           aValue = a[sortConfig.key];
           bValue = b[sortConfig.key];
@@ -44,7 +45,7 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
           aValue = aRank;
           bValue = bRank;
         }
-        
+
         if (aValue < bValue) {
           return sortConfig.direction === 'ascending' ? -1 : 1;
         }
@@ -83,88 +84,132 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
   };
 
   return (
-    <div className="animate-fade-in">
-        <div className="flex items-center mb-4">
-            <BarChartIcon className="h-8 w-8 mr-3 text-teal" />
+    <div className="max-w-7xl mx-auto animate-fade-in">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 rounded-radius-lg bg-teal/10 flex items-center justify-center">
+                <BarChartIcon className="h-6 w-6 text-teal" />
+            </div>
             <div>
-                <h1 className="text-2xl font-heading font-bold text-grey">Competitive Landscape</h1>
-                <p className="text-md text-grey/70">Analysis complete. Star competitors you want the AI to prioritize.</p>
+                <h1 className="text-2xl font-heading font-bold text-text-primary">Competitive Landscape</h1>
+                <p className="text-md text-text-secondary">Analysis complete. Star competitors you want the AI to prioritize.</p>
             </div>
         </div>
-        
+
+        {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <StatCard title="Competitors Analyzed" value={competitorData.length} />
+            <StatCard title="Competitors Analyzed" value={competitorData.length} highlight />
             <StatCard title="Average Score" value={avgScore.toLocaleString()} />
             <StatCard title="Average Word Count" value={avgWordCount.toLocaleString()} />
+            <StatCard title="Top Keywords" value={topKeywords.length} />
         </div>
 
-        <div className="overflow-x-auto bg-black/30 p-4 rounded-lg border border-white/10">
-            <table className="w-full min-w-max text-left text-sm">
-                <thead className="bg-black/70">
-                    <tr>
-                        <th className="p-3 font-heading font-semibold text-grey/80 w-12"></th>
-                        <th className="p-3 font-heading font-semibold text-grey/80 w-2/5">Competitor URL</th>
-                        <th className="p-3 font-heading font-semibold text-grey/80 cursor-pointer" onClick={() => requestSort('Weighted_Score')}>
-                            Score{getSortIndicator('Weighted_Score')}
-                        </th>
-                        <th className="p-3 font-heading font-semibold text-grey/80 cursor-pointer" onClick={() => requestSort('Word_Count')}>
-                            Words{getSortIndicator('Word_Count')}
-                        </th>
-                        {topKeywords.map(({ kw }) => (
-                            <th key={kw} className="p-3 font-heading font-semibold text-grey/80 cursor-pointer truncate max-w-xs" onClick={() => requestSort(kw)} title={kw}>
-                                Rank: "{kw}"{getSortIndicator(kw)}
+        {/* Competitor Table */}
+        <Card variant="default" padding="none" className="overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="w-full min-w-max text-left text-sm">
+                    <thead className="bg-surface-hover border-b border-border">
+                        <tr>
+                            <th className="p-4 font-heading font-semibold text-text-secondary w-12"></th>
+                            <th className="p-4 font-heading font-semibold text-text-secondary w-2/5">Competitor URL</th>
+                            <th
+                                className="p-4 font-heading font-semibold text-text-secondary cursor-pointer hover:text-teal transition-colors"
+                                onClick={() => requestSort('Weighted_Score')}
+                            >
+                                Score{getSortIndicator('Weighted_Score')}
                             </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10">
-                    {sortedCompetitors.map((competitor) => (
-                        <tr key={competitor.URL} className="hover:bg-white/5 transition-colors">
-                            <td className="p-3 text-center">
-                                <button onClick={() => onToggleStar(competitor.URL)} className="p-1 group" title="Star this competitor">
-                                    <StarIcon className={`h-5 w-5 transition-all duration-200 ${competitor.is_starred ? 'text-yellow fill-yellow shadow-glow-yellow' : 'text-grey/40 group-hover:text-yellow'}`} />
-                                </button>
-                            </td>
-                            <td className="p-3 text-teal truncate max-w-xs" title={competitor.URL}>
-                                <a href={competitor.URL} target="_blank" rel="noopener noreferrer">{competitor.URL}</a>
-                            </td>
-                            <td className="p-3 font-bold text-lg text-grey">
-                                <div className="relative">
-                                    <div className="absolute inset-0 bg-teal/20 rounded-md" style={{ width: `${(competitor.Weighted_Score / maxScore) * 100}%`}}></div>
-                                    <span className="relative px-2">{competitor.Weighted_Score.toLocaleString()}</span>
-                                </div>
-                            </td>
-                             <td className="p-3 text-grey/80">
-                                <div className="relative">
-                                    <div className="absolute inset-0 bg-white/10 rounded-md" style={{ width: `${(competitor.Word_Count / maxWordCount) * 100}%`}}></div>
-                                    <span className="relative px-2">{competitor.Word_Count.toLocaleString()}</span>
-                                </div>
-                            </td>
-                            {topKeywords.map(({ kw }) => {
-                                const ranking = competitor.rankings.find(r => r.keyword === kw);
-                                return (
-                                    <td key={`${competitor.URL}-${kw}`} className="p-3 text-center font-medium">
-                                        {ranking ? (
-                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${ranking.rank <= 3 ? 'bg-teal/20 text-teal' : ranking.rank <= 10 ? 'bg-yellow/20 text-yellow' : 'bg-grey/10 text-grey/60'}`}>
-                                                #{ranking.rank}
-                                            </span>
-                                        ) : (
-                                            <span className="text-grey/40">-</span>
-                                        )}
-                                    </td>
-                                );
-                            })}
+                            <th
+                                className="p-4 font-heading font-semibold text-text-secondary cursor-pointer hover:text-teal transition-colors"
+                                onClick={() => requestSort('Word_Count')}
+                            >
+                                Words{getSortIndicator('Word_Count')}
+                            </th>
+                            {topKeywords.map(({ kw }) => (
+                                <th
+                                    key={kw}
+                                    className="p-4 font-heading font-semibold text-text-secondary cursor-pointer hover:text-teal transition-colors truncate max-w-xs"
+                                    onClick={() => requestSort(kw)}
+                                    title={kw}
+                                >
+                                    Rank: "{kw}"{getSortIndicator(kw)}
+                                </th>
+                            ))}
                         </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody className="divide-y divide-border-subtle">
+                        {sortedCompetitors.map((competitor) => (
+                            <tr key={competitor.URL} className="hover:bg-surface-hover transition-colors">
+                                <td className="p-4 text-center">
+                                    <button
+                                        onClick={() => onToggleStar(competitor.URL)}
+                                        className="p-1 group rounded-radius-sm hover:bg-surface-active transition-colors"
+                                        title="Star this competitor"
+                                    >
+                                        <StarIcon className={`h-5 w-5 transition-all duration-200 ${
+                                            competitor.is_starred
+                                                ? 'text-yellow fill-yellow drop-shadow-[0_0_6px_rgba(250,204,21,0.5)]'
+                                                : 'text-text-muted group-hover:text-yellow'
+                                        }`} />
+                                    </button>
+                                </td>
+                                <td className="p-4 truncate max-w-xs" title={competitor.URL}>
+                                    <a
+                                        href={competitor.URL}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-teal hover:text-teal/80 hover:underline transition-colors"
+                                    >
+                                        {competitor.URL}
+                                    </a>
+                                </td>
+                                <td className="p-4 font-bold text-lg text-text-primary">
+                                    <div className="relative flex items-center">
+                                        <div
+                                            className="absolute inset-y-0 left-0 bg-teal/20 rounded-radius-sm"
+                                            style={{ width: `${(competitor.Weighted_Score / maxScore) * 100}%`}}
+                                        />
+                                        <span className="relative px-2">{competitor.Weighted_Score.toLocaleString()}</span>
+                                    </div>
+                                </td>
+                                <td className="p-4 text-text-secondary">
+                                    <div className="relative flex items-center">
+                                        <div
+                                            className="absolute inset-y-0 left-0 bg-surface-active rounded-radius-sm"
+                                            style={{ width: `${(competitor.Word_Count / maxWordCount) * 100}%`}}
+                                        />
+                                        <span className="relative px-2">{competitor.Word_Count.toLocaleString()}</span>
+                                    </div>
+                                </td>
+                                {topKeywords.map(({ kw }) => {
+                                    const ranking = competitor.rankings.find(r => r.keyword === kw);
+                                    return (
+                                        <td key={`${competitor.URL}-${kw}`} className="p-4 text-center">
+                                            {ranking ? (
+                                                <Badge
+                                                    variant={ranking.rank <= 3 ? 'success' : ranking.rank <= 10 ? 'warning' : 'default'}
+                                                    size="sm"
+                                                >
+                                                    #{ranking.rank}
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-text-muted">-</span>
+                                            )}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </Card>
 
-        <div className="mt-8 flex justify-end items-center space-x-4">
-            <Button onClick={onFeelingLucky} variant="secondary">
-                I'm Feeling Lucky ✨
+        {/* Action Buttons */}
+        <div className="mt-8 flex justify-end items-center gap-4">
+            <Button onClick={onFeelingLucky} variant="secondary" size="lg">
+                I'm Feeling Lucky
             </Button>
-            <Button onClick={onProceed}>
+            <Button onClick={onProceed} size="lg" glow>
                 Continue to Brief Creation
             </Button>
         </div>

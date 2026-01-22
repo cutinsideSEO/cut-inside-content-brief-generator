@@ -1,28 +1,30 @@
 // Brief Status Badge - Visual indicator for brief status
 import React from 'react';
 import type { BriefStatus } from '../../types/database';
+import { Badge } from '../ui';
+import type { BadgeProps } from '../ui/Badge';
 
 interface BriefStatusBadgeProps {
   status: BriefStatus;
   className?: string;
 }
 
-const statusConfig: Record<BriefStatus, { label: string; className: string }> = {
+const statusConfig: Record<BriefStatus, { label: string; variant: BadgeProps['variant'] }> = {
   draft: {
     label: 'Draft',
-    className: 'bg-grey/20 text-grey border-grey/30',
+    variant: 'default',
   },
   in_progress: {
     label: 'In Progress',
-    className: 'bg-yellow/20 text-yellow border-yellow/30',
+    variant: 'warning',
   },
   complete: {
     label: 'Complete',
-    className: 'bg-teal/20 text-teal border-teal/30',
+    variant: 'success',
   },
   archived: {
     label: 'Archived',
-    className: 'bg-red-500/20 text-red-400 border-red-500/30',
+    variant: 'error',
   },
 };
 
@@ -30,15 +32,9 @@ const BriefStatusBadge: React.FC<BriefStatusBadgeProps> = ({ status, className =
   const config = statusConfig[status] || statusConfig.draft;
 
   return (
-    <span
-      className={`
-        inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border
-        ${config.className}
-        ${className}
-      `}
-    >
+    <Badge variant={config.variant} size="sm" className={className}>
       {config.label}
-    </span>
+    </Badge>
   );
 };
 

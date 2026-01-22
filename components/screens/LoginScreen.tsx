@@ -3,6 +3,7 @@ import React, { useState, FormEvent } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../Button';
 import Spinner from '../Spinner';
+import { Card, Input, Alert } from '../ui';
 
 interface LoginScreenProps {
   onLoginSuccess?: () => void;
@@ -33,103 +34,109 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   if (!isConfigured) {
     return (
-      <div className="max-w-md mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-heading font-bold text-brand-white mb-2">
-            Welcome to Cut Inside
-          </h1>
-          <p className="text-grey">Content Brief Generator</p>
-        </div>
-
-        <div className="bg-yellow/10 border border-yellow/50 rounded-lg p-4 mb-6">
-          <div className="flex items-start">
-            <svg className="w-5 h-5 text-yellow mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            <div>
-              <h3 className="font-heading font-semibold text-yellow">Supabase Not Configured</h3>
-              <p className="text-sm text-grey mt-1">
-                To enable authentication and brief persistence, add your Supabase credentials
-                to <code className="text-teal">.env.local</code>:
-              </p>
-              <pre className="mt-2 p-2 bg-black/50 rounded text-xs text-grey overflow-x-auto">
-{`VITE_SUPABASE_URL=your-project-url
-VITE_SUPABASE_ANON_KEY=your-anon-key`}
-              </pre>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md w-full animate-fade-in">
+          {/* Logo/Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-teal/10 rounded-radius-lg mb-4">
+              <svg className="w-8 h-8 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
             </div>
+            <h1 className="text-3xl font-heading font-bold text-text-primary mb-2">
+              Welcome to Cut Inside
+            </h1>
+            <p className="text-text-secondary">Content Brief Generator</p>
           </div>
-        </div>
 
-        <p className="text-center text-grey text-sm">
-          You can continue using the app without authentication,
-          but briefs will not be saved.
-        </p>
+          <Alert variant="warning" title="Supabase Not Configured" className="mb-6">
+            <p className="mb-3">
+              To enable authentication and brief persistence, add your Supabase credentials
+              to <code className="text-teal bg-teal/10 px-1.5 py-0.5 rounded">.env.local</code>:
+            </p>
+            <Card variant="outline" padding="sm" className="font-mono text-xs">
+              <p>VITE_SUPABASE_URL=your-project-url</p>
+              <p>VITE_SUPABASE_ANON_KEY=your-anon-key</p>
+            </Card>
+          </Alert>
 
-        <div className="mt-6 text-center">
-          <Button onClick={onLoginSuccess} variant="primary">
-            Continue Without Login
-          </Button>
+          <p className="text-center text-text-muted text-sm mb-6">
+            You can continue using the app without authentication,
+            but briefs will not be saved.
+          </p>
+
+          <div className="text-center">
+            <Button onClick={onLoginSuccess} variant="primary" glow>
+              Continue Without Login
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-heading font-bold text-brand-white mb-2">
-          Welcome to Cut Inside
-        </h1>
-        <p className="text-grey">Content Brief Generator</p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="accessCode" className="block text-sm font-medium text-grey mb-2">
-            Access Code
-          </label>
-          <input
-            id="accessCode"
-            type="text"
-            value={accessCode}
-            onChange={(e) => setAccessCode(e.target.value)}
-            placeholder="Enter your access code"
-            className="w-full px-4 py-3 bg-black/50 border border-white/20 rounded-lg text-brand-white placeholder-grey/50 focus:outline-none focus:border-teal focus:ring-1 focus:ring-teal transition-colors"
-            autoFocus
-            disabled={isLoading}
-          />
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="max-w-md w-full animate-fade-in">
+        {/* Logo/Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-teal/10 rounded-radius-lg mb-4">
+            <svg className="w-8 h-8 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-heading font-bold text-text-primary mb-2">
+            Welcome to Cut Inside
+          </h1>
+          <p className="text-text-secondary">Content Brief Generator</p>
         </div>
 
-        {displayError && (
-          <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3">
-            <p className="text-red-400 text-sm">{displayError}</p>
-          </div>
-        )}
+        <Card variant="elevated" padding="lg">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <Input
+              label="Access Code"
+              id="accessCode"
+              type="text"
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value)}
+              placeholder="Enter your access code"
+              autoFocus
+              disabled={isLoading}
+              error={displayError || undefined}
+              icon={
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+              }
+            />
 
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={isLoading || !accessCode.trim()}
-          className="w-full"
-        >
-          {isLoading ? (
-            <span className="flex items-center justify-center">
-              <Spinner size="sm" className="mr-2" />
-              Validating...
-            </span>
-          ) : (
-            'Sign In'
-          )}
-        </Button>
-      </form>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isLoading || !accessCode.trim()}
+              fullWidth
+              glow
+            >
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Spinner size="sm" />
+                  Validating...
+                </span>
+              ) : (
+                'Sign In'
+              )}
+            </Button>
+          </form>
+        </Card>
 
-      <div className="mt-8 pt-6 border-t border-white/10">
-        <p className="text-center text-grey text-sm">
-          Don't have an access code?{' '}
-          <a href="mailto:support@cutinside.com" className="text-teal hover:underline">
-            Contact your administrator
-          </a>
-        </p>
+        <div className="mt-8 pt-6 border-t border-border-subtle text-center">
+          <p className="text-text-muted text-sm">
+            Don't have an access code?{' '}
+            <a href="mailto:support@cutinside.com" className="text-teal hover:underline transition-colors">
+              Contact your administrator
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

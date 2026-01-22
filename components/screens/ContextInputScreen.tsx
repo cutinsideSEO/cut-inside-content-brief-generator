@@ -3,6 +3,7 @@ import Spinner from '../Spinner';
 import Button from '../Button';
 import { UploadCloudIcon, XIcon, FileTextIcon, MiniSpinner, CheckIcon, AlertTriangleIcon, LinkIcon } from '../Icon';
 import { THEMED_LOADING_MESSAGES } from '../../constants';
+import { Card, Textarea, Input, Badge, Progress } from '../ui';
 
 
 interface ContextInputScreenProps {
@@ -37,12 +38,15 @@ const ThemedLoader: React.FC<{ header: string }> = ({ header }) => {
     }, []);
 
     return (
-        <div className="text-center mb-8">
-            <div className="flex justify-center items-center mb-4">
-                <Spinner />
+        <div className="text-center mb-8 animate-fade-in">
+            <div className="relative inline-flex mb-4">
+                <div className="absolute inset-0 bg-teal/20 rounded-full blur-xl animate-pulse" />
+                <div className="relative">
+                    <Spinner />
+                </div>
             </div>
-            <h1 className="text-2xl font-heading font-bold text-grey">{header}</h1>
-            <p className="text-md text-grey/70">{message}</p>
+            <h1 className="text-2xl font-heading font-bold text-text-primary">{header}</h1>
+            <p className="text-md text-text-secondary mt-2">{message}</p>
         </div>
     );
 };
@@ -79,7 +83,7 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
       onAddFiles(Array.from(event.target.files));
     }
   };
-  
+
   const handleAddUrl = () => {
     if (urlInput.trim()) {
       onAddUrl(urlInput.trim());
@@ -96,7 +100,7 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
       event.dataTransfer.clearData();
     }
   }, [onAddFiles]);
-  
+
   const handleDragEnter = (e: React.DragEvent<HTMLLabelElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); };
   const handleDragLeave = (e: React.DragEvent<HTMLLabelElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(false); };
   const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => { e.preventDefault(); e.stopPropagation(); };
@@ -109,131 +113,174 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   }
-  
+
   return (
     <div className="max-w-7xl mx-auto animate-fade-in">
         {isLoading ? (
             <ThemedLoader header="Analyzing Competitors..." />
         ) : (
             <div className="text-center mb-8">
-                <h1 className="text-2xl font-heading font-bold text-grey">Analysis Complete</h1>
-                <p className="text-md text-grey/70">You may now add optional context for the AI or continue to the next step.</p>
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-status-complete/10 rounded-full mb-4">
+                    <CheckIcon className="h-6 w-6 text-status-complete" />
+                </div>
+                <h1 className="text-2xl font-heading font-bold text-text-primary">Analysis Complete</h1>
+                <p className="text-md text-text-secondary mt-2">You may now add optional context for the AI or continue to the next step.</p>
             </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Panel: Analysis Log */}
             <div className="lg:col-span-3">
-                <div className="bg-black/30 p-4 rounded-lg border border-white/10 sticky top-24">
-                    <h3 className="text-md font-heading font-semibold text-grey/80 mb-2">Analysis Log</h3>
-                    <div ref={logContainerRef} className="h-96 bg-black/50 rounded-md p-3 border border-white/10 overflow-y-auto">
-                    {analysisLogs.map((log, index) => (
-                        <p key={index} className={`text-xs font-mono ${log.toLowerCase().includes('error') ? 'text-red-400' : 'text-grey/60'}`}>
-                        {log}
-                        </p>
-                    ))}
+                <Card variant="default" padding="md" className="sticky top-24">
+                    <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-3">Analysis Log</h3>
+                    <div
+                        ref={logContainerRef}
+                        className="h-96 bg-surface-hover rounded-radius-md p-3 border border-border-subtle overflow-y-auto font-mono text-xs"
+                    >
+                        {analysisLogs.map((log, index) => (
+                            <p
+                                key={index}
+                                className={`${log.toLowerCase().includes('error') ? 'text-status-error' : 'text-text-muted'}`}
+                            >
+                                {log}
+                            </p>
+                        ))}
                     </div>
-                </div>
+                </Card>
             </div>
 
             {/* Center Panel: Main Inputs */}
             <div className="lg:col-span-6 space-y-6">
-                <div className="bg-black/30 p-6 rounded-lg border border-white/10">
-                    <h2 className="text-lg font-heading font-semibold text-grey mb-1">Add Subject Matter Details (Optional)</h2>
-                    <p className="text-sm text-grey/60">Provide extra details about the topic for the AI. You can write in the box below, upload files, or both.</p>
-                    <textarea 
-                        value={subjectInfo} 
-                        onChange={(e) => setSubjectInfo(e.target.value)} 
-                        placeholder="e.g., Explain the core concepts, mention specific technologies to include..." 
-                        className="w-full mt-2 p-3 bg-black border border-white/20 rounded-md text-grey h-32 resize-none focus:ring-2 focus:ring-teal" 
+                <Card variant="default" padding="lg">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                            <FileTextIcon className="h-5 w-5 text-teal" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-heading font-semibold text-text-primary">Subject Matter Details</h2>
+                            <p className="text-sm text-text-muted">Optional: Provide extra details about the topic for the AI</p>
+                        </div>
+                    </div>
+                    <Textarea
+                        value={subjectInfo}
+                        onChange={(e) => setSubjectInfo(e.target.value)}
+                        placeholder="e.g., Explain the core concepts, mention specific technologies to include..."
+                        rows={5}
+                        hint="Write details, upload files, or both"
                     />
-                </div>
-                 <div className="bg-black/30 p-6 rounded-lg border border-white/10">
-                    <h2 className="text-lg font-heading font-semibold text-grey mb-1">Add Brand Information (Optional)</h2>
-                    <p className="text-sm text-grey/60">Describe the brand voice, style, and target audience.</p>
-                    <textarea 
-                        value={brandInfo} 
-                        onChange={(e) => setBrandInfo(e.target.value)} 
-                        placeholder="e.g., We are a B2B SaaS company. Our tone is professional yet approachable. Avoid jargon..." 
-                        className="w-full mt-2 p-3 bg-black border border-white/20 rounded-md text-grey h-32 resize-none focus:ring-2 focus:ring-teal" 
+                </Card>
+
+                <Card variant="default" padding="lg">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                            <svg className="h-5 w-5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-heading font-semibold text-text-primary">Brand Information</h2>
+                            <p className="text-sm text-text-muted">Optional: Describe the brand voice, style, and target audience</p>
+                        </div>
+                    </div>
+                    <Textarea
+                        value={brandInfo}
+                        onChange={(e) => setBrandInfo(e.target.value)}
+                        placeholder="e.g., We are a B2B SaaS company. Our tone is professional yet approachable. Avoid jargon..."
+                        rows={5}
                     />
-                </div>
-                <Button onClick={onContinue} disabled={isLoading} className="w-full !py-4">
+                </Card>
+
+                <Button onClick={onContinue} disabled={isLoading} fullWidth glow size="lg">
                     {isLoading ? "Analyzing..." : "Continue to Competitor Visualization"}
                 </Button>
             </div>
 
             {/* Right Panel: Context Uploaders */}
             <div className="lg:col-span-3 space-y-6">
-                <div className="bg-black/30 p-4 rounded-lg border border-white/10">
-                    <h3 className="text-md font-heading font-semibold text-grey mb-1">Upload Context Files</h3>
-                    <p className="text-sm text-grey/60">PDF, DOCX, TXT, or MD.</p>
-                    <label 
-                        className={`flex flex-col items-center justify-center w-full h-32 mt-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragOver ? 'border-teal bg-teal/10' : 'border-white/20 bg-black/50 hover:bg-white/5'}`}
-                        onDrop={handleDrop} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver}
+                {/* File Upload */}
+                <Card variant="default" padding="md">
+                    <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-1">Upload Context Files</h3>
+                    <p className="text-xs text-text-muted mb-3">PDF, DOCX, TXT, or MD.</p>
+                    <label
+                        className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-radius-lg cursor-pointer transition-all ${
+                            isDragOver
+                                ? 'border-teal bg-teal/10'
+                                : 'border-border bg-surface-hover hover:bg-surface-active hover:border-border-emphasis'
+                        }`}
+                        onDrop={handleDrop}
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                        onDragOver={handleDragOver}
                     >
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <UploadCloudIcon className="w-10 h-10 mb-2 text-grey/40" />
-                            <p className="text-sm text-grey/60"><span className="font-semibold text-teal">Click to upload</span></p>
+                        <div className="flex flex-col items-center justify-center py-4">
+                            <UploadCloudIcon className="w-8 h-8 mb-2 text-text-muted" />
+                            <p className="text-sm text-text-secondary"><span className="font-semibold text-teal">Click to upload</span></p>
                         </div>
                         <input type="file" className="hidden" accept=".pdf,.docx,.txt,.md" onChange={handleFileChange} multiple />
                     </label>
+
                     {contextFiles.length > 0 && (
                         <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
                             {contextFiles.map(file => {
                                 const status = fileContents.get(file.name);
                                 return (
-                                    <div key={file.name} className="bg-black/50 p-2 rounded-lg border border-white/10 flex items-center justify-between text-xs">
-                                        <div className="flex items-center space-x-2 overflow-hidden">
-                                            <FileTextIcon className="h-5 w-5 text-teal flex-shrink-0" />
-                                            <p className="font-semibold text-grey truncate">{file.name}</p>
+                                    <div key={file.name} className="bg-surface-hover p-2 rounded-radius-md border border-border-subtle flex items-center justify-between">
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                            <FileTextIcon className="h-4 w-4 text-teal flex-shrink-0" />
+                                            <p className="text-xs font-medium text-text-primary truncate">{file.name}</p>
                                         </div>
-                                        <div className="flex items-center space-x-2">
-                                            {status?.status === 'parsing' && <MiniSpinner className="h-4 w-4 text-grey/60" />}
-                                            {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-teal" />}
-                                            {status?.status === 'done' && status.error && (
-                                                <div className="relative group"><AlertTriangleIcon className="h-4 w-4 text-red-500" /></div>
-                                            )}
-                                            <button onClick={() => onRemoveFile(file.name)} className="p-0.5 text-grey/50 hover:text-white rounded-full hover:bg-white/10"><XIcon className="h-4 w-4" /></button>
+                                        <div className="flex items-center gap-2">
+                                            {status?.status === 'parsing' && <MiniSpinner className="h-4 w-4 text-text-muted" />}
+                                            {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-status-complete" />}
+                                            {status?.status === 'done' && status.error && <AlertTriangleIcon className="h-4 w-4 text-status-error" />}
+                                            <Button variant="ghost" size="sm" onClick={() => onRemoveFile(file.name)} className="!p-1">
+                                                <XIcon className="h-3 w-3" />
+                                            </Button>
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
                     )}
-                </div>
+                </Card>
 
-                 <div className="bg-black/30 p-4 rounded-lg border border-white/10">
-                    <h3 className="text-md font-heading font-semibold text-grey mb-1">Scrape Context URLs</h3>
-                    <div className="flex items-center space-x-2 mt-2">
-                        <input type="url" value={urlInput} onChange={(e) => setUrlInput(e.target.value)} placeholder="https://..."
-                            className="flex-grow p-2 bg-black border border-white/20 rounded-md text-grey focus:ring-2 focus:ring-teal text-sm"
+                {/* URL Scraper */}
+                <Card variant="default" padding="md">
+                    <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-1">Scrape Context URLs</h3>
+                    <p className="text-xs text-text-muted mb-3">Add URLs to include their content</p>
+                    <div className="flex items-center gap-2">
+                        <Input
+                            type="url"
+                            value={urlInput}
+                            onChange={(e) => setUrlInput(e.target.value)}
+                            placeholder="https://..."
                             onKeyDown={(e) => { if (e.key === 'Enter') handleAddUrl(); }}
+                            size="sm"
                         />
-                        <Button onClick={handleAddUrl} variant="outline" size="sm" className="w-auto px-3 !py-2">Add</Button>
+                        <Button onClick={handleAddUrl} variant="secondary" size="sm">Add</Button>
                     </div>
 
                     {Array.from(urlContents.keys()).length > 0 && (
                         <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
                             {Array.from(urlContents.entries()).map(([url, status]) => (
-                                <div key={url} className="bg-black/50 p-2 rounded-lg border border-white/10 flex items-center justify-between text-xs">
-                                     <div className="flex items-center space-x-2 overflow-hidden">
-                                        <LinkIcon className="h-5 w-5 text-teal flex-shrink-0" />
-                                        <p className="font-semibold text-grey truncate">{url}</p>
+                                <div key={url} className="bg-surface-hover p-2 rounded-radius-md border border-border-subtle flex items-center justify-between">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <LinkIcon className="h-4 w-4 text-teal flex-shrink-0" />
+                                        <p className="text-xs font-medium text-text-primary truncate">{url}</p>
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                        {status?.status === 'scraping' && <MiniSpinner className="h-4 w-4 text-grey/60" />}
-                                        {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-teal" />}
-                                        {status?.status === 'done' && status.error && (
-                                            <div className="relative group"><AlertTriangleIcon className="h-4 w-4 text-red-500" /></div>
-                                        )}
-                                        <button onClick={() => onRemoveUrl(url)} className="p-0.5 text-grey/50 hover:text-white rounded-full hover:bg-white/10"><XIcon className="h-4 w-4" /></button>
+                                    <div className="flex items-center gap-2">
+                                        {status?.status === 'scraping' && <MiniSpinner className="h-4 w-4 text-text-muted" />}
+                                        {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-status-complete" />}
+                                        {status?.status === 'done' && status.error && <AlertTriangleIcon className="h-4 w-4 text-status-error" />}
+                                        <Button variant="ghost" size="sm" onClick={() => onRemoveUrl(url)} className="!p-1">
+                                            <XIcon className="h-3 w-3" />
+                                        </Button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
-                </div>
+                </Card>
             </div>
         </div>
     </div>

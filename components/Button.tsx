@@ -1,15 +1,23 @@
 import React from 'react';
-import { useSound } from '../App';
 
-// FIX: Add variant and size props to ButtonProps to allow for different button styles and fix type errors.
+// Try to import useSound from App, but make it optional
+let useSound: (() => { playSound: (sound: string) => void } | null) | undefined;
+try {
+  // Dynamic import to avoid circular dependency issues
+  const AppModule = require('../App');
+  useSound = AppModule.useSound;
+} catch {
+  useSound = undefined;
+}
+
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   size?: 'md' | 'sm';
 }
 
 const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', size = 'md', className, onClick, ...props }) => {
-  const sound = useSound();
+  const sound = useSound?.();
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     sound?.playSound('click');
@@ -26,6 +34,8 @@ const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', size = '
     secondary: 'w-full bg-grey/20 hover:bg-grey/30 text-brand-white disabled:bg-grey/10',
     outline:
       'w-auto bg-transparent hover:bg-teal/20 text-teal border border-teal/50 hover:border-teal disabled:border-grey/20 disabled:text-grey/50 disabled:bg-transparent',
+    ghost:
+      'w-auto bg-transparent hover:bg-white/5 text-grey hover:text-brand-white disabled:text-grey/50 disabled:bg-transparent',
   };
 
   const sizeStyles = {

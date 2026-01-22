@@ -17,8 +17,29 @@ import DashboardScreen from './components/screens/DashboardScreen';
 import ContentGenerationScreen from './components/screens/ContentGenerationScreen';
 import BriefUploadScreen from './components/screens/BriefUploadScreen';
 
+// Import Supabase integration components
+import SaveStatusIndicator from './components/SaveStatusIndicator';
+import { useBriefLoader } from './hooks/useBriefLoader';
+import { useAutoSave } from './hooks/useAutoSave';
+import { saveBriefState, updateBriefProgress, updateBriefStatus } from './services/briefService';
+import { saveCompetitors } from './services/competitorService';
+import { createArticle } from './services/articleService';
+import type { SaveStatus } from './types/appState';
+
 type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_upload';
 type ToastMessage = { id: number; title: string; message: string };
+
+// Props for Supabase integration
+interface AppProps {
+  briefId?: string | null;
+  clientId?: string | null;
+  clientName?: string | null;
+  onBackToBriefList?: () => void;
+  onSaveStatusChange?: (status: SaveStatus, savedAt?: Date) => void;
+  saveStatus?: SaveStatus;
+  lastSavedAt?: Date | null;
+  isSupabaseMode?: boolean;
+}
 
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -109,11 +130,28 @@ const Toast: React.FC<ToastMessage & { onDismiss: () => void }> = ({ title, mess
 };
 
 
-const App: React.FC = () => {
+const App: React.FC<AppProps> = ({
+  briefId,
+  clientId,
+  clientName,
+  onBackToBriefList,
+  onSaveStatusChange,
+  saveStatus: externalSaveStatus,
+  lastSavedAt: externalLastSavedAt,
+  isSupabaseMode = false,
+}) => {
   const [currentView, setCurrentView] = useState<AppView>('initial_input');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisLogs, setAnalysisLogs] = useState<string[]>([]);
+
+  // Internal save status for auto-save
+  const [internalSaveStatus, setInternalSaveStatus] = useState<SaveStatus>('saved');
+  const [internalLastSavedAt, setInternalLastSavedAt] = useState<Date | null>(null);
+
+  // Use external or internal save status
+  const saveStatus = externalSaveStatus ?? internalSaveStatus;
+  const lastSavedAt = externalLastSavedAt ?? internalLastSavedAt;
   
   // Data state
   const [subjectInfo, setSubjectInfo] = useState('');
@@ -162,6 +200,97 @@ const App: React.FC = () => {
 
   // Feature: PAA (People Also Ask) questions collected from SERPs
   const [paaQuestions, setPaaQuestions] = useState<string[]>([]);
+
+  // Brief loader hook
+  const { loadBrief, isLoading: isBriefLoading } = useBriefLoader();
+
+  // Auto-save hook (only active in Supabase mode)
+  const { triggerSave, saveNow } = useAutoSave(
+    {
+      currentView,
+      briefingStep,
+      briefData,
+      staleSteps,
+      userFeedbacks,
+      paaQuestions,
+      subjectInfo,
+      brandInfo,
+      extractedTemplate,
+      competitorData,
+      saveStatus: internalSaveStatus,
+    },
+    {
+      briefId: briefId || null,
+      enabled: isSupabaseMode && Boolean(briefId),
+      debounceMs: 2000,
+      onSaveStart: () => {
+        setInternalSaveStatus('saving');
+        onSaveStatusChange?.('saving');
+      },
+      onSaveSuccess: (savedAt) => {
+        setInternalSaveStatus('saved');
+        setInternalLastSavedAt(savedAt);
+        onSaveStatusChange?.('saved', savedAt);
+      },
+      onSaveError: (error) => {
+        console.error('Auto-save failed:', error);
+        setInternalSaveStatus('error');
+        onSaveStatusChange?.('error');
+      },
+    }
+  );
+
+  // Load brief data when briefId is provided (Supabase mode)
+  useEffect(() => {
+    const loadExistingBrief = async () => {
+      if (!briefId || !isSupabaseMode) return;
+
+      setIsLoading(true);
+      const loadedState = await loadBrief(briefId);
+
+      if (loadedState) {
+        // Restore all state from the loaded brief
+        setCurrentView(loadedState.currentView as AppView);
+        setBriefingStep(loadedState.briefingStep);
+        setBriefData(loadedState.briefData);
+        setStaleSteps(loadedState.staleSteps);
+        setUserFeedbacks(loadedState.userFeedbacks);
+        setPaaQuestions(loadedState.paaQuestions);
+        setSubjectInfo(loadedState.subjectInfo);
+        setBrandInfo(loadedState.brandInfo);
+        setOutputLanguage(loadedState.outputLanguage);
+        setSerpLanguage(loadedState.serpLanguage);
+        setCompetitorData(loadedState.competitorData);
+        setExtractedTemplate(loadedState.extractedTemplate);
+        setLengthConstraints(loadedState.lengthConstraints);
+
+        // Build keyword volume map from loaded keywords
+        if (loadedState.keywords && loadedState.keywords.length > 0) {
+          const volumeMap = new Map<string, number>();
+          loadedState.keywords.forEach((k) => volumeMap.set(k.kw.toLowerCase(), k.volume));
+          setKeywordVolumeMap(volumeMap);
+          setTopKeywordsForViz(loadedState.keywords.slice(0, 5));
+        }
+
+        // Set the most recent article as generated article if available
+        const currentArticle = loadedState.articles.find((a) => a.isCurrent);
+        if (currentArticle) {
+          setGeneratedArticle({ title: currentArticle.title, content: currentArticle.content });
+        }
+      }
+
+      setIsLoading(false);
+    };
+
+    loadExistingBrief();
+  }, [briefId, isSupabaseMode, loadBrief]);
+
+  // Mark state as unsaved when relevant data changes (Supabase mode)
+  useEffect(() => {
+    if (isSupabaseMode && briefId) {
+      setInternalSaveStatus('unsaved');
+    }
+  }, [briefData, briefingStep, staleSteps, userFeedbacks, subjectInfo, brandInfo, isSupabaseMode, briefId]);
 
   // Toggle animated background when loading
   useEffect(() => {
@@ -1008,6 +1137,30 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-black text-grey font-sans">
         <Header />
         <main className="container mx-auto p-4 md:p-6 lg:p-8">
+            {/* Supabase mode header bar */}
+            {isSupabaseMode && (
+              <div className="flex items-center justify-between mb-4 -mt-2">
+                <div className="flex items-center gap-3">
+                  {onBackToBriefList && (
+                    <button
+                      onClick={onBackToBriefList}
+                      className="flex items-center gap-1.5 text-sm text-grey hover:text-brand-white transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Back to Briefs
+                    </button>
+                  )}
+                  {clientName && (
+                    <span className="text-grey/60 text-sm">
+                      {clientName}
+                    </span>
+                  )}
+                </div>
+                <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+              </div>
+            )}
             <div className="bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
                 {renderCurrentView()}
             </div>

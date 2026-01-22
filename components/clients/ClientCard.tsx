@@ -6,12 +6,14 @@ interface ClientCardProps {
   client: ClientWithBriefCount;
   onClick: (clientId: string) => void;
   isSelected?: boolean;
+  isGenerating?: boolean;
 }
 
 const ClientCard: React.FC<ClientCardProps> = ({
   client,
   onClick,
   isSelected = false,
+  isGenerating = false,
 }) => {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -26,14 +28,27 @@ const ClientCard: React.FC<ClientCardProps> = ({
     <button
       onClick={() => onClick(client.id)}
       className={`
-        w-full text-left p-4 rounded-lg border transition-all duration-200
+        relative w-full text-left p-4 rounded-lg border transition-all duration-200
         bg-black/30 hover:bg-black/40
-        ${isSelected
+        ${isGenerating
+          ? 'border-yellow/50 ring-1 ring-yellow/30'
+          : isSelected
           ? 'border-teal ring-1 ring-teal'
           : 'border-white/10 hover:border-teal/50'
         }
       `}
     >
+      {/* Generation indicator */}
+      {isGenerating && (
+        <div className="absolute top-2 right-2 flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow"></span>
+          </span>
+          <span className="text-xs text-yellow font-medium">Generating</span>
+        </div>
+      )}
+
       {/* Folder Icon and Name */}
       <div className="flex items-start">
         <div className="flex-shrink-0 w-10 h-10 bg-teal/20 rounded-lg flex items-center justify-center mr-3">

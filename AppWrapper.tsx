@@ -153,8 +153,9 @@ const AppWrapperInner: React.FC = () => {
     setState((prev) => ({
       ...prev,
       mode: 'client_select',
-      selectedClientId: null,
-      selectedClientName: null,
+      // Keep client info if generation is in progress (needed for background App)
+      selectedClientId: prev.generationStatus !== 'idle' ? prev.selectedClientId : null,
+      selectedClientName: prev.generationStatus !== 'idle' ? prev.selectedClientName : null,
       currentBriefId: null,
     }));
   }, []);
@@ -246,17 +247,51 @@ const AppWrapperInner: React.FC = () => {
           </div>
         );
       }
+      const isGeneratingOnClientSelect = state.generationStatus !== 'idle' && state.generatingBriefId;
       return (
-        <div className="min-h-screen bg-black text-grey font-sans">
-          <div className="container mx-auto p-4 md:p-6 lg:p-8">
-            <div className="bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
-              <ClientSelectScreen
-                onSelectClient={handleSelectClient}
-                onLogout={handleLogout}
-              />
+        <>
+          <div className="min-h-screen bg-black text-grey font-sans">
+            <div className="container mx-auto p-4 md:p-6 lg:p-8">
+              <div className="bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
+                <ClientSelectScreen
+                  onSelectClient={handleSelectClient}
+                  onLogout={handleLogout}
+                  generatingBriefId={state.generatingBriefId}
+                  generationStatus={state.generationStatus}
+                  generatingClientId={state.selectedClientId}
+                  onViewGeneratingBrief={() => {
+                    if (state.generatingBriefId && state.selectedClientId) {
+                      setState((prev) => ({
+                        ...prev,
+                        mode: 'brief_editor',
+                        currentBriefId: prev.generatingBriefId,
+                      }));
+                    }
+                  }}
+                />
+              </div>
             </div>
           </div>
-        </div>
+          {/* Keep App mounted but hidden during background generation */}
+          {isGeneratingOnClientSelect && (
+            <div className="hidden">
+              <OriginalApp
+                briefId={state.generatingBriefId}
+                clientId={state.selectedClientId}
+                clientName={state.selectedClientName}
+                onBackToBriefList={() => {}}
+                onSaveStatusChange={handleSaveStatusChange}
+                saveStatus={state.saveStatus}
+                lastSavedAt={state.lastSavedAt}
+                isSupabaseMode={true}
+                onGenerationStart={handleGenerationStart}
+                onGenerationProgress={handleGenerationProgress}
+                onGenerationComplete={handleGenerationComplete}
+                isBackgroundMode={true}
+              />
+            </div>
+          )}
+        </>
       );
 
     case 'brief_list':

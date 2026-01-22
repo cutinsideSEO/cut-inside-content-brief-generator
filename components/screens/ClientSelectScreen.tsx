@@ -7,14 +7,26 @@ import ClientCard from '../clients/ClientCard';
 import Button from '../Button';
 import Spinner from '../Spinner';
 
+// Generation status type (matches AppWrapper)
+type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
+
 interface ClientSelectScreenProps {
   onSelectClient: (clientId: string, clientName: string) => void;
   onLogout: () => void;
+  // Background generation props
+  generatingBriefId?: string | null;
+  generationStatus?: GenerationStatus;
+  generatingClientId?: string | null;
+  onViewGeneratingBrief?: () => void;
 }
 
 const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   onSelectClient,
   onLogout,
+  generatingBriefId,
+  generationStatus = 'idle',
+  generatingClientId,
+  onViewGeneratingBrief,
 }) => {
   const { userName, isAdmin } = useAuth();
   const [clients, setClients] = useState<ClientWithBriefCount[]>([]);
@@ -27,6 +39,28 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   const [newClientDescription, setNewClientDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // Check if there's a background generation in progress
+  const isGenerating = generationStatus !== 'idle' && generatingBriefId;
+
+  // Get the generating client name
+  const generatingClientName = generatingClientId
+    ? clients.find(c => c.id === generatingClientId)?.name
+    : null;
+
+  // Get generation status text
+  const getGenerationStatusText = () => {
+    switch (generationStatus) {
+      case 'analyzing_competitors':
+        return 'Analyzing competitors...';
+      case 'generating_brief':
+        return 'Generating brief...';
+      case 'generating_content':
+        return 'Generating content...';
+      default:
+        return '';
+    }
+  };
 
   // Fetch clients on mount
   useEffect(() => {
@@ -168,8 +202,49 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
               key={client.id}
               client={client}
               onClick={() => onSelectClient(client.id, client.name)}
+              isGenerating={client.id === generatingClientId && generationStatus !== 'idle'}
             />
           ))}
+        </div>
+      )}
+
+      {/* Background Generation Indicator */}
+      {isGenerating && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <div className="bg-black/90 border border-yellow/50 rounded-lg p-4 shadow-2xl backdrop-blur-sm max-w-sm">
+            <div className="flex items-start gap-3">
+              {/* Pulsing indicator */}
+              <span className="relative flex h-3 w-3 mt-1 flex-shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow"></span>
+              </span>
+
+              <div className="flex-1">
+                <p className="text-yellow font-medium text-sm">
+                  {getGenerationStatusText()}
+                </p>
+                {generatingClientName && (
+                  <p className="text-grey text-xs mt-0.5">
+                    Client: {generatingClientName}
+                  </p>
+                )}
+                <p className="text-grey/70 text-xs mt-1">
+                  Keep this tab open to continue
+                </p>
+              </div>
+
+              {onViewGeneratingBrief && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onViewGeneratingBrief}
+                  className="flex-shrink-0"
+                >
+                  View
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

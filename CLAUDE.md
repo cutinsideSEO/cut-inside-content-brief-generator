@@ -12,9 +12,9 @@ AI-powered SEO Content Strategist that generates comprehensive, data-driven cont
 |-------|------------|
 | Frontend | React 19.1.1 + TypeScript |
 | Build | Vite 6.4.1 |
-| Styling | Tailwind CSS v3 (CDN) |
-| AI | Google Gemini 3 Flash/Pro (with 2.5 Pro fallback) |
-| Database | Supabase (PostgreSQL + Auth) |
+| Styling | Tailwind CSS v3 (CDN) with custom design tokens |
+| AI | Google Gemini 2.5 Flash/Pro |
+| Database | Supabase (PostgreSQL + RLS) |
 | SEO Data | DataForSEO API |
 | Document Parsing | PDF.js, Mammoth.js |
 | Testing | Vitest 4.0.17 |
@@ -88,15 +88,16 @@ index.tsx → AppWrapper.tsx → AuthProvider
 
 ```
 ├── components/
+│   ├── ui/             # Reusable UI component library (Card, Badge, Input, Tabs, Modal, etc.)
 │   ├── screens/        # Full-page views (Login, ClientSelect, BriefList, etc.)
-│   ├── stages/         # Brief step components (Stage1-8)
+│   ├── stages/         # Brief step components (Stage1-7)
 │   ├── briefs/         # Brief-related components (BriefListCard, BriefStatusBadge)
 │   └── clients/        # Client-related components (ClientCard)
 ├── contexts/
 │   ├── AuthContext.tsx # Access code authentication state
-│   └── AppContext.tsx  # Global app state (unused currently)
+│   └── ToastContext.tsx # Global toast notification system
 ├── hooks/
-│   ├── useAutoSave.ts  # Debounced auto-save to Supabase
+│   ├── useAutoSave.ts  # Debounced auto-save to Supabase (2s debounce)
 │   └── useBriefLoader.ts # Load brief data from Supabase
 ├── services/
 │   ├── supabaseClient.ts    # Supabase client + isSupabaseConfigured()
@@ -104,9 +105,9 @@ index.tsx → AppWrapper.tsx → AuthProvider
 │   ├── briefService.ts      # Brief CRUD operations
 │   ├── clientService.ts     # Client/folder management
 │   ├── competitorService.ts # Save/load competitor data
-│   ├── contextService.ts    # Context files/URLs
+│   ├── contextService.ts    # Context files/URLs (uploads to Supabase Storage)
 │   ├── articleService.ts    # Generated articles
-│   ├── geminiService.ts     # Google Gemini API
+│   ├── geminiService.ts     # Google Gemini API with streaming
 │   ├── dataforseoService.ts # SERP & on-page analysis
 │   └── markdownService.ts   # Brief export/import
 ├── types/
@@ -114,9 +115,9 @@ index.tsx → AppWrapper.tsx → AuthProvider
 │   └── appState.ts     # App state types
 ├── supabase/
 │   └── schema.sql      # Database schema (7 tables)
-├── App.tsx             # Main brief wizard logic (state hub)
-├── AppWrapper.tsx      # Auth + navigation wrapper
-└── types.ts            # Legacy types (ContentBrief, etc.)
+├── App.tsx             # Main brief wizard logic (state hub with 20+ useState hooks)
+├── AppWrapper.tsx      # Auth + navigation wrapper + background generation
+└── types.ts            # Core types (ContentBrief, CompetitorPage, etc.)
 ```
 
 ### Database Schema (Supabase)
@@ -213,3 +214,31 @@ Run with: `npm test` or `npm run test:run`
 
 Deployed to Vercel. Environment variables must be set in Vercel dashboard.
 Push to `master` triggers auto-deploy.
+
+## UI Component Library
+
+Reusable components in `components/ui/` follow a dark theme design system:
+
+**Design Tokens (Tailwind classes):**
+- Surfaces: `bg-surface`, `bg-surface-hover`, `bg-surface-active`
+- Text: `text-text-primary`, `text-text-secondary`, `text-text-muted`
+- Borders: `border-border`, `border-border-subtle`, `border-border-emphasis`
+- Status: `text-status-complete`, `text-status-error`, `text-status-warning`
+- Brand: `text-teal`, `bg-teal`, `text-yellow`
+
+**Available Components:**
+- `Card` - Container with variants (default, elevated, outlined)
+- `Badge` - Status indicators (success, warning, error, info, default)
+- `Input`, `Textarea` - Form inputs with labels, hints, errors
+- `Tabs` - Tab navigation with `items`, `activeId`, `onChange` props
+- `Modal` - Dialog overlay with header/footer slots
+- `Progress` - Progress bar with percentage
+- `Callout` - Highlighted information boxes
+- `Alert` - Dismissible alerts
+- `Tooltip`, `Toast` - Contextual information
+
+Import from: `import { Card, Badge, Input, Tabs } from './components/ui';`
+
+## Brief Naming
+
+Brief names are automatically updated to the primary keyword (highest search volume) when analysis starts, making them identifiable in the dashboard instead of generic "New Brief - {date}".

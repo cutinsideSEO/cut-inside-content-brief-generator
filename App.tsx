@@ -965,6 +965,19 @@ const App: React.FC<AppProps> = ({
       }
 
       // Content generation completed successfully
+      // Save the generated article to the database
+      if (briefId && isSupabaseMode) {
+        try {
+          await createArticle(briefId, initialTitle, fullContent, {
+            model_settings: modelSettings,
+            length_constraints: lengthConstraints,
+            writer_instructions: isUploadedBrief ? writerInstructions : undefined,
+          });
+        } catch (saveErr) {
+          console.error('Failed to save article to database:', saveErr);
+        }
+      }
+
       if (briefId && onGenerationComplete) {
         onGenerationComplete(briefId, true);
       }

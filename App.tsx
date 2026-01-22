@@ -162,8 +162,8 @@ const App: React.FC<AppProps> = ({
   const [briefData, setBriefData] = useState<Partial<ContentBrief>>({});
   const [serpLanguage, setSerpLanguage] = useState('English');
   const [outputLanguage, setOutputLanguage] = useState('English');
-  const [apiLogin, setApiLogin] = useState('');
-  const [apiPassword, setApiPassword] = useState('');
+  const [apiLogin, setApiLogin] = useState(import.meta.env.VITE_DATAFORSEO_LOGIN || '');
+  const [apiPassword, setApiPassword] = useState(import.meta.env.VITE_DATAFORSEO_PASSWORD || '');
   
   // File context state
   const [contextFiles, setContextFiles] = useState<Map<string, File>>(new Map());
@@ -1019,8 +1019,8 @@ const App: React.FC<AppProps> = ({
     setContextFiles(new Map());
     setFileContents(new Map());
     setUrlContents(new Map());
-    setApiLogin('');
-    setApiPassword('');
+    setApiLogin(import.meta.env.VITE_DATAFORSEO_LOGIN || '');
+    setApiPassword(import.meta.env.VITE_DATAFORSEO_PASSWORD || '');
     setGeneratedArticle(null);
     setGenerationProgress(null);
     setIsUploadedBrief(false);

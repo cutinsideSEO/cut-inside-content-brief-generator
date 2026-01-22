@@ -5,6 +5,13 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Debug: Log configuration status (remove in production)
+console.log('[Supabase Config]', {
+  urlConfigured: Boolean(supabaseUrl),
+  keyConfigured: Boolean(supabaseAnonKey),
+  url: supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : 'NOT SET',
+});
+
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(

@@ -53,9 +53,11 @@ const AppWrapperInner: React.FC = () => {
   // Determine initial mode based on auth and config
   useEffect(() => {
     if (!authLoading) {
-      if (isConfigured && isAuthenticated) {
+      if (isConfigured) {
+        // Supabase configured - show client_select (which will show login if not authenticated)
         setState((prev) => ({ ...prev, mode: 'client_select' }));
-      } else if (!isConfigured) {
+      } else {
+        // No Supabase - run in standalone mode
         setState((prev) => ({ ...prev, mode: 'standalone' }));
       }
     }

@@ -34,3 +34,5 @@ QA images/
 .env
 .env.local
 .env.*.local
+
+.vercel

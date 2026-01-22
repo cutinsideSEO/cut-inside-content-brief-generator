@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="https://cutinside.com/llm-perception-tool/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cut Inside - Content Brief Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=Montserrat:wght@400&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .bg-grid {
+        background-color: #1A1A18;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        background-position: center center;
+        transition: background-size 0.5s ease-in-out;
+      }
+      body[data-loading="true"] .bg-grid {
+        animation: activeGrid 4s linear infinite;
+      }
+      .prose {
+        color: #E8E8E8;
+      }
+      .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+        color: #FFFFFF;
+        font-family: 'Familjen Grotesk', sans-serif;
+      }
+      .prose h1 { font-size: 2.25em; }
+      .prose h2 { font-size: 1.875em; }
+      .prose h3 { font-size: 1.5em; }
+      .prose p { margin-top: 1.25em; margin-bottom: 1.25em; }
+
+      /* Toast Notifications */
+      .toast-container {
+        position: fixed;
+        bottom: 1rem;
+        right: 1rem;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.5rem;
+      }
+      .toast {
+        animation: toast-in 0.5s ease-out forwards;
+      }
+      @keyframes toast-in {
+        from {
+          opacity: 0;
+          transform: translateX(100%);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      /* Sound Toggle Switch */
+      .sound-toggle-switch {
+        width: 44px;
+        height: 24px;
+      }
+      .sound-toggle-switch .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #333;
+        transition: .4s;
+        border-radius: 24px;
+      }
+      .sound-toggle-switch .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+      }
+      .sound-toggle-switch input:checked + .slider {
+        background-color: #008080;
+      }
+      .sound-toggle-switch input:checked + .slider:before {
+        transform: translateX(20px);
+      }
+      
+      /* Active Grid Animation */
+      @keyframes activeGrid {
+        0% { background-position: 0 0; }
+        100% { background-position: 50px 50px; }
+      }
+
+      /* Celebration Animation */
+      .celebration-container {
+        animation: celebrate-fade-in 0.5s ease-out;
+      }
+      @keyframes celebrate-fade-in {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .celebration-icon {
+        animation: celebrate-icon-pop 0.7s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+      }
+      @keyframes celebrate-icon-pop {
+        0% { transform: scale(0); }
+        70% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+      }
+
+      /* Slide-in Panel Animation */
+      .animate-slide-in-right {
+        animation: slideInRight 0.3s ease-out forwards;
+      }
+      @keyframes slideInRight {
+        from {
+          opacity: 0;
+          transform: translateX(100%);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+    </style>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              black: '#1A1A18',
+              teal: '#008080',
+              yellow: '#FDD401',
+              grey: '#E8E8E8',
+              'brand-white': '#FFFFFF',
+            },
+            fontFamily: {
+              sans: ['Montserrat', 'sans-serif'],
+              heading: ['Familjen Grotesk', 'sans-serif'],
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'pulse-subtle': 'pulseSubtle 2s infinite ease-in-out'
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: 0, transform: 'translateY(10px)' },
+                '100%': { opacity: 1, transform: 'translateY(0)' },
+              },
+              pulseSubtle: {
+                '0%, 100%': { opacity: 1 },
+                '50%': { opacity: 0.7 },
+              }
+            },
+            boxShadow: {
+              'glow-teal': '0 0 15px 0 rgba(0, 128, 128, 0.6)',
+              'glow-yellow': '0 0 15px 0 rgba(253, 212, 1, 0.6)',
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.16.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-black text-grey font-sans bg-grid">
+    <div id="root"></div>
+    <!-- Parsing libraries loaded statically to prevent race conditions -->
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.5.136/legacy/build/pdf.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

@@ -36,3 +36,4 @@ QA images/
 .env.*.local
 
 .vercel
+.playwright-mcp/

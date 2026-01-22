@@ -3,7 +3,14 @@ import Button from '../Button';
 import { AlertTriangleIcon, UploadCloudIcon, XIcon, FileCodeIcon, BrainCircuitIcon, ChevronDownIcon, LinkIcon, SettingsIcon } from '../Icon';
 import ModelSelector from '../ModelSelector';
 import LengthSettings from '../LengthSettings';
+import KeywordTableInput from '../KeywordTableInput';
 import type { ModelSettings, LengthConstraints, ExtractedTemplate } from '../../types';
+
+interface KeywordRow {
+  id: string;
+  keyword: string;
+  volume: string;
+}
 
 interface InitialInputScreenProps {
   onStartAnalysis: (
@@ -55,7 +62,9 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   const [localError, setLocalError] = useState('');
   const [flow, setFlow] = useState<'create' | null>(null);
   const [inputMethod, setInputMethod] = useState<'csv' | 'manual'>('csv');
-  const [manualKeywords, setManualKeywords] = useState('');
+  const [manualKeywordRows, setManualKeywordRows] = useState<KeywordRow[]>([
+    { id: '1', keyword: '', volume: '' }
+  ]);
 
   // Feature 6: Model settings
   const [modelSettings, setModelSettings] = useState<ModelSettings>({
@@ -166,30 +175,25 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         }
 
     } else { // manual input
-        if (!manualKeywords.trim()) {
-            setLocalError("Please enter keywords and their volumes.");
+        // Filter out empty rows and validate
+        const validRows = manualKeywordRows.filter(row => row.keyword.trim() && row.volume.trim());
+
+        if (validRows.length === 0) {
+            setLocalError("Please enter at least one keyword with its volume.");
             return;
         }
-        try {
-            keywords = manualKeywords.trim().split('\n').map((line, i) => {
-                const parts = line.split(',');
-                if (parts.length !== 2) {
-                    throw new Error(`Invalid format on line ${i + 1}. Please use 'keyword, volume'.`);
-                }
-                const kw = parts[0].trim();
-                const volume = parseInt(parts[1].trim(), 10);
-                if (!kw) {
-                    throw new Error(`Missing keyword on line ${i + 1}.`);
-                }
-                if (isNaN(volume)) {
-                    throw new Error(`Invalid volume on line ${i + 1}. Volume must be a number.`);
-                }
-                return { kw, volume };
-            });
-        } catch (err) {
-            setLocalError(err instanceof Error ? err.message : "Failed to parse manual input.");
+
+        // Check for invalid volumes
+        const invalidRow = validRows.find(row => isNaN(parseInt(row.volume, 10)));
+        if (invalidRow) {
+            setLocalError(`Invalid volume for keyword "${invalidRow.keyword}". Volume must be a number.`);
             return;
         }
+
+        keywords = validRows.map(row => ({
+            kw: row.keyword.trim(),
+            volume: parseInt(row.volume, 10)
+        }));
     }
 
     if (keywords.length === 0) {
@@ -299,14 +303,10 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
             )}
 
             {inputMethod === 'manual' && (
-              <div className="bg-black/50 p-4 rounded-lg border border-white/10">
-                  <textarea
-                      value={manualKeywords}
-                      onChange={(e) => setManualKeywords(e.target.value)}
-                      placeholder="Enter one keyword and volume per line, separated by a comma.&#10;e.g., machine learning, 100000&#10;what is ml, 50000"
-                      className="w-full p-3 bg-black border border-white/20 rounded-md text-grey h-40 resize-y focus:ring-2 focus:ring-teal font-mono text-sm"
-                  />
-              </div>
+              <KeywordTableInput
+                value={manualKeywordRows}
+                onChange={setManualKeywordRows}
+              />
             )}
 
 

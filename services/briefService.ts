@@ -229,6 +229,40 @@ export async function saveBriefData(
 }
 
 /**
+ * Compute brief status from state
+ * Status is derived from the current view and brief data completeness
+ */
+function computeBriefStatus(
+  currentView: AppView | undefined,
+  briefData: Partial<ContentBrief> | undefined
+): BriefStatus {
+  // If at initial input, it's a draft
+  if (!currentView || currentView === 'initial_input') {
+    return 'draft';
+  }
+
+  // If brief data has all 7 steps completed, mark as complete
+  // Steps: 1=page_goal+target_audience, 2=keyword_strategy, 3=competitor_insights,
+  //        4=content_gap_analysis, 5=article_structure, 6=faqs, 7=on_page_seo
+  const hasAllSteps = briefData &&
+    briefData.page_goal &&
+    briefData.target_audience &&
+    briefData.keyword_strategy &&
+    briefData.competitor_insights &&
+    briefData.content_gap_analysis &&
+    briefData.article_structure &&
+    briefData.faqs &&
+    briefData.on_page_seo;
+
+  if (hasAllSteps && (currentView === 'dashboard' || currentView === 'content_generation')) {
+    return 'complete';
+  }
+
+  // Otherwise, it's in progress
+  return 'in_progress';
+}
+
+/**
  * Save complete brief state (for auto-save)
  */
 export async function saveBriefState(
@@ -243,9 +277,22 @@ export async function saveBriefState(
     subject_info?: string;
     brand_info?: string;
     extracted_template?: ExtractedTemplate | null;
+    // New fields for complete persistence
+    keywords?: { kw: string; volume: number }[] | null;
+    output_language?: string;
+    serp_language?: string;
+    serp_country?: string;
+    model_settings?: ModelSettings | null;
+    length_constraints?: LengthConstraints | null;
   }
 ): Promise<ApiResponse<Brief>> {
-  return updateBrief(briefId, state);
+  // Compute the status from state to ensure consistency
+  const computedStatus = computeBriefStatus(state.current_view, state.brief_data);
+
+  return updateBrief(briefId, {
+    ...state,
+    status: computedStatus,
+  });
 }
 
 /**

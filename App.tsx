@@ -45,6 +45,8 @@ interface AppProps {
   onGenerationProgress?: (step: number) => void;
   onGenerationComplete?: (briefId: string, success: boolean) => void;
   isBackgroundMode?: boolean;
+  // Callback for parent to request an immediate save (for save-before-navigation)
+  onSaveNowRef?: React.MutableRefObject<(() => Promise<void>) | null>;
 }
 
 const MAX_FILE_SIZE_MB = 10;
@@ -149,6 +151,7 @@ const App: React.FC<AppProps> = ({
   onGenerationProgress,
   onGenerationComplete,
   isBackgroundMode = false,
+  onSaveNowRef,
 }) => {
   const [currentView, setCurrentView] = useState<AppView>('initial_input');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -208,11 +211,20 @@ const App: React.FC<AppProps> = ({
     strictMode: false,
   });
 
+  // Model settings and SERP country for auto-save
+  const [modelSettings, setModelSettingsState] = useState<ModelSettings | null>(null);
+  const [serpCountry, setSerpCountry] = useState('United States');
+
   // Feature: PAA (People Also Ask) questions collected from SERPs
   const [paaQuestions, setPaaQuestions] = useState<string[]>([]);
 
   // Brief loader hook
   const { loadBrief, isLoading: isBriefLoading } = useBriefLoader();
+
+  // Build keywords array from keywordVolumeMap for auto-save
+  const keywordsForSave = topKeywordsForViz.length > 0
+    ? topKeywordsForViz
+    : Array.from(keywordVolumeMap.entries()).map(([kw, volume]) => ({ kw, volume }));
 
   // Auto-save hook (only active in Supabase mode)
   const { triggerSave, saveNow } = useAutoSave(
@@ -228,11 +240,18 @@ const App: React.FC<AppProps> = ({
       extractedTemplate,
       competitorData,
       saveStatus: internalSaveStatus,
+      // New fields for complete persistence
+      outputLanguage,
+      serpLanguage,
+      serpCountry,
+      modelSettings,
+      lengthConstraints,
+      keywords: keywordsForSave.length > 0 ? keywordsForSave : null,
     },
     {
       briefId: briefId || null,
       enabled: isSupabaseMode && Boolean(briefId),
-      debounceMs: 2000,
+      debounceMs: 500, // Reduced to minimize data loss
       onSaveStart: () => {
         setInternalSaveStatus('saving');
         onSaveStatusChange?.('saving');
@@ -249,6 +268,18 @@ const App: React.FC<AppProps> = ({
       },
     }
   );
+
+  // Expose saveNow to parent via ref (for save-before-navigation)
+  useEffect(() => {
+    if (onSaveNowRef) {
+      onSaveNowRef.current = saveNow;
+    }
+    return () => {
+      if (onSaveNowRef) {
+        onSaveNowRef.current = null;
+      }
+    };
+  }, [onSaveNowRef, saveNow]);
 
   // Load brief data when briefId is provided (Supabase mode)
   useEffect(() => {
@@ -270,9 +301,11 @@ const App: React.FC<AppProps> = ({
         setBrandInfo(loadedState.brandInfo);
         setOutputLanguage(loadedState.outputLanguage);
         setSerpLanguage(loadedState.serpLanguage);
+        setSerpCountry(loadedState.serpCountry);
         setCompetitorData(loadedState.competitorData);
         setExtractedTemplate(loadedState.extractedTemplate);
         setLengthConstraints(loadedState.lengthConstraints);
+        setModelSettingsState(loadedState.modelSettings);
 
         // Build keyword volume map from loaded keywords
         if (loadedState.keywords && loadedState.keywords.length > 0) {
@@ -300,7 +333,24 @@ const App: React.FC<AppProps> = ({
     if (isSupabaseMode && briefId) {
       setInternalSaveStatus('unsaved');
     }
-  }, [briefData, briefingStep, staleSteps, userFeedbacks, subjectInfo, brandInfo, isSupabaseMode, briefId]);
+  }, [
+    briefData,
+    briefingStep,
+    staleSteps,
+    userFeedbacks,
+    subjectInfo,
+    brandInfo,
+    isSupabaseMode,
+    briefId,
+    // Include new fields
+    outputLanguage,
+    serpLanguage,
+    serpCountry,
+    modelSettings,
+    lengthConstraints,
+    topKeywordsForViz,
+    extractedTemplate,
+  ]);
 
   // Toggle animated background when loading
   useEffect(() => {
@@ -359,10 +409,12 @@ const App: React.FC<AppProps> = ({
     setOutputLanguage(outputLanguage);
     setApiLogin(login);
     setApiPassword(password);
+    setSerpCountry(country);
 
     // Feature 6: Apply model settings
     if (modelSettings) {
-      setModelSettings(modelSettings);
+      setModelSettings(modelSettings); // geminiService setter
+      setModelSettingsState(modelSettings); // local state for auto-save
     }
 
     // Feature 3: Store length constraints
@@ -1094,7 +1146,12 @@ const App: React.FC<AppProps> = ({
     return newParagraph;
   }, [outputLanguage, briefData.article_structure]);
 
-  const handleRestart = () => {
+  const handleRestart = async () => {
+    // Save current state before clearing (prevents data loss)
+    if (isSupabaseMode && briefId) {
+      await saveNow();
+    }
+
     setCurrentView('initial_input');
     setBriefData({});
     setError(null);
@@ -1109,6 +1166,7 @@ const App: React.FC<AppProps> = ({
     setUserFeedbacks({});
     setSerpLanguage('English');
     setOutputLanguage('English');
+    setSerpCountry('United States');
     setContextFiles(new Map());
     setFileContents(new Map());
     setUrlContents(new Map());
@@ -1122,6 +1180,8 @@ const App: React.FC<AppProps> = ({
     setHasAchievedDataMaven(false); // Reset achievement
     setPaaQuestions([]); // Reset PAA questions
     setExtractedTemplate(null); // Reset template
+    setModelSettingsState(null); // Reset model settings
+    setLengthConstraints({ globalTarget: null, sectionTargets: {}, strictMode: false }); // Reset constraints
   };
 
   const renderCurrentView = () => {

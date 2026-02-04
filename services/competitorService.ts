@@ -31,19 +31,15 @@ export async function getCompetitorsForBrief(briefId: string): Promise<ApiRespon
 }
 
 /**
- * Save competitors for a brief (bulk insert/replace)
+ * Save competitors for a brief using upsert pattern
+ * This prevents data loss compared to delete-all + insert
+ * Requires unique index on (brief_id, url) - see migrations/001_add_competitor_unique_constraint.sql
  */
 export async function saveCompetitors(
   briefId: string,
   competitors: CompetitorPage[]
 ): Promise<ApiResponse<BriefCompetitor[]>> {
   try {
-    // First, delete existing competitors for this brief
-    await supabase
-      .from('brief_competitors')
-      .delete()
-      .eq('brief_id', briefId);
-
     // Convert CompetitorPage[] to BriefCompetitorInsert[]
     const competitorInserts: BriefCompetitorInsert[] = competitors.map((comp) => ({
       brief_id: briefId,
@@ -58,15 +54,49 @@ export async function saveCompetitors(
       is_starred: comp.is_starred || false,
     }));
 
-    // Insert new competitors
+    // Use upsert to insert or update competitors
+    // onConflict on (brief_id, url) requires the unique index from migration
     const { data, error } = await supabase
       .from('brief_competitors')
-      .insert(competitorInserts)
+      .upsert(competitorInserts, {
+        onConflict: 'brief_id,url',
+        ignoreDuplicates: false, // Update existing records
+      })
       .select();
 
     if (error) {
+      // If the unique constraint doesn't exist yet, fall back to delete + insert
+      if (error.message.includes('unique') || error.message.includes('constraint')) {
+        console.warn('Upsert failed, falling back to delete + insert:', error.message);
+
+        // Delete existing competitors
+        await supabase
+          .from('brief_competitors')
+          .delete()
+          .eq('brief_id', briefId);
+
+        // Insert new competitors
+        const { data: insertData, error: insertError } = await supabase
+          .from('brief_competitors')
+          .insert(competitorInserts)
+          .select();
+
+        if (insertError) {
+          return { data: null, error: insertError.message };
+        }
+
+        return { data: insertData as BriefCompetitor[], error: null };
+      }
       return { data: null, error: error.message };
     }
+
+    // Remove competitors that are no longer in the list
+    const currentUrls = competitors.map((c) => c.URL);
+    await supabase
+      .from('brief_competitors')
+      .delete()
+      .eq('brief_id', briefId)
+      .not('url', 'in', `(${currentUrls.map((u) => `"${u.replace(/"/g, '\\"')}"`).join(',')})`);
 
     return { data: data as BriefCompetitor[], error: null };
   } catch (err) {

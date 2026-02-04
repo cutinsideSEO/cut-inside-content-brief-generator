@@ -1,5 +1,5 @@
 // AppWrapper - Integrates Supabase auth and brief management with the existing App
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { isSupabaseConfigured } from './services/supabaseClient';
 import { createBrief, getBrief, updateBriefProgress, updateBriefStatus } from './services/briefService';
@@ -51,6 +51,9 @@ interface WrapperState {
 const AppWrapperInner: React.FC = () => {
   const { isAuthenticated, isLoading: authLoading, logout, isConfigured } = useAuth();
   const { loadBrief, isLoading: briefLoading } = useBriefLoader();
+
+  // Ref to hold saveNow function from the currently active App instance
+  const saveNowRef = useRef<(() => Promise<void>) | null>(null);
 
   const [state, setState] = useState<WrapperState>({
     mode: 'standalone',
@@ -379,18 +382,32 @@ const AppWrapperInner: React.FC = () => {
     case 'brief_editor':
       // Check if this brief is currently generating
       const currentBriefGenerating = state.currentBriefId ? state.generatingBriefs[state.currentBriefId] : null;
+
+      // Handler for back to brief list that saves first
+      const handleBackToBriefListWithSave = async () => {
+        // Flush any pending saves before navigating
+        if (saveNowRef.current) {
+          try {
+            await saveNowRef.current();
+          } catch (err) {
+            console.error('Failed to save before navigation:', err);
+            // Continue with navigation even if save fails
+          }
+        }
+        setState((prev) => ({
+          ...prev,
+          mode: 'brief_list',
+          currentBriefId: null,
+        }));
+      };
+
       // Pass the brief ID and save handlers to the original App
       return (
         <OriginalApp
           briefId={state.currentBriefId}
           clientId={state.selectedClientId}
           clientName={state.selectedClientName}
-          onBackToBriefList={() => setState((prev) => ({
-            ...prev,
-            mode: 'brief_list',
-            currentBriefId: null,
-            // Generation tracking is now in the map, no need to update it here
-          }))}
+          onBackToBriefList={handleBackToBriefListWithSave}
           onSaveStatusChange={handleSaveStatusChange}
           saveStatus={state.saveStatus}
           lastSavedAt={state.lastSavedAt}
@@ -399,6 +416,7 @@ const AppWrapperInner: React.FC = () => {
           onGenerationProgress={(step) => state.currentBriefId && handleGenerationProgress(state.currentBriefId, step)}
           onGenerationComplete={handleGenerationComplete}
           isBackgroundMode={false}
+          onSaveNowRef={saveNowRef}
         />
       );
 

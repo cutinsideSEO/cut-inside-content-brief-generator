@@ -1,10 +1,10 @@
 // useAutoSave Hook - Debounced auto-save to Supabase
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { saveBriefState } from '../services/briefService';
 import { saveCompetitors } from '../services/competitorService';
 import type { AppState, SaveStatus } from '../types/appState';
 import type { AppView } from '../types/database';
-import type { ContentBrief, CompetitorPage, ExtractedTemplate } from '../types';
+import type { ContentBrief, CompetitorPage, ExtractedTemplate, ModelSettings, LengthConstraints } from '../types';
 
 interface AutoSaveData {
   current_view: AppView;
@@ -16,6 +16,13 @@ interface AutoSaveData {
   subject_info: string;
   brand_info: string;
   extracted_template: ExtractedTemplate | null;
+  // New fields to save
+  keywords: { kw: string; volume: number }[] | null;
+  output_language: string;
+  serp_language: string;
+  serp_country: string;
+  model_settings: ModelSettings | null;
+  length_constraints: LengthConstraints | null;
 }
 
 interface UseAutoSaveOptions {
@@ -50,13 +57,22 @@ export function useAutoSave(
     | 'extractedTemplate'
     | 'competitorData'
     | 'saveStatus'
-  >,
+    // New fields for complete persistence
+    | 'outputLanguage'
+    | 'serpLanguage'
+    | 'serpCountry'
+    | 'modelSettings'
+    | 'lengthConstraints'
+  > & {
+    // Keywords passed separately since App.tsx uses a different structure
+    keywords: { kw: string; volume: number }[] | null;
+  },
   options: UseAutoSaveOptions
 ): UseAutoSaveReturn {
   const {
     briefId,
     enabled,
-    debounceMs = 2000,
+    debounceMs = 500, // Reduced from 2000ms to minimize data loss on navigation
     onSaveStart,
     onSaveSuccess,
     onSaveError,
@@ -78,6 +94,13 @@ export function useAutoSave(
       subject_info: state.subjectInfo,
       brand_info: state.brandInfo,
       extracted_template: state.extractedTemplate,
+      // New fields
+      keywords: state.keywords,
+      output_language: state.outputLanguage,
+      serp_language: state.serpLanguage,
+      serp_country: state.serpCountry,
+      model_settings: state.modelSettings,
+      length_constraints: state.lengthConstraints,
     };
   }, [
     state.currentView,
@@ -89,6 +112,12 @@ export function useAutoSave(
     state.subjectInfo,
     state.brandInfo,
     state.extractedTemplate,
+    state.keywords,
+    state.outputLanguage,
+    state.serpLanguage,
+    state.serpCountry,
+    state.modelSettings,
+    state.lengthConstraints,
   ]);
 
   // Check if data has changed
@@ -183,11 +212,31 @@ export function useAutoSave(
     }
   }, [state.saveStatus, enabled, briefId, triggerSave]);
 
-  // Cleanup on unmount
+  // Store a ref to the latest performSave function and state for unmount cleanup
+  const performSaveRef = useRef(performSave);
+  const hasDataChangedRef = useRef(hasDataChanged);
+  const enabledRef = useRef(enabled);
+  const briefIdRef = useRef(briefId);
+
+  // Keep refs up to date
+  useEffect(() => {
+    performSaveRef.current = performSave;
+    hasDataChangedRef.current = hasDataChanged;
+    enabledRef.current = enabled;
+    briefIdRef.current = briefId;
+  });
+
+  // Cleanup on unmount - flush pending saves
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      // Fire a save on unmount if there are pending changes
+      // This helps prevent data loss when navigating away
+      if (enabledRef.current && briefIdRef.current && hasDataChangedRef.current()) {
+        performSaveRef.current();
       }
     };
   }, []);

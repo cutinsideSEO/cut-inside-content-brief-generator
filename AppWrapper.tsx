@@ -202,6 +202,7 @@ const AppWrapperInner: React.FC = () => {
       selectedClientId: null,
       selectedClientName: null,
       currentBriefId: null,
+      selectedArticleId: null,
     }));
   }, []);
 
@@ -235,6 +236,7 @@ const AppWrapperInner: React.FC = () => {
       ...prev,
       mode: 'brief_editor',
       currentBriefId: briefId,
+      selectedArticleId: null,
     }));
   }, []);
 
@@ -244,6 +246,7 @@ const AppWrapperInner: React.FC = () => {
       ...prev,
       mode: 'brief_editor',
       currentBriefId: briefId,
+      selectedArticleId: null,
     }));
   }, []);
 
@@ -464,6 +467,7 @@ const AppWrapperInner: React.FC = () => {
           ...prev,
           mode: 'brief_list',
           currentBriefId: null,
+          selectedArticleId: null,
         }));
       };
 

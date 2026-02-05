@@ -736,6 +736,58 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
         }
     }
 
+    // Build E-E-A-T signals instruction if available on the brief
+    let eeatInstruction = '';
+    if (brief.eeat_signals) {
+        const s = brief.eeat_signals;
+        const bullets = [
+            ...(s.experience?.length ? [`**Experience:** ${s.experience.join('; ')}`] : []),
+            ...(s.expertise?.length ? [`**Expertise:** ${s.expertise.join('; ')}`] : []),
+            ...(s.authority?.length ? [`**Authority:** ${s.authority.join('; ')}`] : []),
+            ...(s.trust?.length ? [`**Trust:** ${s.trust.join('; ')}`] : []),
+        ];
+        if (bullets.length > 0) {
+            eeatInstruction = `
+---
+
+**🛡️ E-E-A-T SIGNALS — WEAVE THESE INTO YOUR WRITING:**
+Where naturally relevant to this section, incorporate the following credibility signals:
+${bullets.map(b => `- ${b}`).join('\n')}
+
+Do NOT force every signal into every section. Only include signals that fit organically with this section's topic. A single well-placed signal per section is better than shoehorning multiple.
+`;
+        }
+    }
+
+    // Build brief validation awareness — flag known gaps so the writer compensates
+    let validationInstruction = '';
+    if (brief.validation?.improvements && brief.validation.improvements.length > 0) {
+        const relevantImprovements = brief.validation.improvements.filter(imp => {
+            // Include improvements that reference this section or are general
+            const sectionLower = sectionToWrite.heading.toLowerCase();
+            const impSectionLower = imp.section.toLowerCase();
+            return impSectionLower === 'general' ||
+                   impSectionLower === 'overall' ||
+                   sectionLower.includes(impSectionLower) ||
+                   impSectionLower.includes(sectionLower.split(':')[0].trim());
+        });
+
+        // Always include all improvements for the first section so nothing is missed
+        const improvementsToShow = (currentSectionIndex === 0)
+            ? brief.validation.improvements
+            : relevantImprovements;
+
+        if (improvementsToShow.length > 0) {
+            validationInstruction = `
+---
+
+**⚠️ BRIEF QUALITY ISSUES — COMPENSATE IN YOUR WRITING:**
+A validation pass identified these gaps in the brief. Address them in your writing where relevant:
+${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.suggestion}`).join('\n')}
+`;
+        }
+    }
+
     // Build additional resources instruction if available
     let resourcesInstruction = '';
     if (sectionToWrite.additional_resources && sectionToWrite.additional_resources.length > 0) {
@@ -770,6 +822,8 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
         ${wordCountInstruction}
         ${resourcesInstruction}
         ${wordBudgetInstruction}
+        ${eeatInstruction}
+        ${validationInstruction}
 
         ---
 

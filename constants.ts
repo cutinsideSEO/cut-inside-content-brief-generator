@@ -206,7 +206,9 @@ export const getContentGenerationPrompt = (language: string, writerInstructions?
     5.  You will see a list of 'Upcoming Headings' to help you anticipate the article's flow and write a good transition.
     6.  Your entire response must be only the text (one or more paragraphs) for the current section. Do not add any extra formatting, titles, or conversational text.
     7.  Your entire response MUST be in **${language}**.
-    8.  **WORD COUNT DISCIPLINE:** When a word count target is specified, you MUST respect it. Count your output mentally as you write. It is better to be concise and impactful than to pad with filler content. If a strict limit is set, DO NOT exceed it under any circumstances.`;
+    8.  **WORD COUNT DISCIPLINE:** When a word count target is specified, you MUST respect it. Count your output mentally as you write. It is better to be concise and impactful than to pad with filler content. If a strict limit is set, DO NOT exceed it under any circumstances.
+    9.  **E-E-A-T SIGNALS:** When E-E-A-T (Experience, Expertise, Authority, Trust) signals are provided, weave them naturally into your writing. Cite authoritative sources, demonstrate expertise through precise language, and include trust signals where appropriate. Do NOT list them artificially — integrate them so the content reads as genuinely authoritative.
+    10. **BRIEF QUALITY COMPENSATION:** When brief validation issues are flagged, actively compensate for them in your writing. If the brief missed covering a topic, fill the gap. If keyword integration was weak, ensure you use the keywords naturally. Your job is to produce the best possible content even if the brief has imperfections.`;
 
     if (writerInstructions && writerInstructions.trim()) {
         prompt += `

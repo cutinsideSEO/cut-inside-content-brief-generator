@@ -48,15 +48,15 @@ const Stage6Faqs: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       {faqsData.reasoning && (
         <div className="flex items-center gap-2 mb-2">
           <AIReasoningIcon reasoning={faqsData.reasoning} />
-          <span className="text-xs text-text-muted">AI-generated questions based on PAA data and competitor analysis</span>
+          <span className="text-xs text-gray-400">AI-generated questions based on PAA data and competitor analysis</span>
         </div>
       )}
 
       <div className="space-y-1">
         {faqsData.questions.map((item, index) => (
-          <div key={index} className="group border-b border-border-subtle last:border-b-0 py-3">
+          <div key={index} className="group border-b border-gray-100 last:border-b-0 py-3">
             <div className="flex items-start gap-3">
-              <span className="text-sm font-heading font-bold text-text-muted mt-0.5 w-6 text-right flex-shrink-0">
+              <span className="text-sm font-heading font-bold text-gray-400 mt-0.5 w-6 text-right flex-shrink-0">
                 {index + 1}.
               </span>
               <div className="flex-1 min-w-0">
@@ -71,7 +71,7 @@ const Stage6Faqs: React.FC<StageProps> = ({ briefData, setBriefData }) => {
                     value={item.guidelines?.join('\n') || ''}
                     onChange={(val) => handleFaqChange(index, 'guidelines', val)}
                     placeholder="Guidelines for answering this question..."
-                    textClassName="text-text-secondary text-xs"
+                    textClassName="text-gray-600 text-xs"
                   />
                 </div>
               </div>
@@ -79,7 +79,7 @@ const Stage6Faqs: React.FC<StageProps> = ({ briefData, setBriefData }) => {
                 variant="ghost"
                 size="sm"
                 onClick={() => handleRemoveFaq(index)}
-                className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-status-error transition-opacity flex-shrink-0"
+                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity flex-shrink-0"
               >
                 <XIcon className="h-3.5 w-3.5" />
               </Button>
@@ -89,7 +89,7 @@ const Stage6Faqs: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       </div>
 
       {faqsData.questions.length === 0 && (
-        <div className="text-center py-8 text-text-muted">
+        <div className="text-center py-8 text-gray-400">
           <p>No FAQs generated yet.</p>
         </div>
       )}

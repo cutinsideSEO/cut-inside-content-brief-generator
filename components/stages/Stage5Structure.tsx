@@ -18,7 +18,7 @@ interface StageProps {
 const HeadingInsightsPopover: React.FC<{ keywords?: string[]; competitors?: string[] }> = ({ keywords, competitors }) => {
     if (!keywords?.length && !competitors?.length) return null;
     return (
-        <div className="absolute z-10 w-72 p-3 text-sm font-normal text-text-secondary bg-surface-elevated rounded-radius-md border border-border shadow-card-elevated -translate-y-full -translate-x-1/2 left-1/2 -top-2 animate-fade-in">
+        <div className="absolute z-10 w-72 p-3 text-sm font-normal text-gray-600 bg-white rounded-md border border-gray-200 shadow-card-elevated -translate-y-full -translate-x-1/2 left-1/2 -top-2 animate-fade-in">
             {keywords?.length > 0 && (
                 <div className="mb-3">
                     <h4 className="font-heading font-semibold text-teal text-xs uppercase tracking-wider">Targeted Keywords</h4>
@@ -31,8 +31,8 @@ const HeadingInsightsPopover: React.FC<{ keywords?: string[]; competitors?: stri
             )}
             {competitors?.length > 0 && (
                  <div>
-                    <h4 className="font-heading font-semibold text-status-generating text-xs uppercase tracking-wider">Competitor Coverage</h4>
-                    <ul className="text-xs text-text-muted mt-2 space-y-1">
+                    <h4 className="font-heading font-semibold text-amber-500 text-xs uppercase tracking-wider">Competitor Coverage</h4>
+                    <ul className="text-xs text-gray-400 mt-2 space-y-1">
                         {competitors.map(c => <li key={c} className="truncate" title={c}>• {c}</li>)}
                     </ul>
                 </div>
@@ -60,8 +60,8 @@ const OutlineNode: React.FC<{
   const levelPadding = (path.length - 1) * 1.5;
   const levelColors: Record<string, string> = {
     'H2': 'border-l-teal',
-    'H3': 'border-l-status-complete',
-    'H4': 'border-l-status-generating',
+    'H3': 'border-l-emerald-400',
+    'H4': 'border-l-amber-400',
   };
 
   const hasSnippet = item.featured_snippet_target?.is_target;
@@ -73,19 +73,19 @@ const OutlineNode: React.FC<{
         <button
           type="button"
           onClick={() => onToggleExpand(pathKey)}
-          className="w-full flex items-center gap-3 py-2.5 pl-4 pr-2 hover:bg-surface-hover/50 transition-colors text-left rounded-r-radius-sm"
+          className="w-full flex items-center gap-3 py-2.5 pl-4 pr-2 hover:bg-gray-100 transition-colors text-left rounded-r-sm"
         >
-          <ChevronDownIcon className={`h-4 w-4 text-text-muted flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+          <ChevronDownIcon className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
           <Badge variant="teal" size="sm">{item.level}</Badge>
-          <span className="text-sm font-heading font-semibold text-text-primary truncate flex-1">
+          <span className="text-sm font-heading font-semibold text-gray-900 truncate flex-1">
             {item.heading || 'Untitled section'}
           </span>
           <div className="flex items-center gap-2 flex-shrink-0">
             {item.target_word_count && item.target_word_count > 0 && (
-              <span className="text-xs text-text-muted">{item.target_word_count.toLocaleString()}w</span>
+              <span className="text-xs text-gray-400">{item.target_word_count.toLocaleString()}w</span>
             )}
             {hasSnippet && (
-              <ZapIcon className="h-3.5 w-3.5 text-green-400" />
+              <ZapIcon className="h-3.5 w-3.5 text-emerald-500" />
             )}
             <div
               className="relative"
@@ -94,7 +94,7 @@ const OutlineNode: React.FC<{
               onClick={(e) => e.stopPropagation()}
             >
               {(item.targeted_keywords?.length || item.competitor_coverage?.length) ? (
-                <PuzzleIcon className="h-3.5 w-3.5 text-text-muted" />
+                <PuzzleIcon className="h-3.5 w-3.5 text-gray-400" />
               ) : null}
               {isHovered && <HeadingInsightsPopover keywords={item.targeted_keywords} competitors={item.competitor_coverage} />}
             </div>
@@ -108,7 +108,7 @@ const OutlineNode: React.FC<{
               <div className="flex items-center gap-2">
                 {item.reasoning && <AIReasoningIcon reasoning={item.reasoning} />}
                 {hasSnippet && item.featured_snippet_target && (
-                  <span className="text-xs text-text-muted">
+                  <span className="text-xs text-gray-400">
                     Snippet: <Badge variant="default" size="sm">{SNIPPET_FORMAT_LABELS[item.featured_snippet_target.format]?.label}</Badge>
                     {item.featured_snippet_target.target_query && (
                       <span className="ml-1 text-teal">"{item.featured_snippet_target.target_query}"</span>
@@ -116,7 +116,7 @@ const OutlineNode: React.FC<{
                   </span>
                 )}
                 {item.additional_resources && item.additional_resources.length > 0 && (
-                  <span className="text-xs text-status-generating">
+                  <span className="text-xs text-amber-500">
                     {item.additional_resources.length} resource{item.additional_resources.length > 1 ? 's' : ''} needed
                   </span>
                 )}
@@ -125,14 +125,14 @@ const OutlineNode: React.FC<{
                 variant="ghost"
                 size="sm"
                 onClick={() => onRemove(path)}
-                className="text-text-muted hover:text-status-error"
+                className="text-gray-400 hover:text-red-500"
               >
                 <XIcon className="h-3.5 w-3.5" />
               </Button>
             </div>
 
             <div>
-              <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-1">Heading</label>
+              <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-1">Heading</label>
               <Input
                 value={item.heading}
                 onChange={(e) => handleInputChange('heading', e.target.value)}
@@ -141,7 +141,7 @@ const OutlineNode: React.FC<{
             </div>
 
             <div>
-              <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-1">Guidelines</label>
+              <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-1">Guidelines</label>
               <EditableText
                 value={item.guidelines.join('\n')}
                 onChange={(val) => handleInputChange('guidelines', val.split('\n'))}
@@ -262,7 +262,7 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       {/* Word count + reasoning */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <label htmlFor="word_count" className="text-sm font-heading font-medium text-text-secondary">Word Count Target</label>
+          <label htmlFor="word_count" className="text-sm font-heading font-medium text-gray-600">Word Count Target</label>
           {structure.reasoning && <AIReasoningIcon reasoning={structure.reasoning} />}
         </div>
         <div className="w-40">
@@ -280,7 +280,7 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       {/* Content Outline */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider">Content Outline</h3>
+          <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider">Content Outline</h3>
           {structure.outline && structure.outline.length > 0 && (
             <button
               type="button"
@@ -304,7 +304,7 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
             />
           ))}
           {structure.outline?.length === 0 && (
-            <p className="text-sm text-text-muted italic py-4 text-center">No outline sections yet</p>
+            <p className="text-sm text-gray-400 italic py-4 text-center">No outline sections yet</p>
           )}
         </div>
       </div>

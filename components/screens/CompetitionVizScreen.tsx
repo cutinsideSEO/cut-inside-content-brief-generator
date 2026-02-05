@@ -16,8 +16,8 @@ type SortKey = 'Weighted_Score' | 'Word_Count' | string; // string for dynamic k
 
 const StatCard: React.FC<{ title: string; value: string | number; highlight?: boolean }> = ({ title, value, highlight }) => (
     <Card variant="default" padding="md" className={highlight ? 'border-teal/30' : ''}>
-        <p className="text-sm text-text-muted font-heading">{title}</p>
-        <p className={`text-2xl font-bold font-heading ${highlight ? 'text-teal' : 'text-text-primary'}`}>{value}</p>
+        <p className="text-sm text-gray-400 font-heading">{title}</p>
+        <p className={`text-2xl font-bold font-heading ${highlight ? 'text-teal' : 'text-gray-900'}`}>{value}</p>
     </Card>
 );
 
@@ -87,12 +87,12 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
     <div className="animate-fade-in">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 rounded-radius-lg bg-teal/10 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-lg bg-teal/10 flex items-center justify-center">
                 <BarChartIcon className="h-6 w-6 text-teal" />
             </div>
             <div>
-                <h1 className="text-2xl font-heading font-bold text-text-primary">Competitive Landscape</h1>
-                <p className="text-md text-text-secondary">Analysis complete. Star competitors you want the AI to prioritize.</p>
+                <h1 className="text-2xl font-heading font-bold text-gray-900">Competitive Landscape</h1>
+                <p className="text-md text-gray-600">Analysis complete. Star competitors you want the AI to prioritize.</p>
             </div>
         </div>
 
@@ -108,18 +108,18 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
         <Card variant="default" padding="none" className="overflow-hidden">
             <div className="overflow-x-auto">
                 <table className="w-full min-w-max text-left text-sm">
-                    <thead className="bg-surface-hover border-b border-border">
+                    <thead className="bg-gray-100 border-b border-gray-200">
                         <tr>
-                            <th className="p-4 font-heading font-semibold text-text-secondary w-12"></th>
-                            <th className="p-4 font-heading font-semibold text-text-secondary w-2/5">Competitor URL</th>
+                            <th className="p-4 font-heading font-semibold text-gray-600 w-12"></th>
+                            <th className="p-4 font-heading font-semibold text-gray-600 w-2/5">Competitor URL</th>
                             <th
-                                className="p-4 font-heading font-semibold text-text-secondary cursor-pointer hover:text-teal transition-colors"
+                                className="p-4 font-heading font-semibold text-gray-600 cursor-pointer hover:text-teal transition-colors"
                                 onClick={() => requestSort('Weighted_Score')}
                             >
                                 Score{getSortIndicator('Weighted_Score')}
                             </th>
                             <th
-                                className="p-4 font-heading font-semibold text-text-secondary cursor-pointer hover:text-teal transition-colors"
+                                className="p-4 font-heading font-semibold text-gray-600 cursor-pointer hover:text-teal transition-colors"
                                 onClick={() => requestSort('Word_Count')}
                             >
                                 Words{getSortIndicator('Word_Count')}
@@ -127,7 +127,7 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
                             {topKeywords.map(({ kw }) => (
                                 <th
                                     key={kw}
-                                    className="p-4 font-heading font-semibold text-text-secondary cursor-pointer hover:text-teal transition-colors truncate max-w-xs"
+                                    className="p-4 font-heading font-semibold text-gray-600 cursor-pointer hover:text-teal transition-colors truncate max-w-xs"
                                     onClick={() => requestSort(kw)}
                                     title={kw}
                                 >
@@ -138,17 +138,17 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
                     </thead>
                     <tbody className="divide-y divide-border-subtle">
                         {sortedCompetitors.map((competitor) => (
-                            <tr key={competitor.URL} className="hover:bg-surface-hover transition-colors">
+                            <tr key={competitor.URL} className="hover:bg-gray-100 transition-colors">
                                 <td className="p-4 text-center">
                                     <button
                                         onClick={() => onToggleStar(competitor.URL)}
-                                        className="p-1 group rounded-radius-sm hover:bg-surface-active transition-colors"
+                                        className="p-1 group rounded-sm hover:bg-gray-200 transition-colors"
                                         title="Star this competitor"
                                     >
                                         <StarIcon className={`h-5 w-5 transition-all duration-200 ${
                                             competitor.is_starred
-                                                ? 'text-yellow fill-yellow drop-shadow-[0_0_6px_rgba(250,204,21,0.5)]'
-                                                : 'text-text-muted group-hover:text-yellow'
+                                                ? 'text-amber-500 fill-yellow drop-shadow-[0_0_6px_rgba(250,204,21,0.5)]'
+                                                : 'text-gray-400 group-hover:text-amber-500'
                                         }`} />
                                     </button>
                                 </td>
@@ -162,19 +162,19 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
                                         {competitor.URL}
                                     </a>
                                 </td>
-                                <td className="p-4 font-bold text-lg text-text-primary">
+                                <td className="p-4 font-bold text-lg text-gray-900">
                                     <div className="relative flex items-center">
                                         <div
-                                            className="absolute inset-y-0 left-0 bg-teal/20 rounded-radius-sm"
+                                            className="absolute inset-y-0 left-0 bg-teal/20 rounded-sm"
                                             style={{ width: `${(competitor.Weighted_Score / maxScore) * 100}%`}}
                                         />
                                         <span className="relative px-2">{competitor.Weighted_Score.toLocaleString()}</span>
                                     </div>
                                 </td>
-                                <td className="p-4 text-text-secondary">
+                                <td className="p-4 text-gray-600">
                                     <div className="relative flex items-center">
                                         <div
-                                            className="absolute inset-y-0 left-0 bg-surface-active rounded-radius-sm"
+                                            className="absolute inset-y-0 left-0 bg-gray-200 rounded-sm"
                                             style={{ width: `${(competitor.Word_Count / maxWordCount) * 100}%`}}
                                         />
                                         <span className="relative px-2">{competitor.Word_Count.toLocaleString()}</span>
@@ -192,7 +192,7 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
                                                     #{ranking.rank}
                                                 </Badge>
                                             ) : (
-                                                <span className="text-text-muted">-</span>
+                                                <span className="text-gray-400">-</span>
                                             )}
                                         </td>
                                     );

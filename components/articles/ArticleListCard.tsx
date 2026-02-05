@@ -24,12 +24,12 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <FileTextIcon className="h-4 w-4 text-teal flex-shrink-0" />
-                        <h3 className="text-lg font-heading font-semibold text-text-primary truncate">
+                        <h3 className="text-lg font-heading font-semibold text-gray-900 truncate">
                             {article.title}
                         </h3>
                     </div>
-                    <p className="text-sm text-text-tertiary">
-                        From: <span className="text-text-secondary">{article.brief_name}</span>
+                    <p className="text-sm text-gray-500">
+                        From: <span className="text-gray-600">{article.brief_name}</span>
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -38,19 +38,19 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
                 </div>
             </div>
 
-            <div className="flex items-center text-sm text-text-secondary mb-4">
+            <div className="flex items-center text-sm text-gray-600 mb-4">
                 <span className="mr-3">
-                    <span className="text-text-muted">Words:</span>{' '}
-                    <span className="text-text-primary">{wordCount.toLocaleString()}</span>
+                    <span className="text-gray-400">Words:</span>{' '}
+                    <span className="text-gray-900">{wordCount.toLocaleString()}</span>
                 </span>
-                <span className="text-text-muted">|</span>
+                <span className="text-gray-400">|</span>
                 <span className="ml-3">
-                    <span className="text-text-muted">Created:</span>{' '}
+                    <span className="text-gray-400">Created:</span>{' '}
                     {formatDate(article.created_at)}
                 </span>
             </div>
 
-            <div className="flex gap-2 pt-3 border-t border-border-subtle">
+            <div className="flex gap-2 pt-3 border-t border-gray-100">
                 <Button variant="primary" size="sm" onClick={() => onView(article.id)}>
                     View Article
                 </Button>

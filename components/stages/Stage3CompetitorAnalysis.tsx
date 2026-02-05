@@ -54,7 +54,7 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
       {/* Differentiation Summary */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider">
+          <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider">
             Differentiation Summary
           </h3>
           {insights.differentiation_summary.reasoning && (
@@ -69,8 +69,8 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
       </div>
 
       {/* Competitor Breakdowns */}
-      <div className="border-t border-border-subtle pt-8">
-        <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-4">
+      <div className="border-t border-gray-100 pt-8">
+        <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider mb-4">
           Competitor Breakdowns
         </h3>
         <div className="space-y-1">
@@ -80,20 +80,20 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
             const isExpanded = expandedIndex === index;
 
             return (
-              <div key={index} className="border-b border-border-subtle last:border-b-0">
+              <div key={index} className="border-b border-gray-100 last:border-b-0">
                 {/* Collapsed header row */}
                 <button
                   type="button"
                   onClick={() => toggleExpanded(index)}
-                  className="w-full flex items-center gap-3 py-3 hover:bg-surface-hover/50 transition-colors text-left rounded-radius-sm"
+                  className="w-full flex items-center gap-3 py-3 hover:bg-gray-100 transition-colors text-left rounded-sm"
                 >
-                  <ChevronDownIcon className={`h-4 w-4 text-text-muted flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                  <ChevronDownIcon className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   <span className="text-sm font-heading font-medium text-teal truncate flex-1" title={item.url}>
                     {item.url}
                   </span>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {bestRank && (
-                      <span className="text-xs text-text-muted">
+                      <span className="text-xs text-gray-400">
                         #{bestRank.rank} for "{bestRank.keyword}"
                       </span>
                     )}
@@ -120,7 +120,7 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Description</label>
+                        <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">Description</label>
                         <EditableText
                           value={item.description}
                           onChange={(val) => handleBreakdownChange(index, 'description', val)}
@@ -130,7 +130,7 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-xs font-heading font-medium text-status-complete uppercase tracking-wider mb-2">
+                          <label className="block text-xs font-heading font-medium text-emerald-500 uppercase tracking-wider mb-2">
                             Strengths
                           </label>
                           <EditableText
@@ -140,7 +140,7 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-heading font-medium text-status-generating uppercase tracking-wider mb-2">
+                          <label className="block text-xs font-heading font-medium text-amber-500 uppercase tracking-wider mb-2">
                             Weaknesses
                           </label>
                           <EditableText
@@ -159,7 +159,7 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
         </div>
 
         {insights.competitor_breakdown.length === 0 && (
-          <div className="text-center py-8 text-text-muted">
+          <div className="text-center py-8 text-gray-400">
             <p>No competitor insights available yet.</p>
           </div>
         )}

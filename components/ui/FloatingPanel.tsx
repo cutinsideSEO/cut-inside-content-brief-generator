@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 export interface FloatingPanelProps extends React.HTMLAttributes<HTMLDivElement> {
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
@@ -11,7 +12,7 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
   position = 'bottom-right',
   maxHeight = '400px',
   variant = 'default',
-  className = '',
+  className,
   children,
   ...props
 }) => {
@@ -23,20 +24,22 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
   };
 
   const variantStyles = {
-    default: 'border-border',
-    warning: 'border-status-generating/50',
+    default: 'border-gray-200',
+    warning: 'border-amber-300',
     info: 'border-teal/50',
   };
 
-  const baseStyles =
-    'fixed z-50 w-80 glass-effect border rounded-radius-xl shadow-card-elevated animate-slide-in-bottom';
-
-  const classes = [baseStyles, positionStyles[position], variantStyles[variant], className]
-    .filter(Boolean)
-    .join(' ');
-
   return (
-    <div className={classes} style={{ maxHeight }} {...props}>
+    <div
+      className={cn(
+        'fixed z-50 w-80 glass-effect border rounded-xl shadow-card-elevated animate-slide-in-bottom',
+        positionStyles[position],
+        variantStyles[variant],
+        className
+      )}
+      style={{ maxHeight }}
+      {...props}
+    >
       <div className="overflow-y-auto custom-scrollbar h-full" style={{ maxHeight }}>
         {children}
       </div>
@@ -51,17 +54,20 @@ export interface FloatingPanelHeaderProps extends React.HTMLAttributes<HTMLDivEl
 
 export const FloatingPanelHeader: React.FC<FloatingPanelHeaderProps> = ({
   icon,
-  className = '',
+  className,
   children,
   ...props
 }) => {
   return (
     <div
-      className={`flex items-center gap-2 p-4 border-b border-border sticky top-0 glass-effect ${className}`}
+      className={cn(
+        'flex items-center gap-2 p-4 border-b border-gray-200 sticky top-0 glass-effect',
+        className
+      )}
       {...props}
     >
       {icon && <span className="flex-shrink-0">{icon}</span>}
-      <span className="font-heading font-semibold text-text-primary">{children}</span>
+      <span className="font-heading font-semibold text-foreground">{children}</span>
     </div>
   );
 };
@@ -80,19 +86,19 @@ export const FloatingPanelItem: React.FC<FloatingPanelItemProps> = ({
   status,
   progress,
   action,
-  className = '',
+  className,
   ...props
 }) => {
   return (
-    <div className={`p-4 border-b border-border last:border-b-0 ${className}`} {...props}>
+    <div className={cn('p-4 border-b border-gray-200 last:border-b-0', className)} {...props}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-text-primary truncate">{title}</div>
-          {subtitle && <div className="text-sm text-text-muted truncate">{subtitle}</div>}
+          <div className="font-medium text-foreground truncate">{title}</div>
+          {subtitle && <div className="text-sm text-gray-400 truncate">{subtitle}</div>}
         </div>
         {action && <div className="flex-shrink-0">{action}</div>}
       </div>
-      {status && <div className="text-sm text-text-secondary mb-2">{status}</div>}
+      {status && <div className="text-sm text-muted-foreground mb-2">{status}</div>}
       {progress && <div>{progress}</div>}
     </div>
   );
@@ -103,13 +109,16 @@ export interface FloatingPanelFooterProps extends React.HTMLAttributes<HTMLDivEl
 }
 
 export const FloatingPanelFooter: React.FC<FloatingPanelFooterProps> = ({
-  className = '',
+  className,
   children,
   ...props
 }) => {
   return (
     <div
-      className={`p-3 border-t border-border text-xs text-text-muted text-center sticky bottom-0 glass-effect ${className}`}
+      className={cn(
+        'p-3 border-t border-gray-200 text-xs text-gray-400 text-center sticky bottom-0 glass-effect',
+        className
+      )}
       {...props}
     >
       {children}

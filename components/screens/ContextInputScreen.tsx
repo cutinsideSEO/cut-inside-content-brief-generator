@@ -45,8 +45,8 @@ const ThemedLoader: React.FC<{ header: string }> = ({ header }) => {
                     <Spinner />
                 </div>
             </div>
-            <h1 className="text-2xl font-heading font-bold text-text-primary">{header}</h1>
-            <p className="text-md text-text-secondary mt-2">{message}</p>
+            <h1 className="text-2xl font-heading font-bold text-gray-900">{header}</h1>
+            <p className="text-md text-gray-600 mt-2">{message}</p>
         </div>
     );
 };
@@ -121,8 +121,8 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
             <ThemedLoader header="Analyzing Competitors..." />
         ) : (
             <div className="text-center mb-8">
-                <h1 className="text-2xl font-heading font-bold text-text-primary">Add context for the AI</h1>
-                <p className="text-md text-text-secondary mt-2">Optional - provide additional information to improve the brief</p>
+                <h1 className="text-2xl font-heading font-bold text-gray-900">Add context for the AI</h1>
+                <p className="text-md text-gray-600 mt-2">Optional - provide additional information to improve the brief</p>
             </div>
         )}
 
@@ -133,7 +133,7 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                     <button
                         type="button"
                         onClick={() => setShowLog(!showLog)}
-                        className="flex items-center gap-2 text-sm text-text-muted hover:text-text-secondary transition-colors"
+                        className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
                     >
                         <svg
                             className={`h-4 w-4 transition-transform duration-200 ${showLog ? 'rotate-90' : ''}`}
@@ -149,12 +149,12 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                         <div className="mt-2">
                             <div
                                 ref={logContainerRef}
-                                className="h-48 bg-surface-hover rounded-radius-md p-3 border border-border-subtle overflow-y-auto font-mono text-xs"
+                                className="h-48 bg-gray-100 rounded-md p-3 border border-gray-100 overflow-y-auto font-mono text-xs"
                             >
                                 {analysisLogs.map((log, index) => (
                                     <p
                                         key={index}
-                                        className={`${log.toLowerCase().includes('error') ? 'text-status-error' : 'text-text-muted'}`}
+                                        className={`${log.toLowerCase().includes('error') ? 'text-red-500' : 'text-gray-400'}`}
                                     >
                                         {log}
                                     </p>
@@ -168,12 +168,12 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
             {/* Subject Matter Details */}
             <Card variant="default" padding="lg">
                 <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-md bg-teal/10 flex items-center justify-center">
                         <FileTextIcon className="h-5 w-5 text-teal" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-heading font-semibold text-text-primary">Subject Matter Details</h2>
-                        <p className="text-sm text-text-muted">Provide extra details about the topic for the AI</p>
+                        <h2 className="text-lg font-heading font-semibold text-gray-900">Subject Matter Details</h2>
+                        <p className="text-sm text-gray-400">Provide extra details about the topic for the AI</p>
                     </div>
                 </div>
                 <Textarea
@@ -188,14 +188,14 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
             {/* Brand Information */}
             <Card variant="default" padding="lg">
                 <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-md bg-teal/10 flex items-center justify-center">
                         <svg className="h-5 w-5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
                     </div>
                     <div>
-                        <h2 className="text-lg font-heading font-semibold text-text-primary">Brand Information</h2>
-                        <p className="text-sm text-text-muted">Describe the brand voice, style, and target audience</p>
+                        <h2 className="text-lg font-heading font-semibold text-gray-900">Brand Information</h2>
+                        <p className="text-sm text-gray-400">Describe the brand voice, style, and target audience</p>
                     </div>
                 </div>
                 <Textarea
@@ -209,19 +209,19 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
             {/* File Upload */}
             <Card variant="default" padding="lg">
                 <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-md bg-teal/10 flex items-center justify-center">
                         <UploadCloudIcon className="h-5 w-5 text-teal" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-heading font-semibold text-text-primary">Upload Context Files</h2>
-                        <p className="text-sm text-text-muted">PDF, DOCX, TXT, or MD files with relevant information</p>
+                        <h2 className="text-lg font-heading font-semibold text-gray-900">Upload Context Files</h2>
+                        <p className="text-sm text-gray-400">PDF, DOCX, TXT, or MD files with relevant information</p>
                     </div>
                 </div>
                 <label
-                    className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-radius-lg cursor-pointer transition-all ${
+                    className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
                         isDragOver
                             ? 'border-teal bg-teal/10'
-                            : 'border-border bg-surface-hover hover:bg-surface-active hover:border-border-emphasis'
+                            : 'border-gray-200 bg-gray-100 hover:bg-gray-200 hover:border-gray-300'
                     }`}
                     onDrop={handleDrop}
                     onDragEnter={handleDragEnter}
@@ -229,8 +229,8 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                     onDragOver={handleDragOver}
                 >
                     <div className="flex flex-col items-center justify-center py-4">
-                        <UploadCloudIcon className="w-8 h-8 mb-2 text-text-muted" />
-                        <p className="text-sm text-text-secondary"><span className="font-semibold text-teal">Click to upload</span> or drag and drop</p>
+                        <UploadCloudIcon className="w-8 h-8 mb-2 text-gray-400" />
+                        <p className="text-sm text-gray-600"><span className="font-semibold text-teal">Click to upload</span> or drag and drop</p>
                     </div>
                     <input type="file" className="hidden" accept=".pdf,.docx,.txt,.md" onChange={handleFileChange} multiple />
                 </label>
@@ -240,15 +240,15 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                         {contextFiles.map(file => {
                             const status = fileContents.get(file.name);
                             return (
-                                <div key={file.name} className="bg-surface-hover p-2 rounded-radius-md border border-border-subtle flex items-center justify-between">
+                                <div key={file.name} className="bg-gray-100 p-2 rounded-md border border-gray-100 flex items-center justify-between">
                                     <div className="flex items-center gap-2 overflow-hidden">
                                         <FileTextIcon className="h-4 w-4 text-teal flex-shrink-0" />
-                                        <p className="text-xs font-medium text-text-primary truncate">{file.name}</p>
+                                        <p className="text-xs font-medium text-gray-900 truncate">{file.name}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {status?.status === 'parsing' && <MiniSpinner className="h-4 w-4 text-text-muted" />}
-                                        {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-status-complete" />}
-                                        {status?.status === 'done' && status.error && <AlertTriangleIcon className="h-4 w-4 text-status-error" />}
+                                        {status?.status === 'parsing' && <MiniSpinner className="h-4 w-4 text-gray-400" />}
+                                        {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-emerald-500" />}
+                                        {status?.status === 'done' && status.error && <AlertTriangleIcon className="h-4 w-4 text-red-500" />}
                                         <Button variant="ghost" size="sm" onClick={() => onRemoveFile(file.name)} className="!p-1">
                                             <XIcon className="h-3 w-3" />
                                         </Button>
@@ -263,12 +263,12 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
             {/* URL Scraper */}
             <Card variant="default" padding="lg">
                 <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-md bg-teal/10 flex items-center justify-center">
                         <LinkIcon className="h-5 w-5 text-teal" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-heading font-semibold text-text-primary">Scrape Context URLs</h2>
-                        <p className="text-sm text-text-muted">Add URLs to include their content as context</p>
+                        <h2 className="text-lg font-heading font-semibold text-gray-900">Scrape Context URLs</h2>
+                        <p className="text-sm text-gray-400">Add URLs to include their content as context</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -286,15 +286,15 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                 {Array.from(urlContents.keys()).length > 0 && (
                     <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
                         {Array.from(urlContents.entries()).map(([url, status]) => (
-                            <div key={url} className="bg-surface-hover p-2 rounded-radius-md border border-border-subtle flex items-center justify-between">
+                            <div key={url} className="bg-gray-100 p-2 rounded-md border border-gray-100 flex items-center justify-between">
                                 <div className="flex items-center gap-2 overflow-hidden">
                                     <LinkIcon className="h-4 w-4 text-teal flex-shrink-0" />
-                                    <p className="text-xs font-medium text-text-primary truncate">{url}</p>
+                                    <p className="text-xs font-medium text-gray-900 truncate">{url}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {status?.status === 'scraping' && <MiniSpinner className="h-4 w-4 text-text-muted" />}
-                                    {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-status-complete" />}
-                                    {status?.status === 'done' && status.error && <AlertTriangleIcon className="h-4 w-4 text-status-error" />}
+                                    {status?.status === 'scraping' && <MiniSpinner className="h-4 w-4 text-gray-400" />}
+                                    {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-emerald-500" />}
+                                    {status?.status === 'done' && status.error && <AlertTriangleIcon className="h-4 w-4 text-red-500" />}
                                     <Button variant="ghost" size="sm" onClick={() => onRemoveUrl(url)} className="!p-1">
                                         <XIcon className="h-3 w-3" />
                                     </Button>
@@ -314,7 +314,7 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                     type="button"
                     onClick={onContinue}
                     disabled={isLoading}
-                    className="text-sm text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-sm text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     Skip this step
                 </button>

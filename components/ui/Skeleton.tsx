@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'text' | 'circular' | 'rectangular';
@@ -14,21 +15,19 @@ const Skeleton: React.FC<SkeletonProps> = ({
   height,
   animation = 'wave',
   lines = 1,
-  className = '',
+  className,
   style,
   ...props
 }) => {
-  const baseStyles = 'bg-surface-hover rounded';
-
   const animationStyles = {
     pulse: 'animate-pulse',
     wave: 'skeleton-shimmer',
   };
 
   const variantStyles = {
-    text: 'rounded-radius-sm',
+    text: 'rounded-sm',
     circular: 'rounded-full',
-    rectangular: 'rounded-radius-md',
+    rectangular: 'rounded-md',
   };
 
   const getSize = () => {
@@ -53,9 +52,12 @@ const Skeleton: React.FC<SkeletonProps> = ({
 
   const sizeStyle = getSize();
 
-  const classes = [baseStyles, animationStyles[animation], variantStyles[variant], className]
-    .filter(Boolean)
-    .join(' ');
+  const classes = cn(
+    'bg-gray-200 rounded',
+    animationStyles[animation],
+    variantStyles[variant],
+    className
+  );
 
   if (variant === 'text' && lines > 1) {
     return (

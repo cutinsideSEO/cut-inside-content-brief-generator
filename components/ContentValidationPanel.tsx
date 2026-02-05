@@ -29,13 +29,13 @@ interface ContentValidationPanelProps {
 // Score badge color helper
 const getScoreColor = (score: number): string => {
   if (score >= 80) return 'bg-green-500';
-  if (score >= 60) return 'bg-yellow-500';
+  if (score >= 60) return 'bg-amber-400-500';
   return 'bg-red-500';
 };
 
 const getScoreTextColor = (score: number): string => {
-  if (score >= 80) return 'text-green-400';
-  if (score >= 60) return 'text-yellow-400';
+  if (score >= 80) return 'text-emerald-500';
+  if (score >= 60) return 'text-amber-500-400';
   return 'text-red-400';
 };
 
@@ -43,8 +43,8 @@ const getScoreTextColor = (score: number): string => {
 const SeverityBadge: React.FC<{ severity: ProposedChange['severity'] }> = ({ severity }) => {
   const config = {
     critical: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/50', icon: AlertCircleIcon },
-    warning: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/50', icon: AlertTriangleIcon },
-    suggestion: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/50', icon: LightbulbIcon },
+    warning: { bg: 'bg-amber-400-500/20', text: 'text-amber-500-400', border: 'border-yellow-500/50', icon: AlertTriangleIcon },
+    suggestion: { bg: 'bg-blue-500/20', text: 'text-blue-600', border: 'border-blue-500/50', icon: LightbulbIcon },
   };
   const { bg, text, border, icon: Icon } = config[severity];
 
@@ -65,21 +65,21 @@ const ScoreBar: React.FC<{ label: string; score: number; explanation?: string }>
       <div className="flex justify-between items-center mb-1">
         <button
           onClick={() => setShowExplanation(!showExplanation)}
-          className="text-sm text-grey/80 hover:text-white flex items-center gap-1 transition-colors"
+          className="text-sm text-gray-600/80 hover:text-white flex items-center gap-1 transition-colors"
         >
           {showExplanation ? <ChevronUpIcon className="h-3 w-3" /> : <ChevronDownIcon className="h-3 w-3" />}
           {label}
         </button>
         <span className={`text-sm font-bold ${getScoreTextColor(score)}`}>{score}/100</span>
       </div>
-      <div className="w-full bg-grey/20 rounded-full h-2">
+      <div className="w-full bg-gray-200/20 rounded-full h-2">
         <div
           className={`h-2 rounded-full transition-all duration-500 ${getScoreColor(score)}`}
           style={{ width: `${score}%` }}
         />
       </div>
       {showExplanation && explanation && (
-        <p className="text-xs text-grey/60 mt-1 pl-4 border-l border-white/10">{explanation}</p>
+        <p className="text-xs text-gray-600/60 mt-1 pl-4 border-l border-white/10">{explanation}</p>
       )}
     </div>
   );
@@ -106,18 +106,18 @@ const ProposedChangeCard: React.FC<{
           type="checkbox"
           checked={isSelected}
           onChange={onToggle}
-          className="mt-1 h-4 w-4 rounded border-grey/30 bg-black text-teal focus:ring-teal"
+          className="mt-1 h-4 w-4 rounded border-grey/30 bg-background text-teal focus:ring-teal"
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <SeverityBadge severity={change.severity} />
             {change.location.sectionHeading && (
-              <span className="text-xs text-grey/50 truncate">
+              <span className="text-xs text-gray-600/50 truncate">
                 in "{change.location.sectionHeading}"
               </span>
             )}
           </div>
-          <p className="text-sm text-grey/90">{change.description}</p>
+          <p className="text-sm text-gray-600/90">{change.description}</p>
 
           {(change.currentText || change.proposedText) && (
             <button
@@ -134,18 +134,18 @@ const ProposedChangeCard: React.FC<{
               {change.currentText && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded p-2">
                   <span className="text-xs text-red-400 font-medium block mb-1">Current:</span>
-                  <p className="text-xs text-grey/80 whitespace-pre-wrap">{change.currentText}</p>
+                  <p className="text-xs text-gray-600/80 whitespace-pre-wrap">{change.currentText}</p>
                 </div>
               )}
               {change.proposedText && (
                 <div className="bg-green-500/10 border border-green-500/30 rounded p-2">
-                  <span className="text-xs text-green-400 font-medium block mb-1">Proposed:</span>
-                  <p className="text-xs text-grey/80 whitespace-pre-wrap">{change.proposedText}</p>
+                  <span className="text-xs text-emerald-500 font-medium block mb-1">Proposed:</span>
+                  <p className="text-xs text-gray-600/80 whitespace-pre-wrap">{change.proposedText}</p>
                 </div>
               )}
               <div className="bg-white/5 border border-white/10 rounded p-2">
-                <span className="text-xs text-grey/60 font-medium block mb-1">Reasoning:</span>
-                <p className="text-xs text-grey/70">{change.reasoning}</p>
+                <span className="text-xs text-gray-600/60 font-medium block mb-1">Reasoning:</span>
+                <p className="text-xs text-gray-600/70">{change.reasoning}</p>
               </div>
             </div>
           )}
@@ -168,8 +168,8 @@ const MessageBubble: React.FC<{ message: ValidationMessage }> = ({ message }) =>
             : 'bg-white/5 border border-white/10'
         }`}
       >
-        <p className="text-sm text-grey/90 whitespace-pre-wrap">{message.content}</p>
-        <span className="text-xs text-grey/50 mt-1 block">
+        <p className="text-sm text-gray-600/90 whitespace-pre-wrap">{message.content}</p>
+        <span className="text-xs text-gray-600/50 mt-1 block">
           {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
@@ -318,14 +318,14 @@ const ContentValidationPanel: React.FC<ContentValidationPanelProps> = ({
   const totalChanges = validationResult?.proposedChanges.length || 0;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full md:w-[500px] lg:w-[550px] bg-black border-l border-white/20 shadow-2xl z-50 flex flex-col animate-slide-in-right">
+    <div className="fixed inset-y-0 right-0 w-full md:w-[500px] lg:w-[550px] bg-background border-l border-white/20 shadow-2xl z-50 flex flex-col animate-slide-in-right">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
           <ShieldCheckIcon className="h-6 w-6 text-teal" />
           <div>
-            <h2 className="text-lg font-heading font-bold text-grey">Content Validation</h2>
-            <p className="text-xs text-grey/60">AI analysis against brief</p>
+            <h2 className="text-lg font-heading font-bold text-gray-600">Content Validation</h2>
+            <p className="text-xs text-gray-600/60">AI analysis against brief</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -340,7 +340,7 @@ const ContentValidationPanel: React.FC<ContentValidationPanelProps> = ({
           )}
           <button
             onClick={onClose}
-            className="p-2 text-grey/50 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            className="p-2 text-gray-600/50 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
           >
             <XIcon className="h-5 w-5" />
           </button>
@@ -352,7 +352,7 @@ const ContentValidationPanel: React.FC<ContentValidationPanelProps> = ({
         {isValidating && conversationHistory.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full">
             <Spinner />
-            <p className="text-grey/70 mt-4">Analyzing content against brief...</p>
+            <p className="text-gray-600/70 mt-4">Analyzing content against brief...</p>
           </div>
         ) : error && !validationResult ? (
           <div className="flex flex-col items-center justify-center h-full text-red-400">
@@ -367,7 +367,7 @@ const ContentValidationPanel: React.FC<ContentValidationPanelProps> = ({
             {/* Score bars */}
             {validationResult && (
               <div className="mb-6 pb-4 border-b border-white/10">
-                <h3 className="text-sm font-heading font-semibold text-grey/80 mb-3">Quality Scores</h3>
+                <h3 className="text-sm font-heading font-semibold text-gray-600/80 mb-3">Quality Scores</h3>
                 <ScoreBar
                   label="Brief Alignment"
                   score={validationResult.scores.briefAlignment.score}
@@ -388,7 +388,7 @@ const ContentValidationPanel: React.FC<ContentValidationPanelProps> = ({
                   score={validationResult.scores.paragraphLengths.score}
                   explanation={validationResult.scores.paragraphLengths.explanation}
                 />
-                <div className="flex items-center justify-between text-sm text-grey/70 mt-2">
+                <div className="flex items-center justify-between text-sm text-gray-600/70 mt-2">
                   <span>Word Count</span>
                   <span>
                     {validationResult.scores.totalWordCount.actual} /{' '}
@@ -407,7 +407,7 @@ const ContentValidationPanel: React.FC<ContentValidationPanelProps> = ({
                 <div className="flex justify-start mb-3">
                   <div className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center gap-2">
                     <RefreshCwIcon className="h-4 w-4 text-teal animate-spin" />
-                    <span className="text-sm text-grey/70">Re-analyzing...</span>
+                    <span className="text-sm text-gray-600/70">Re-analyzing...</span>
                   </div>
                 </div>
               )}
@@ -418,7 +418,7 @@ const ContentValidationPanel: React.FC<ContentValidationPanelProps> = ({
             {validationResult && validationResult.proposedChanges.length > 0 && (
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-heading font-semibold text-grey/80">
+                  <h3 className="text-sm font-heading font-semibold text-gray-600/80">
                     Proposed Changes ({selectedCount}/{totalChanges} selected)
                   </h3>
                   <div className="flex gap-2">
@@ -428,10 +428,10 @@ const ContentValidationPanel: React.FC<ContentValidationPanelProps> = ({
                     >
                       Select all
                     </button>
-                    <span className="text-grey/30">|</span>
+                    <span className="text-gray-600/30">|</span>
                     <button
                       onClick={handleDeselectAll}
-                      className="text-xs text-grey/60 hover:text-grey/80"
+                      className="text-xs text-gray-600/60 hover:text-gray-600/80"
                     >
                       Deselect all
                     </button>
@@ -449,8 +449,8 @@ const ContentValidationPanel: React.FC<ContentValidationPanelProps> = ({
             )}
 
             {validationResult && validationResult.proposedChanges.length === 0 && (
-              <div className="text-center py-8 text-grey/60">
-                <CheckIcon className="h-12 w-12 mx-auto mb-2 text-green-400" />
+              <div className="text-center py-8 text-gray-600/60">
+                <CheckIcon className="h-12 w-12 mx-auto mb-2 text-emerald-500" />
                 <p>No issues found! Your content aligns well with the brief.</p>
               </div>
             )}
@@ -467,13 +467,13 @@ const ContentValidationPanel: React.FC<ContentValidationPanelProps> = ({
             onChange={(e) => setUserMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Add instructions or ask for changes..."
-            className="flex-1 p-2 bg-black border border-white/20 rounded-lg text-sm text-grey resize-none h-16 focus:ring-1 focus:ring-teal focus:border-teal"
+            className="flex-1 p-2 bg-background border border-white/20 rounded-lg text-sm text-gray-600 resize-none h-16 focus:ring-1 focus:ring-teal focus:border-teal"
             disabled={isValidating}
           />
           <button
             onClick={handleSendMessage}
             disabled={isValidating || !userMessage.trim()}
-            className="px-4 bg-teal/20 hover:bg-teal/30 disabled:bg-grey/10 disabled:text-grey/30 text-teal rounded-lg transition-colors"
+            className="px-4 bg-teal/20 hover:bg-teal/30 disabled:bg-gray-200/10 disabled:text-gray-600/30 text-teal rounded-lg transition-colors"
           >
             <SendIcon className="h-5 w-5" />
           </button>

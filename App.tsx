@@ -124,10 +124,10 @@ const Toast: React.FC<ToastMessage & { onDismiss: () => void }> = ({ title, mess
   }, [onDismiss]);
 
   return (
-    <div className="toast bg-teal/90 backdrop-blur-sm border border-teal/50 text-brand-white p-4 rounded-lg shadow-lg w-80">
+    <div className="toast bg-teal/90 backdrop-blur-sm border border-teal/50 text-white p-4 rounded-lg shadow-lg w-80">
       <div className="flex items-start">
         <div className="flex-shrink-0">
-          <BrainCircuitIcon className="h-6 w-6 text-yellow" />
+          <BrainCircuitIcon className="h-6 w-6 text-amber-500" />
         </div>
         <div className="ml-3 w-0 flex-1">
           <p className="text-sm font-heading font-bold">{title}</p>
@@ -1308,7 +1308,7 @@ const App: React.FC<AppProps> = ({
 
   return (
     <SoundProvider>
-        <div className="min-h-screen bg-black text-grey font-sans flex flex-col">
+        <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
         <Header
           isSupabaseMode={isSupabaseMode}
           clientName={clientName}

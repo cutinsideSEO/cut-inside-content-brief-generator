@@ -50,8 +50,8 @@ const ThemedLoader: React.FC<{ header: string; step?: number }> = ({ header, ste
                 <div className="absolute inset-0 bg-teal/20 rounded-full blur-xl animate-pulse" />
                 <Spinner />
             </div>
-            <p className="mt-6 text-center font-heading font-semibold text-lg text-text-primary">{header}</p>
-            <p className="text-center text-text-muted mt-2 transition-opacity duration-300">{message}</p>
+            <p className="mt-6 text-center font-heading font-semibold text-lg text-gray-900">{header}</p>
+            <p className="text-center text-gray-400 mt-2 transition-opacity duration-300">{message}</p>
             {step && (
                 <div className="mt-6 w-full max-w-xs">
                     <Progress value={(step / 7) * 100} size="sm" color="teal" showLabel label={`Step ${step} of 7`} />
@@ -122,10 +122,10 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
               </div>
             </div>
 
-            <h2 className="text-2xl font-heading font-bold text-text-primary mb-2">
+            <h2 className="text-2xl font-heading font-bold text-gray-900 mb-2">
               Automatically Generating Brief
             </h2>
-            <p className="text-text-secondary text-lg mb-8">
+            <p className="text-gray-600 text-lg mb-8">
               {isLoading ? `Working on ${stepNames[currentStep]}` : 'Preparing next step...'}
             </p>
 
@@ -149,7 +149,7 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
                         ? 'bg-teal text-surface-primary'
                         : step === currentStep
                           ? 'bg-teal/20 text-teal border-2 border-teal animate-pulse'
-                          : 'bg-surface-hover text-text-muted'
+                          : 'bg-gray-100 text-gray-400'
                     }`}
                   >
                     {step < currentStep ? <CheckIcon className="h-4 w-4" /> : step}
@@ -158,7 +158,7 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
               </div>
             </div>
 
-            <p className="text-text-muted text-sm mt-8">
+            <p className="text-gray-400 text-sm mt-8">
               You can navigate away - we'll continue in the background
             </p>
           </div>
@@ -175,11 +175,11 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
     if (error && !briefingStepHasData(currentStep, briefData)) {
        return (
         <div className="flex flex-col items-center justify-center min-h-[50vh] animate-fade-in">
-          <div className="bg-status-error/10 rounded-full p-4 mb-4">
-            <AlertCircleIcon className="h-12 w-12 text-status-error"/>
+          <div className="bg-red-500/10 rounded-full p-4 mb-4">
+            <AlertCircleIcon className="h-12 w-12 text-red-500"/>
           </div>
-          <h3 className="text-xl font-heading font-semibold text-text-primary mb-2">Generation Failed</h3>
-          <p className="text-sm text-text-secondary max-w-md text-center">{error}</p>
+          <h3 className="text-xl font-heading font-semibold text-gray-900 mb-2">Generation Failed</h3>
+          <p className="text-sm text-gray-600 max-w-md text-center">{error}</p>
           <Button
             variant="secondary"
             onClick={() => onRegenerate(logicalCurrentStep, userFeedback)}
@@ -213,7 +213,7 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
                 <Badge variant="teal" size="sm">Step {currentStep}/7</Badge>
-                <h2 className="text-xl font-heading font-semibold text-text-primary">
+                <h2 className="text-xl font-heading font-semibold text-gray-900">
                     {stepNames[currentStep]}
                 </h2>
             </div>
@@ -233,7 +233,7 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
             <Card variant="default" padding="md">
                 <div className="space-y-4">
                     <div>
-                        <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-3">
+                        <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider mb-3">
                             Feedback for Regeneration
                         </h3>
                         <Textarea

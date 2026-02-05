@@ -88,7 +88,7 @@ const InteractiveMarkdownPreview: React.FC<InteractiveMarkdownPreviewProps> = ({
   return (
     <div className="prose space-y-2">
       {onParagraphRegenerate && (
-        <div className="flex items-center gap-2 text-xs text-text-muted mb-4 pb-2 border-b border-border-subtle">
+        <div className="flex items-center gap-2 text-xs text-gray-400 mb-4 pb-2 border-b border-gray-100">
           <EditIcon className="h-3 w-3" />
           <span>Click any paragraph to provide feedback and regenerate</span>
         </div>
@@ -102,10 +102,10 @@ const InteractiveMarkdownPreview: React.FC<InteractiveMarkdownPreviewProps> = ({
         const canEdit = isParagraph && onParagraphRegenerate;
 
         const baseClasses = {
-          h1: 'text-4xl font-heading font-bold text-text-primary',
-          h2: 'text-2xl font-heading font-bold mt-6 border-b border-border-subtle pb-2 text-text-primary',
-          h3: 'text-xl font-heading font-semibold mt-4 text-text-primary',
-          paragraph: 'mt-4 text-text-secondary leading-relaxed',
+          h1: 'text-4xl font-heading font-bold text-gray-900',
+          h2: 'text-2xl font-heading font-bold mt-6 border-b border-gray-100 pb-2 text-gray-900',
+          h3: 'text-xl font-heading font-semibold mt-4 text-gray-900',
+          paragraph: 'mt-4 text-gray-600 leading-relaxed',
         };
 
         const Tag = element.type === 'paragraph' ? 'p' : element.type;
@@ -118,11 +118,11 @@ const InteractiveMarkdownPreview: React.FC<InteractiveMarkdownPreviewProps> = ({
             onMouseLeave={() => setHoveredIndex(null)}
           >
             <div
-              className={`rounded-radius-md transition-all ${
+              className={`rounded-md transition-all ${
                 isActive
                   ? 'bg-teal/10 border border-teal/50 p-3 -mx-3'
                   : isHovered && canEdit && !isRegenerating
-                  ? 'bg-surface-hover border border-border p-3 -mx-3'
+                  ? 'bg-gray-100 border border-gray-200 p-3 -mx-3'
                   : ''
               } ${isRegenerating && !isThisRegenerating ? 'opacity-50' : ''}`}
               onClick={() => {
@@ -136,14 +136,14 @@ const InteractiveMarkdownPreview: React.FC<InteractiveMarkdownPreviewProps> = ({
               </Tag>
 
               {isThisRegenerating && (
-                <div className="absolute inset-0 flex items-center justify-center bg-surface-primary/50 rounded-radius-md">
+                <div className="absolute inset-0 flex items-center justify-center bg-white/50 rounded-md">
                   <RefreshCwIcon className="h-5 w-5 text-teal animate-spin" />
                 </div>
               )}
 
               {isHovered && canEdit && !isActive && !isRegenerating && (
                 <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="bg-surface-elevated px-2 py-1 rounded-radius-sm text-xs text-text-muted border border-border">
+                  <div className="bg-white px-2 py-1 rounded-sm text-xs text-gray-400 border border-gray-200">
                     Click to edit
                   </div>
                 </div>
@@ -156,7 +156,7 @@ const InteractiveMarkdownPreview: React.FC<InteractiveMarkdownPreviewProps> = ({
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}
                   placeholder="What should change? e.g., 'Make it more concise', 'Add more detail', 'Change the tone'"
-                  className="w-full p-2 bg-surface-primary border border-border rounded-radius-md text-sm text-text-primary h-20 resize-none focus:ring-1 focus:ring-teal focus:border-teal"
+                  className="w-full p-2 bg-white border border-gray-200 rounded-md text-sm text-gray-900 h-20 resize-none focus:ring-1 focus:ring-teal focus:border-teal"
                   disabled={isThisRegenerating}
                   autoFocus
                 />
@@ -182,7 +182,7 @@ const InteractiveMarkdownPreview: React.FC<InteractiveMarkdownPreviewProps> = ({
                   <button
                     onClick={handleCancelFeedback}
                     disabled={isThisRegenerating}
-                    className="p-2 text-text-muted hover:text-text-primary rounded-full hover:bg-surface-hover transition-colors"
+                    className="p-2 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors"
                   >
                     <XIcon className="h-4 w-4" />
                   </button>
@@ -200,11 +200,11 @@ const InteractiveMarkdownPreview: React.FC<InteractiveMarkdownPreviewProps> = ({
 const SimpleMarkdownPreview: React.FC<{ markdown: string }> = ({ markdown }) => {
     const lines = markdown.split('\n');
     const elements = lines.map((line, i) => {
-        if (line.startsWith('### ')) return <h3 key={i} className="text-xl font-heading font-semibold mt-4 text-text-primary">{line.substring(4)}</h3>;
-        if (line.startsWith('## ')) return <h2 key={i} className="text-2xl font-heading font-bold mt-6 border-b border-border-subtle pb-2 text-text-primary">{line.substring(3)}</h2>;
-        if (line.startsWith('# ')) return <h1 key={i} className="text-4xl font-heading font-bold text-text-primary">{line.substring(2)}</h1>;
+        if (line.startsWith('### ')) return <h3 key={i} className="text-xl font-heading font-semibold mt-4 text-gray-900">{line.substring(4)}</h3>;
+        if (line.startsWith('## ')) return <h2 key={i} className="text-2xl font-heading font-bold mt-6 border-b border-gray-100 pb-2 text-gray-900">{line.substring(3)}</h2>;
+        if (line.startsWith('# ')) return <h1 key={i} className="text-4xl font-heading font-bold text-gray-900">{line.substring(2)}</h1>;
         if (line.trim() === '') return null; // Don't render empty paragraphs
-        return <p key={i} className="mt-4 text-text-secondary leading-relaxed">{line}</p>;
+        return <p key={i} className="mt-4 text-gray-600 leading-relaxed">{line}</p>;
     }).filter(Boolean);
 
     return <div className="prose">{elements}</div>;
@@ -324,8 +324,8 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
             <Spinner />
           </div>
         </div>
-        <h1 className="text-2xl font-heading font-bold text-text-primary mt-6">AI is Writing Your Article...</h1>
-        <p className="text-md text-text-secondary">This is a profound process and may take several minutes.</p>
+        <h1 className="text-2xl font-heading font-bold text-gray-900 mt-6">AI is Writing Your Article...</h1>
+        <p className="text-md text-gray-600">This is a profound process and may take several minutes.</p>
 
         {progress && (
             <div className="w-full max-w-lg mt-8">
@@ -334,7 +334,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
                     <span className="text-sm font-medium text-teal">{percentage}%</span>
                 </div>
                 <Progress value={percentage} max={100} size="md" />
-                <p className="text-sm text-text-muted mt-2 truncate">Writing: {progress.currentSection}</p>
+                <p className="text-sm text-gray-400 mt-2 truncate">Writing: {progress.currentSection}</p>
             </div>
         )}
       </div>
@@ -344,11 +344,11 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
   if (error && !article) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] text-center animate-fade-in">
-        <div className="w-16 h-16 rounded-full bg-status-error/10 flex items-center justify-center mb-4">
-          <AlertTriangleIcon className="h-8 w-8 text-status-error" />
+        <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+          <AlertTriangleIcon className="h-8 w-8 text-red-500" />
         </div>
-        <h1 className="text-2xl font-heading font-bold text-text-primary">Content Generation Failed</h1>
-        <p className="text-md text-text-secondary mt-2 max-w-xl">{error}</p>
+        <h1 className="text-2xl font-heading font-bold text-gray-900">Content Generation Failed</h1>
+        <p className="text-md text-gray-600 mt-2 max-w-xl">{error}</p>
         <Button onClick={onBack} variant="secondary" className="mt-6">
           Back to Dashboard
         </Button>
@@ -359,7 +359,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
   if (!article) {
     return (
         <div className="text-center min-h-[70vh] flex flex-col items-center justify-center animate-fade-in">
-            <h1 className="text-2xl font-heading font-bold text-text-primary">No article generated.</h1>
+            <h1 className="text-2xl font-heading font-bold text-gray-900">No article generated.</h1>
              <Button onClick={onBack} variant="secondary" className="mt-6">
                 Back to Dashboard
             </Button>
@@ -373,8 +373,8 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
               <div className="celebration-icon w-24 h-24 rounded-full bg-teal flex items-center justify-center shadow-glow-teal-lg mb-4">
                   <CheckIcon className="h-16 w-16 text-surface-primary"/>
               </div>
-              <h1 className="text-3xl font-heading font-bold text-text-primary">Strategy Deployed.</h1>
-              <p className="text-xl text-text-secondary">Content Ready.</p>
+              <h1 className="text-3xl font-heading font-bold text-gray-900">Strategy Deployed.</h1>
+              <p className="text-xl text-gray-600">Content Ready.</p>
           </div>
       )
   }
@@ -384,12 +384,12 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-radius-lg bg-teal/10 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-lg bg-teal/10 flex items-center justify-center">
                     <BrainCircuitIcon className="h-6 w-6 text-teal" />
                 </div>
                 <div>
-                    <h1 className="text-2xl font-heading font-bold text-text-primary">Generated Article</h1>
-                    <p className="text-md text-text-secondary">Review, edit, and download your content.</p>
+                    <h1 className="text-2xl font-heading font-bold text-gray-900">Generated Article</h1>
+                    <p className="text-md text-gray-600">Review, edit, and download your content.</p>
                 </div>
             </div>
             <div className="flex items-center gap-3">
@@ -410,7 +410,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
 
         {/* Title Input */}
         <Card variant="default" padding="md" className="mb-4">
-            <label className="block text-sm font-heading font-medium text-text-secondary mb-2">Article Title (H1)</label>
+            <label className="block text-sm font-heading font-medium text-gray-600 mb-2">Article Title (H1)</label>
             <Input
                 type="text"
                 value={article.title}
@@ -422,14 +422,14 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
 
         {/* Edit Mode Toggle */}
         <div className="flex items-center gap-3 mb-4">
-          <span className="text-sm text-text-muted">Edit Mode:</span>
-          <div className="flex bg-surface-hover rounded-radius-lg p-1 border border-border-subtle">
+          <span className="text-sm text-gray-400">Edit Mode:</span>
+          <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-100">
             <button
               onClick={() => setEditMode('paragraph')}
-              className={`px-3 py-1.5 text-xs rounded-radius-md transition-colors flex items-center gap-1 ${
+              className={`px-3 py-1.5 text-xs rounded-md transition-colors flex items-center gap-1 ${
                 editMode === 'paragraph'
                   ? 'bg-teal text-surface-primary font-semibold'
-                  : 'text-text-muted hover:text-text-primary hover:bg-surface-active'
+                  : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
               }`}
               title="Click paragraphs to regenerate with AI feedback"
             >
@@ -438,10 +438,10 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
             </button>
             <button
               onClick={() => setEditMode('selection')}
-              className={`px-3 py-1.5 text-xs rounded-radius-md transition-colors flex items-center gap-1 ${
+              className={`px-3 py-1.5 text-xs rounded-md transition-colors flex items-center gap-1 ${
                 editMode === 'selection'
                   ? 'bg-teal text-surface-primary font-semibold'
-                  : 'text-text-muted hover:text-text-primary hover:bg-surface-active'
+                  : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
               }`}
               title="Select any text to rewrite, expand, or shorten"
             >
@@ -450,10 +450,10 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
             </button>
             <button
               onClick={() => setEditMode('raw')}
-              className={`px-3 py-1.5 text-xs rounded-radius-md transition-colors flex items-center gap-1 ${
+              className={`px-3 py-1.5 text-xs rounded-md transition-colors flex items-center gap-1 ${
                 editMode === 'raw'
                   ? 'bg-teal text-surface-primary font-semibold'
-                  : 'text-text-muted hover:text-text-primary hover:bg-surface-active'
+                  : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
               }`}
               title="Direct markdown editing"
             >
@@ -461,7 +461,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
               Raw
             </button>
           </div>
-          <span className="text-xs text-text-muted">
+          <span className="text-xs text-gray-400">
             {editMode === 'paragraph' && 'Click paragraphs to regenerate with AI'}
             {editMode === 'selection' && 'Select text to rewrite, expand, or shorten'}
             {editMode === 'raw' && 'Edit markdown directly'}
@@ -471,20 +471,20 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
         {/* Editor Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[65vh]">
             <Card variant="default" padding="none" className="flex flex-col overflow-hidden">
-                <div className="p-3 border-b border-border bg-surface-hover">
-                    <label className="text-sm font-heading font-medium text-text-secondary">Editor (Markdown)</label>
+                <div className="p-3 border-b border-gray-200 bg-gray-100">
+                    <label className="text-sm font-heading font-medium text-gray-600">Editor (Markdown)</label>
                 </div>
                 <textarea
                     value={article.content.substring(article.content.indexOf('\n\n') + 2)} // Hide the H1 from text area
                     onChange={handleContentChange}
-                    className="flex-1 p-4 bg-surface-primary text-text-primary font-mono text-sm leading-relaxed focus:outline-none focus:ring-0 resize-none border-none"
+                    className="flex-1 p-4 bg-white text-gray-900 font-mono text-sm leading-relaxed focus:outline-none focus:ring-0 resize-none border-none"
                     spellCheck="false"
                 />
             </Card>
 
             <Card variant="default" padding="none" className="flex flex-col overflow-hidden">
-                <div className="p-3 border-b border-border bg-surface-hover">
-                    <label className="text-sm font-heading font-medium text-text-secondary">
+                <div className="p-3 border-b border-gray-200 bg-gray-100">
+                    <label className="text-sm font-heading font-medium text-gray-600">
                       {editMode === 'paragraph' && 'Interactive Preview (Click paragraphs to edit)'}
                       {editMode === 'selection' && 'Selection Mode (Select text to rewrite)'}
                       {editMode === 'raw' && 'Live Preview'}

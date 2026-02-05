@@ -37,15 +37,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       <div className="animate-fade-in">
         {/* Logo/Header */}
         <div className="text-center mb-8 lg:hidden">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-teal/10 rounded-radius-lg mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-teal/10 rounded-lg mb-4">
             <svg className="w-8 h-8 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-heading font-bold text-text-primary mb-2">
+          <h1 className="text-3xl font-heading font-bold text-gray-900 mb-2">
             Welcome to Cut Inside
           </h1>
-          <p className="text-text-secondary">Content Brief Generator</p>
+          <p className="text-gray-600">Content Brief Generator</p>
         </div>
 
         <Alert variant="warning" title="Supabase Not Configured" className="mb-6">
@@ -59,7 +59,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           </Card>
         </Alert>
 
-        <p className="text-center text-text-muted text-sm mb-6">
+        <p className="text-center text-gray-400 text-sm mb-6">
           You can continue using the app without authentication,
           but briefs will not be saved.
         </p>
@@ -77,15 +77,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     <div className="animate-fade-in">
       {/* Logo/Header */}
       <div className="text-center mb-8 lg:hidden">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-teal/10 rounded-radius-lg mb-4">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-teal/10 rounded-lg mb-4">
           <svg className="w-8 h-8 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         </div>
-        <h1 className="text-3xl font-heading font-bold text-text-primary mb-2">
+        <h1 className="text-3xl font-heading font-bold text-gray-900 mb-2">
           Welcome to Cut Inside
         </h1>
-        <p className="text-text-secondary">Content Brief Generator</p>
+        <p className="text-gray-600">Content Brief Generator</p>
       </div>
 
       <Card variant="elevated" padding="lg">
@@ -126,8 +126,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         </form>
       </Card>
 
-      <div className="mt-8 pt-6 border-t border-border-subtle text-center">
-        <p className="text-text-muted text-sm">
+      <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+        <p className="text-gray-400 text-sm">
           Don't have an access code?{' '}
           <a href="mailto:support@cutinside.com" className="text-teal hover:underline transition-colors">
             Contact your administrator

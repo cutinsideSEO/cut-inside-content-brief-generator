@@ -35,18 +35,18 @@ const Stage7Final: React.FC<StageProps> = ({ briefData, onRestart, competitorDat
 
   return (
     <div className="flex flex-col h-full">
-        <h2 className="text-xl font-bold text-green-400 mb-2">Brief Generation Complete!</h2>
+        <h2 className="text-xl font-bold text-emerald-500 mb-2">Brief Generation Complete!</h2>
         <p className="text-gray-400 mb-4">Here is your final, comprehensive content brief. You can copy it as JSON or export it as a formatted Markdown file.</p>
         <div className="relative flex-grow min-h-0">
            <button 
               onClick={handleCopy}
-              className="absolute top-3 right-3 p-2 bg-gray-700/80 hover:bg-gray-600 rounded-md text-gray-300 hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="absolute top-3 right-3 p-2 bg-gray-100/80 hover:bg-gray-200 rounded-md text-gray-700 hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500"
               aria-label="Copy to clipboard"
             >
-              {copied ? <CheckIcon className="h-5 w-5 text-green-400"/> : <CopyIcon className="h-5 w-5"/>}
+              {copied ? <CheckIcon className="h-5 w-5 text-emerald-500"/> : <CopyIcon className="h-5 w-5"/>}
             </button>
-          <pre className="w-full h-full p-4 bg-gray-900 border border-gray-700 rounded-md overflow-auto">
-            <code className="text-sm text-gray-300 font-mono whitespace-pre-wrap">{finalBriefJson}</code>
+          <pre className="w-full h-full p-4 bg-gray-50 border border-gray-200 rounded-md overflow-auto">
+            <code className="text-sm text-gray-700 font-mono whitespace-pre-wrap">{finalBriefJson}</code>
           </pre>
         </div>
         <div className="mt-4 flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">

@@ -64,7 +64,7 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <label htmlFor={id} className="text-sm font-heading font-semibold text-text-primary">
+          <label htmlFor={id} className="text-sm font-heading font-semibold text-gray-900">
             {label}
           </label>
           {charStatus && (
@@ -101,7 +101,7 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
     <div className="space-y-6">
       {/* Core SEO */}
       <div>
-        <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-4">Core SEO</h3>
+        <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider mb-4">Core SEO</h3>
         <div className="space-y-5">
           <SeoField
             id="title_tag"
@@ -145,8 +145,8 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       </div>
 
       {/* Social Media */}
-      <div className="border-t border-border-subtle pt-6">
-        <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-4">Social Media (Open Graph)</h3>
+      <div className="border-t border-gray-100 pt-6">
+        <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider mb-4">Social Media (Open Graph)</h3>
         <div className="space-y-5">
           <SeoField
             id="og_title"

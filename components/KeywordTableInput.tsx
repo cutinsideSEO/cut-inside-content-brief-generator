@@ -105,8 +105,8 @@ const KeywordTableInput: React.FC<KeywordTableInputProps> = ({ value, onChange }
     <div ref={tableRef} className="bg-black/50 rounded-lg border border-white/10 overflow-hidden">
       {/* Header */}
       <div className="grid grid-cols-[1fr_120px_40px] gap-2 p-3 bg-white/5 border-b border-white/10">
-        <div className="text-sm font-heading font-semibold text-grey/80">Keyword</div>
-        <div className="text-sm font-heading font-semibold text-grey/80">Volume</div>
+        <div className="text-sm font-heading font-semibold text-gray-600/80">Keyword</div>
+        <div className="text-sm font-heading font-semibold text-gray-600/80">Volume</div>
         <div></div>
       </div>
 
@@ -125,7 +125,7 @@ const KeywordTableInput: React.FC<KeywordTableInputProps> = ({ value, onChange }
               onPaste={(e) => handlePaste(e, row.id, 'keyword')}
               onKeyDown={(e) => handleKeyDown(e, index)}
               placeholder="Enter keyword..."
-              className="w-full px-3 py-2 bg-black border border-white/20 rounded text-grey text-sm focus:ring-1 focus:ring-teal focus:border-teal"
+              className="w-full px-3 py-2 bg-background border border-white/20 rounded text-gray-600 text-sm focus:ring-1 focus:ring-teal focus:border-teal"
             />
             <input
               type="text"
@@ -140,12 +140,12 @@ const KeywordTableInput: React.FC<KeywordTableInputProps> = ({ value, onChange }
               onPaste={(e) => handlePaste(e, row.id, 'volume')}
               onKeyDown={(e) => handleKeyDown(e, index)}
               placeholder="0"
-              className="w-full px-3 py-2 bg-black border border-white/20 rounded text-grey text-sm text-right focus:ring-1 focus:ring-teal focus:border-teal"
+              className="w-full px-3 py-2 bg-background border border-white/20 rounded text-gray-600 text-sm text-right focus:ring-1 focus:ring-teal focus:border-teal"
             />
             <button
               onClick={() => removeRow(row.id)}
               disabled={value.length <= 1}
-              className="p-2 text-grey/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-grey/40 disabled:hover:bg-transparent"
+              className="p-2 text-gray-600/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-600/40 disabled:hover:bg-transparent"
               title="Remove row"
             >
               <XIcon className="h-4 w-4" />
@@ -162,7 +162,7 @@ const KeywordTableInput: React.FC<KeywordTableInputProps> = ({ value, onChange }
         >
           + Add Keyword
         </button>
-        <span className="text-xs text-grey/50">
+        <span className="text-xs text-gray-600/50">
           Tip: Paste from Excel/Sheets (Keyword + Volume columns)
         </span>
       </div>

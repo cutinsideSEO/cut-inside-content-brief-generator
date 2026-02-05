@@ -42,15 +42,15 @@ const ArticleViewScreen: React.FC<ArticleViewScreenProps> = ({ articleId, onBack
     // Simple markdown rendering
     const renderMarkdown = (text: string) => {
         return text
-            .replace(/^### (.+)$/gm, '<h3 class="text-lg font-heading font-semibold text-text-primary mt-6 mb-2">$1</h3>')
-            .replace(/^## (.+)$/gm, '<h2 class="text-xl font-heading font-bold text-text-primary mt-8 mb-3">$1</h2>')
-            .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-heading font-bold text-text-primary mt-8 mb-4">$1</h1>')
+            .replace(/^### (.+)$/gm, '<h3 class="text-lg font-heading font-semibold text-gray-900 mt-6 mb-2">$1</h3>')
+            .replace(/^## (.+)$/gm, '<h2 class="text-xl font-heading font-bold text-gray-900 mt-8 mb-3">$1</h2>')
+            .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-heading font-bold text-gray-900 mt-8 mb-4">$1</h1>')
             .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc text-text-secondary">$1</li>')
-            .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-4 list-decimal text-text-secondary">$2</li>')
-            .replace(/\n\n/g, '</p><p class="text-text-secondary leading-relaxed mb-4">')
-            .replace(/^(?!<)/, '<p class="text-text-secondary leading-relaxed mb-4">')
+            .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc text-gray-600">$1</li>')
+            .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-4 list-decimal text-gray-600">$2</li>')
+            .replace(/\n\n/g, '</p><p class="text-gray-600 leading-relaxed mb-4">')
+            .replace(/^(?!<)/, '<p class="text-gray-600 leading-relaxed mb-4">')
             .replace(/$/, '</p>');
     };
 
@@ -81,19 +81,19 @@ const ArticleViewScreen: React.FC<ArticleViewScreenProps> = ({ articleId, onBack
                 <div>
                     <button
                         onClick={onBack}
-                        className="flex items-center gap-2 text-sm text-text-secondary hover:text-teal transition-colors mb-3 group"
+                        className="flex items-center gap-2 text-sm text-gray-600 hover:text-teal transition-colors mb-3 group"
                     >
                         <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
                         Back to Articles
                     </button>
-                    <h1 className="text-2xl font-heading font-bold text-text-primary">{article.title}</h1>
+                    <h1 className="text-2xl font-heading font-bold text-gray-900">{article.title}</h1>
                     <div className="flex items-center gap-3 mt-2">
                         <Badge variant="default" size="sm">Version {article.version}</Badge>
                         {article.is_current && <Badge variant="success" size="sm">Current</Badge>}
-                        <span className="text-sm text-text-muted">{wordCount.toLocaleString()} words</span>
-                        <span className="text-sm text-text-muted">
+                        <span className="text-sm text-gray-400">{wordCount.toLocaleString()} words</span>
+                        <span className="text-sm text-gray-400">
                             {new Date(article.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
                     </div>

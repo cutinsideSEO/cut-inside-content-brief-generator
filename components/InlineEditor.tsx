@@ -152,7 +152,7 @@ const InlineEditor: React.FC<InlineEditorProps> = ({
     <div className="relative">
       {/* Selection hint */}
       {!readOnly && !showToolbar && (
-        <div className="text-xs text-grey/50 mb-2 flex items-center space-x-1">
+        <div className="text-xs text-gray-600/50 mb-2 flex items-center space-x-1">
           <EditIcon className="h-3 w-3" />
           <span>Select text to rewrite, expand, or shorten</span>
         </div>
@@ -195,7 +195,7 @@ const InlineEditor: React.FC<InlineEditorProps> = ({
                   className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm transition-colors ${
                     isRewriting
                       ? 'opacity-50 cursor-not-allowed'
-                      : 'hover:bg-white/10 text-grey/80 hover:text-white'
+                      : 'hover:bg-white/10 text-gray-600/80 hover:text-white'
                   }`}
                   title={item.description}
                 >
@@ -217,7 +217,7 @@ const InlineEditor: React.FC<InlineEditorProps> = ({
                 value={customInstruction}
                 onChange={(e) => setCustomInstruction(e.target.value)}
                 placeholder="Enter your instruction, e.g., 'Make it more formal'"
-                className="w-full p-2 bg-black border border-white/20 rounded-md text-sm text-grey focus:ring-1 focus:ring-teal"
+                className="w-full p-2 bg-background border border-white/20 rounded-md text-sm text-gray-600 focus:ring-1 focus:ring-teal"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && customInstruction.trim()) {
@@ -247,7 +247,7 @@ const InlineEditor: React.FC<InlineEditorProps> = ({
                 <button
                   onClick={handleCancelCustom}
                   disabled={isRewriting}
-                  className="p-2 text-grey/50 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+                  className="p-2 text-gray-600/50 hover:text-white rounded-full hover:bg-white/10 transition-colors"
                 >
                   <XIcon className="h-4 w-4" />
                 </button>

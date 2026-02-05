@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './styles/globals.css';
 import AppWrapper from './AppWrapper';
 
 const rootElement = document.getElementById('root');

@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'elevated' | 'interactive' | 'outline';
@@ -15,56 +16,43 @@ const Card: React.FC<CardProps> = ({
   hover = false,
   glow = 'none',
   statusBorder = 'none',
-  className = '',
+  className,
   children,
   ...props
 }) => {
-  const baseStyles = 'rounded-radius-lg transition-all duration-200';
-
-  const variantStyles = {
-    default: 'bg-surface-elevated border border-border shadow-card shadow-inner-subtle',
-    elevated: 'bg-surface-elevated border border-border shadow-card-elevated',
-    interactive: 'bg-surface-elevated border border-border shadow-card cursor-pointer interactive-card',
-    outline: 'bg-transparent border border-border',
-  };
-
-  const paddingStyles = {
-    sm: 'p-4',
-    md: 'p-5',
-    lg: 'p-6',
-    none: '',
-  };
-
-  const hoverStyles = hover ? 'card-hover-lift hover:shadow-card-hover hover:border-border-emphasis' : '';
-
-  const glowStyles = {
-    teal: 'hover:shadow-glow-teal-sm hover:border-teal/30',
-    yellow: 'hover:shadow-glow-yellow-sm hover:border-yellow/30',
-    none: '',
-  };
-
-  const statusBorderStyles = {
-    generating: 'border-l-4 border-l-status-generating status-border-generating',
-    complete: 'border-l-4 border-l-status-complete',
-    draft: 'border-l-4 border-l-status-draft',
-    error: 'border-l-4 border-l-status-error',
-    none: '',
-  };
-
-  const classes = [
-    baseStyles,
-    variantStyles[variant],
-    paddingStyles[padding],
-    hoverStyles,
-    glowStyles[glow],
-    statusBorderStyles[statusBorder],
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ');
-
   return (
-    <div className={classes} {...props}>
+    <div
+      className={cn(
+        'rounded-lg transition-all duration-200',
+
+        // Variant
+        variant === 'default' && 'bg-card border border-border shadow-card',
+        variant === 'elevated' && 'bg-card border border-border shadow-card-elevated',
+        variant === 'interactive' && 'bg-card border border-border shadow-card cursor-pointer interactive-card',
+        variant === 'outline' && 'bg-transparent border border-border',
+
+        // Padding
+        padding === 'sm' && 'p-4',
+        padding === 'md' && 'p-5',
+        padding === 'lg' && 'p-6',
+
+        // Hover
+        hover && 'card-hover-lift hover:shadow-card-hover hover:border-gray-300',
+
+        // Glow
+        glow === 'teal' && 'hover:shadow-glow-teal-sm hover:border-teal/30',
+        glow === 'yellow' && 'hover:shadow-md hover:border-amber-300',
+
+        // Status border
+        statusBorder === 'generating' && 'border-l-4 border-l-amber-400 status-border-generating',
+        statusBorder === 'complete' && 'border-l-4 border-l-emerald-400',
+        statusBorder === 'draft' && 'border-l-4 border-l-gray-300',
+        statusBorder === 'error' && 'border-l-4 border-l-red-400',
+
+        className
+      )}
+      {...props}
+    >
       {children}
     </div>
   );

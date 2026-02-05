@@ -34,7 +34,7 @@ const Stage1Goal: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       {searchIntent && (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider">
+            <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider">
               Search Intent Classification
             </h3>
             {searchIntent.reasoning && (
@@ -43,8 +43,8 @@ const Stage1Goal: React.FC<StageProps> = ({ briefData, setBriefData }) => {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {intentInfo && <Badge variant={intentInfo.variant} size="md">{intentInfo.label}</Badge>}
-            <span className="text-text-muted">|</span>
-            <span className="text-text-secondary text-sm">{searchIntent.preferred_format}</span>
+            <span className="text-gray-400">|</span>
+            <span className="text-gray-600 text-sm">{searchIntent.preferred_format}</span>
           </div>
           {searchIntent.serp_features && searchIntent.serp_features.length > 0 && (
             <div className="flex gap-2 flex-wrap mt-2">
@@ -55,9 +55,9 @@ const Stage1Goal: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       )}
 
       {/* Page Goal */}
-      <div className="border-t border-border-subtle pt-8">
+      <div className="border-t border-gray-100 pt-8">
         <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider">Page Goal</h3>
+          <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider">Page Goal</h3>
           {briefData.page_goal?.reasoning && <AIReasoningIcon reasoning={briefData.page_goal.reasoning} />}
         </div>
         <EditableText
@@ -68,9 +68,9 @@ const Stage1Goal: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       </div>
 
       {/* Target Audience */}
-      <div className="border-t border-border-subtle pt-8">
+      <div className="border-t border-gray-100 pt-8">
         <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider">Target Audience</h3>
+          <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider">Target Audience</h3>
           {briefData.target_audience?.reasoning && <AIReasoningIcon reasoning={briefData.target_audience.reasoning} />}
         </div>
         <EditableText

@@ -159,8 +159,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-text-primary">{clientName}</h1>
-          <p className="text-text-secondary mt-0.5">{briefs.length} {briefs.length === 1 ? 'brief' : 'briefs'}</p>
+          <h1 className="text-2xl font-heading font-bold text-gray-900">{clientName}</h1>
+          <p className="text-gray-600 mt-0.5">{briefs.length} {briefs.length === 1 ? 'brief' : 'briefs'}</p>
         </div>
         <Button
           variant="primary"
@@ -202,7 +202,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
             </div>
           ) : articles.length === 0 ? (
             <Card variant="default" padding="lg" className="text-center">
-              <p className="text-text-secondary py-8">No articles generated yet for this client.</p>
+              <p className="text-gray-600 py-8">No articles generated yet for this client.</p>
             </Card>
           ) : (
             <div className="space-y-3">
@@ -269,17 +269,17 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                   <Skeleton variant="text" width="60%" height={24} className="mb-2" />
                   <Skeleton variant="text" width="30%" height={16} />
                 </div>
-                <Skeleton variant="rectangular" width={80} height={24} className="rounded-radius-sm" />
+                <Skeleton variant="rectangular" width={80} height={24} className="rounded-sm" />
               </div>
               <div className="flex gap-2 mb-4">
-                <Skeleton variant="rectangular" width={70} height={22} className="rounded-radius-sm" />
-                <Skeleton variant="rectangular" width={90} height={22} className="rounded-radius-sm" />
-                <Skeleton variant="rectangular" width={60} height={22} className="rounded-radius-sm" />
+                <Skeleton variant="rectangular" width={70} height={22} className="rounded-sm" />
+                <Skeleton variant="rectangular" width={90} height={22} className="rounded-sm" />
+                <Skeleton variant="rectangular" width={60} height={22} className="rounded-sm" />
               </div>
               <Skeleton variant="text" width="50%" height={16} className="mb-4" />
-              <div className="flex gap-2 pt-3 border-t border-border-subtle">
-                <Skeleton variant="rectangular" width={80} height={32} className="rounded-radius-md" />
-                <Skeleton variant="rectangular" width={100} height={32} className="rounded-radius-md" />
+              <div className="flex gap-2 pt-3 border-t border-gray-100">
+                <Skeleton variant="rectangular" width={80} height={32} className="rounded-md" />
+                <Skeleton variant="rectangular" width={100} height={32} className="rounded-md" />
               </div>
             </Card>
           ))}
@@ -305,10 +305,10 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-heading font-semibold text-text-primary mb-2">
+            <h3 className="text-lg font-heading font-semibold text-gray-900 mb-2">
               No briefs yet
             </h3>
-            <p className="text-text-secondary mb-6 max-w-sm mx-auto">
+            <p className="text-gray-600 mb-6 max-w-sm mx-auto">
               Create your first content brief for {clientName}.
             </p>
             <Button variant="primary" onClick={onCreateBrief} glow>
@@ -321,7 +321,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       {/* No results from filter */}
       {!isLoading && !error && briefs.length > 0 && filteredBriefs.length === 0 && (
         <Card variant="default" padding="lg" className="text-center">
-          <p className="text-text-secondary">No briefs match your search or filter.</p>
+          <p className="text-gray-600">No briefs match your search or filter.</p>
           <Button
             variant="secondary"
             onClick={() => {
@@ -341,8 +341,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           {/* In Progress Section */}
           {inProgressBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'in_progress') && (
             <section>
-              <h2 className="text-lg font-heading font-semibold text-text-primary mb-4 flex items-center">
-                <span className="w-3 h-3 bg-status-generating rounded-full mr-3" />
+              <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4 flex items-center">
+                <span className="w-3 h-3 bg-amber-500 rounded-full mr-3" />
                 In Progress ({inProgressBriefs.length})
               </h2>
               <div className="space-y-3">
@@ -369,8 +369,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           {/* Draft Section */}
           {draftBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'draft') && (
             <section>
-              <h2 className="text-lg font-heading font-semibold text-text-primary mb-4 flex items-center">
-                <span className="w-3 h-3 bg-status-draft rounded-full mr-3" />
+              <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4 flex items-center">
+                <span className="w-3 h-3 bg-gray-400 rounded-full mr-3" />
                 Drafts ({draftBriefs.length})
               </h2>
               <div className="space-y-3">
@@ -397,8 +397,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           {/* Complete Section */}
           {completeBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'complete') && (
             <section>
-              <h2 className="text-lg font-heading font-semibold text-text-primary mb-4 flex items-center">
-                <span className="w-3 h-3 bg-status-complete rounded-full mr-3" />
+              <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4 flex items-center">
+                <span className="w-3 h-3 bg-emerald-500 rounded-full mr-3" />
                 Complete ({completeBriefs.length})
               </h2>
               <div className="space-y-3">

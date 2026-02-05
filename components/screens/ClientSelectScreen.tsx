@@ -160,10 +160,10 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-text-primary">
+          <h1 className="text-2xl font-heading font-bold text-gray-900">
             Welcome back, {userName || 'User'}
           </h1>
-          <p className="text-text-secondary mt-1">Select a client folder to view or create briefs</p>
+          <p className="text-gray-600 mt-1">Select a client folder to view or create briefs</p>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -217,13 +217,13 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <Card key={i} padding="md">
               <div className="flex items-start">
-                <Skeleton variant="rectangular" width={48} height={48} className="rounded-radius-lg mr-4" />
+                <Skeleton variant="rectangular" width={48} height={48} className="rounded-lg mr-4" />
                 <div className="flex-1">
                   <Skeleton variant="text" width="70%" height={24} className="mb-2" />
                   <Skeleton variant="text" width="90%" height={16} />
                 </div>
               </div>
-              <div className="mt-4 pt-4 border-t border-border-subtle flex justify-between">
+              <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between">
                 <Skeleton variant="text" width={60} height={16} />
                 <Skeleton variant="text" width={100} height={16} />
               </div>
@@ -251,10 +251,10 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-heading font-semibold text-text-primary mb-2">
+            <h3 className="text-lg font-heading font-semibold text-gray-900 mb-2">
               No client folders yet
             </h3>
-            <p className="text-text-secondary mb-6 max-w-sm mx-auto">
+            <p className="text-gray-600 mb-6 max-w-sm mx-auto">
               Create your first client folder to start organizing your briefs.
             </p>
             <Button variant="primary" onClick={() => setShowCreateModal(true)} glow>
@@ -267,13 +267,14 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
       {/* Client grid */}
       {!isLoading && !error && filteredClients.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredClients.map((client) => (
+          {filteredClients.map((client, index) => (
             <ClientCard
               key={client.id}
               client={client}
               onClick={() => onSelectClient(client.id, client.name)}
               isGenerating={getGeneratingBriefsForClient(client.id).length > 0}
               generatingCount={getGeneratingBriefsForClient(client.id).length}
+              colorIndex={clients.indexOf(client)}
             />
           ))}
         </div>
@@ -282,7 +283,7 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
       {/* No search results */}
       {!isLoading && !error && clients.length > 0 && filteredClients.length === 0 && (
         <Card variant="default" padding="lg" className="text-center">
-          <p className="text-text-secondary">No clients match your search.</p>
+          <p className="text-gray-600">No clients match your search.</p>
           <Button variant="secondary" onClick={() => setSearchQuery('')} className="mt-4">
             Clear Search
           </Button>
@@ -295,8 +296,8 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
           <FloatingPanelHeader
             icon={
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-generating opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-status-generating"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
               </span>
             }
           >

@@ -111,7 +111,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
       className={`
         relative
         ${isSelected ? 'border-teal ring-1 ring-teal' : ''}
-        ${isGenerating ? 'border-status-generating/50 ring-1 ring-status-generating/30' : ''}
+        ${isGenerating ? 'border-amber-400/50 ring-1 ring-status-generating/30' : ''}
       `}
     >
       {/* Generation indicator */}
@@ -127,11 +127,11 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-heading font-semibold text-text-primary truncate">
+          <h3 className="text-lg font-heading font-semibold text-gray-900 truncate">
             {brief.name}
           </h3>
           {brief.client && (
-            <p className="text-sm text-text-tertiary mt-0.5">{brief.client.name}</p>
+            <p className="text-sm text-gray-500 mt-0.5">{brief.client.name}</p>
           )}
         </div>
         {!isGenerating && <BriefStatusBadge status={brief.status} className="ml-3 flex-shrink-0" />}
@@ -146,7 +146,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
             </Badge>
           ))}
           {(brief.keywords?.length || 0) > 3 && (
-            <span className="inline-block px-2 py-0.5 text-xs text-text-muted">
+            <span className="inline-block px-2 py-0.5 text-xs text-gray-400">
               +{(brief.keywords?.length || 0) - 3} more
             </span>
           )}
@@ -168,19 +168,19 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
 
       {/* Progress and metadata */}
       {!isGenerating && (
-        <div className="flex items-center text-sm text-text-secondary mb-4">
+        <div className="flex items-center text-sm text-gray-600 mb-4">
           <span className="mr-3">
-            <span className="text-text-muted">Progress:</span>{' '}
-            <span className="text-text-primary">{getProgressText()}</span>
+            <span className="text-gray-400">Progress:</span>{' '}
+            <span className="text-gray-900">{getProgressText()}</span>
           </span>
-          <span className="text-text-muted">|</span>
+          <span className="text-gray-400">|</span>
           <span className="ml-3">
-            <span className="text-text-muted">Updated:</span>{' '}
+            <span className="text-gray-400">Updated:</span>{' '}
             {formatDate(brief.updated_at)} at {formatTime(brief.updated_at)}
           </span>
           {articleCount !== undefined && articleCount > 0 && (
             <>
-              <span className="text-text-muted ml-3">|</span>
+              <span className="text-gray-400 ml-3">|</span>
               <span className="ml-3">
                 <span className="text-teal">{articleCount} article{articleCount > 1 ? 's' : ''}</span>
               </span>
@@ -190,7 +190,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
       )}
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-2 pt-3 border-t border-border-subtle">
+      <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
         {isGenerating ? (
           <>
             <Button
@@ -200,7 +200,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
             >
               View Progress
             </Button>
-            <span className="flex items-center text-xs text-status-generating ml-2">
+            <span className="flex items-center text-xs text-amber-500 ml-2">
               <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />

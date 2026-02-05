@@ -1,16 +1,14 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
-// Try to import useSound from App, but make it optional
 let useSound: (() => { playSound: (sound: string) => void } | null) | undefined;
 try {
-  // Dynamic import to avoid circular dependency issues
   const AppModule = require('../App');
   useSound = AppModule.useSound;
 } catch {
   useSound = undefined;
 }
 
-// Spinner component for loading state
 const Spinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
   const sizeClasses = {
     sm: 'w-3 h-3',
@@ -19,7 +17,7 @@ const Spinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
   };
   return (
     <svg
-      className={`animate-spin ${sizeClasses[size]}`}
+      className={cn('animate-spin', sizeClasses[size])}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
@@ -70,18 +68,18 @@ const Button: React.FC<ButtonProps> = ({
   };
 
   const baseStyle =
-    'font-heading font-bold rounded-radius-md transition-all duration-200 ease-in-out focus:outline-none focus-ring transform active:scale-[0.98] flex items-center justify-center gap-2 disabled:cursor-not-allowed';
+    'font-heading font-bold rounded-md transition-all duration-200 ease-in-out focus:outline-none focus-ring transform active:scale-[0.98] flex items-center justify-center gap-2 disabled:cursor-not-allowed';
 
   const variantStyles = {
-    primary: 'bg-teal hover:bg-teal/90 text-brand-white disabled:bg-grey/20 disabled:text-grey/50',
+    primary: 'bg-gradient-to-r from-teal-500 to-teal-700 hover:from-teal-600 hover:to-teal-800 text-white shadow-sm hover:shadow-md disabled:from-gray-200 disabled:to-gray-300 disabled:text-gray-400',
     secondary:
-      'bg-surface-elevated border border-border hover:bg-surface-hover text-grey hover:text-brand-white disabled:bg-grey/10 disabled:text-grey/50',
+      'bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 hover:text-gray-900 shadow-sm disabled:bg-gray-50 disabled:text-gray-400',
     outline:
-      'bg-transparent hover:bg-teal/10 text-teal border border-teal/50 hover:border-teal disabled:border-grey/20 disabled:text-grey/50 disabled:bg-transparent',
+      'bg-transparent hover:bg-teal-50 text-teal border border-teal/50 hover:border-teal disabled:border-gray-200 disabled:text-gray-400 disabled:bg-transparent',
     ghost:
-      'bg-transparent hover:bg-surface-hover text-grey hover:text-brand-white disabled:text-grey/50 disabled:bg-transparent',
+      'bg-transparent hover:bg-gray-100 text-gray-700 hover:text-gray-900 disabled:text-gray-400 disabled:bg-transparent',
     danger:
-      'bg-status-error/10 border border-status-error/30 text-status-error hover:bg-status-error/20 hover:border-status-error/50 disabled:bg-grey/10 disabled:text-grey/50 disabled:border-grey/20',
+      'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 hover:border-red-300 disabled:bg-gray-50 disabled:text-gray-400 disabled:border-gray-200',
   };
 
   const sizeStyles = {
@@ -91,10 +89,10 @@ const Button: React.FC<ButtonProps> = ({
   };
 
   const widthStyle = fullWidth ? 'w-full' : 'w-auto';
-  const glowStyle = glow && variant === 'primary' ? 'shadow-glow-teal hover:shadow-glow-teal-lg' : '';
+  const glowStyle = glow && variant === 'primary' ? 'shadow-glow-teal hover:shadow-glow-teal' : '';
   const loadingStyle = loading ? 'opacity-80 cursor-wait' : '';
 
-  const classes = [
+  const classes = cn(
     baseStyle,
     variantStyles[variant],
     sizeStyles[size],
@@ -102,9 +100,7 @@ const Button: React.FC<ButtonProps> = ({
     glowStyle,
     loadingStyle,
     className,
-  ]
-    .filter(Boolean)
-    .join(' ');
+  );
 
   const spinnerSize = size === 'lg' ? 'md' : size === 'md' ? 'md' : 'sm';
 

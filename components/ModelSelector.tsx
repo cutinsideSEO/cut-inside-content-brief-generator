@@ -60,7 +60,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ settings, onChange, compa
         <select
           value={settings.model}
           onChange={(e) => handleModelChange(e.target.value as GeminiModel)}
-          className="p-2 bg-black border border-white/20 rounded-md text-sm text-grey focus:ring-1 focus:ring-teal appearance-none bg-no-repeat pr-8"
+          className="p-2 bg-background border border-white/20 rounded-md text-sm text-gray-600 focus:ring-1 focus:ring-teal appearance-none bg-no-repeat pr-8"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
             backgroundPosition: 'right 0.25rem center',
@@ -80,7 +80,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ settings, onChange, compa
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-grey/80 mb-2">AI Model</label>
+        <label className="block text-sm font-medium text-gray-600/80 mb-2">AI Model</label>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           {models.map((m) => (
             <button
@@ -94,9 +94,9 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ settings, onChange, compa
             >
               <div className="flex items-center space-x-2">
                 {m.icon}
-                <span className="font-medium text-grey">{m.label}</span>
+                <span className="font-medium text-gray-600">{m.label}</span>
               </div>
-              <p className="text-xs text-grey/60 mt-1">{m.description}</p>
+              <p className="text-xs text-gray-600/60 mt-1">{m.description}</p>
             </button>
           ))}
         </div>
@@ -104,7 +104,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ settings, onChange, compa
 
       {settings.model.includes('gemini-3') && (
         <div>
-          <label className="block text-sm font-medium text-grey/80 mb-2">Thinking Level</label>
+          <label className="block text-sm font-medium text-gray-600/80 mb-2">Thinking Level</label>
           <div className="flex bg-black/50 rounded-lg p-1">
             {thinkingLevels.map((level) => {
               const isDisabled = level.value === 'minimal' && !settings.model.includes('flash');
@@ -117,8 +117,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ settings, onChange, compa
                     settings.thinkingLevel === level.value
                       ? 'bg-teal text-white'
                       : isDisabled
-                      ? 'text-grey/30 cursor-not-allowed'
-                      : 'text-grey/60 hover:bg-white/5'
+                      ? 'text-gray-600/30 cursor-not-allowed'
+                      : 'text-gray-600/60 hover:bg-white/5'
                   }`}
                   title={isDisabled ? 'Minimal is only available for Flash model' : level.description}
                 >
@@ -127,7 +127,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ settings, onChange, compa
               );
             })}
           </div>
-          <p className="text-xs text-grey/50 mt-1">
+          <p className="text-xs text-gray-600/50 mt-1">
             Higher thinking = better quality for complex tasks, but slower
           </p>
         </div>

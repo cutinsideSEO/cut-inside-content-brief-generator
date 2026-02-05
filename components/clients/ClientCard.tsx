@@ -2,6 +2,7 @@
 import React from 'react';
 import type { ClientWithBriefCount } from '../../types/database';
 import { Card, Badge } from '../ui';
+import { getClientColor } from '../../lib/clientColors';
 
 interface ClientCardProps {
   client: ClientWithBriefCount;
@@ -9,6 +10,7 @@ interface ClientCardProps {
   isSelected?: boolean;
   isGenerating?: boolean;
   generatingCount?: number;
+  colorIndex?: number;
 }
 
 const ClientCard: React.FC<ClientCardProps> = ({
@@ -17,7 +19,9 @@ const ClientCard: React.FC<ClientCardProps> = ({
   isSelected = false,
   isGenerating = false,
   generatingCount = 0,
+  colorIndex = 0,
 }) => {
+  const clientColor = getClientColor(colorIndex);
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -34,8 +38,8 @@ const ClientCard: React.FC<ClientCardProps> = ({
       hover
       glow={isGenerating ? 'yellow' : 'teal'}
       className={`
-        relative cursor-pointer
-        ${isGenerating ? 'border-status-generating/50 ring-1 ring-status-generating/30' : ''}
+        relative cursor-pointer border-l-4 ${clientColor.border}
+        ${isGenerating ? 'border-amber-400/50 ring-1 ring-status-generating/30' : ''}
         ${isSelected ? 'border-teal ring-1 ring-teal' : ''}
       `}
       onClick={() => onClick(client.id)}
@@ -51,9 +55,9 @@ const ClientCard: React.FC<ClientCardProps> = ({
 
       {/* Folder Icon and Name */}
       <div className="flex items-start">
-        <div className="flex-shrink-0 w-12 h-12 bg-teal/20 rounded-radius-lg flex items-center justify-center mr-4">
+        <div className={`flex-shrink-0 w-12 h-12 ${clientColor.bg} rounded-lg flex items-center justify-center mr-4`}>
           <svg
-            className="w-6 h-6 text-teal"
+            className={`w-6 h-6 ${clientColor.icon}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -67,11 +71,11 @@ const ClientCard: React.FC<ClientCardProps> = ({
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-heading font-semibold text-text-primary truncate">
+          <h3 className="text-lg font-heading font-semibold text-gray-900 truncate">
             {client.name}
           </h3>
           {client.description && (
-            <p className="text-sm text-text-tertiary mt-0.5 line-clamp-2">
+            <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
               {client.description}
             </p>
           )}
@@ -79,12 +83,12 @@ const ClientCard: React.FC<ClientCardProps> = ({
       </div>
 
       {/* Stats */}
-      <div className="mt-4 pt-4 border-t border-border-subtle flex items-center justify-between text-sm">
-        <span className="text-text-secondary">
-          <span className="text-text-primary font-medium">{client.brief_count}</span>
+      <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
+        <span className="text-gray-600">
+          <span className="text-gray-900 font-medium">{client.brief_count}</span>
           {' '}{client.brief_count === 1 ? 'brief' : 'briefs'}
         </span>
-        <span className="text-text-muted">
+        <span className="text-gray-400">
           Created {formatDate(client.created_at)}
         </span>
       </div>

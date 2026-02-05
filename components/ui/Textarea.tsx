@@ -1,4 +1,5 @@
 import React, { forwardRef, useEffect, useRef, useImperativeHandle } from 'react';
+import { cn } from '@/lib/utils';
 
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   rows?: number;
@@ -20,7 +21,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       label,
       hint,
       showCount = false,
-      className = '',
+      className,
       id,
       value,
       onChange,
@@ -51,22 +52,13 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       adjustHeight();
     };
 
-    const baseStyles =
-      'w-full bg-surface-elevated border rounded-radius-md text-text-primary placeholder:text-text-muted transition-all duration-200 focus:outline-none focus-ring resize-none custom-scrollbar py-3 px-4';
-
-    const stateStyles = error
-      ? 'border-status-error focus:border-status-error'
-      : 'border-border hover:border-border-emphasis focus:border-teal';
-
-    const textareaClasses = [baseStyles, stateStyles, className].filter(Boolean).join(' ');
-
     const currentLength = typeof value === 'string' ? value.length : 0;
     const showCounter = showCount || maxLength;
 
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={textareaId} className="block text-sm font-medium text-text-secondary mb-2">
+          <label htmlFor={textareaId} className="block text-sm font-medium text-gray-700 mb-2">
             {label}
           </label>
         )}
@@ -78,18 +70,27 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
             maxLength={maxLength}
             value={value}
             onChange={handleChange}
-            className={textareaClasses}
+            className={cn(
+              'w-full bg-white border rounded-md text-foreground placeholder:text-gray-400 transition-all duration-200 focus:outline-none focus-ring resize-none custom-scrollbar py-3 px-4',
+
+              // State
+              error
+                ? 'border-red-400 focus:border-red-400'
+                : 'border-gray-200 hover:border-gray-300 focus:border-teal',
+
+              className
+            )}
             {...props}
           />
           {showCounter && (
-            <div className="absolute bottom-2 right-3 text-xs text-text-muted">
+            <div className="absolute bottom-2 right-3 text-xs text-gray-400">
               {currentLength}
               {maxLength && `/${maxLength}`}
             </div>
           )}
         </div>
-        {hint && !error && <p className="mt-1.5 text-sm text-text-muted">{hint}</p>}
-        {error && <p className="mt-1.5 text-sm text-status-error">{error}</p>}
+        {hint && !error && <p className="mt-1.5 text-sm text-gray-400">{hint}</p>}
+        {error && <p className="mt-1.5 text-sm text-red-500">{error}</p>}
       </div>
     );
   }

@@ -44,7 +44,7 @@ const PreWizardHeader: React.FC<PreWizardHeaderProps> = ({
   userName,
 }) => {
   return (
-    <header className="bg-surface-elevated/80 backdrop-blur-md border-b border-border sticky top-0 z-50">
+    <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* Left side: Logo + Title + Breadcrumb */}
@@ -54,22 +54,22 @@ const PreWizardHeader: React.FC<PreWizardHeaderProps> = ({
               alt="CUT INSIDE Logo"
               className="h-7 w-auto"
             />
-            <div className="hidden md:flex items-center gap-2 pl-4 border-l border-border-subtle">
-              <p className="text-sm text-text-secondary font-heading tracking-wider">
+            <div className="hidden md:flex items-center gap-2 pl-4 border-l border-gray-200">
+              <p className="text-sm text-gray-600 font-heading tracking-wider">
                 Content Brief Generator
               </p>
               {clientName && (
                 <>
-                  <ChevronRightSvg className="h-3.5 w-3.5 text-text-muted" />
+                  <ChevronRightSvg className="h-3.5 w-3.5 text-gray-400" />
                   {onClientClick ? (
                     <button
                       onClick={onClientClick}
-                      className="text-sm text-text-muted hover:text-teal transition-colors font-heading"
+                      className="text-sm text-gray-400 hover:text-teal transition-colors font-heading"
                     >
                       {clientName}
                     </button>
                   ) : (
-                    <span className="text-sm text-text-muted font-heading">
+                    <span className="text-sm text-gray-400 font-heading">
                       {clientName}
                     </span>
                   )}
@@ -81,12 +81,12 @@ const PreWizardHeader: React.FC<PreWizardHeaderProps> = ({
           {/* Right side: User name + Sign Out */}
           <div className="flex items-center gap-4">
             {userName && (
-              <span className="text-sm text-text-secondary">{userName}</span>
+              <span className="text-sm text-gray-600">{userName}</span>
             )}
             {onLogout && (
               <button
                 onClick={onLogout}
-                className="flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary transition-colors"
+                className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-900 transition-colors"
               >
                 <LogOutSvg className="h-4 w-4" />
                 <span className="hidden sm:inline">Sign Out</span>

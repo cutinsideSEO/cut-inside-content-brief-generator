@@ -22,7 +22,7 @@ const Header: React.FC<HeaderProps> = ({
   const sound = useSound();
 
   return (
-    <header className="bg-surface-elevated/80 backdrop-blur-md border-b border-border sticky top-0 z-50">
+    <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* Logo + Breadcrumbs */}
@@ -32,20 +32,20 @@ const Header: React.FC<HeaderProps> = ({
               alt="CUT INSIDE Logo"
               className="h-7 w-auto"
             />
-            <div className="hidden md:flex items-center gap-2 pl-4 border-l border-border-subtle">
-              <p className="text-sm text-text-secondary font-heading tracking-wider">Content Brief Generator</p>
+            <div className="hidden md:flex items-center gap-2 pl-4 border-l border-gray-200">
+              <p className="text-sm text-gray-600 font-heading tracking-wider">Content Brief Generator</p>
               {isSupabaseMode && clientName && (
                 <>
-                  <ChevronRightIcon className="h-3.5 w-3.5 text-text-muted" />
+                  <ChevronRightIcon className="h-3.5 w-3.5 text-gray-400" />
                   {onBackToBriefList ? (
                     <button
                       onClick={onBackToBriefList}
-                      className="text-sm text-text-muted hover:text-teal transition-colors font-heading"
+                      className="text-sm text-gray-400 hover:text-teal transition-colors font-heading"
                     >
                       {clientName}
                     </button>
                   ) : (
-                    <span className="text-sm text-text-muted font-heading">{clientName}</span>
+                    <span className="text-sm text-gray-400 font-heading">{clientName}</span>
                   )}
                 </>
               )}
@@ -59,10 +59,10 @@ const Header: React.FC<HeaderProps> = ({
             )}
             <button
               onClick={sound?.toggleSound}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-radius-md transition-all ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all ${
                 sound?.isSoundEnabled
-                  ? 'bg-teal/10 text-teal hover:bg-teal/20'
-                  : 'bg-surface-hover text-text-muted hover:bg-surface-active hover:text-text-secondary'
+                  ? 'bg-teal-50 text-teal hover:bg-teal-100'
+                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
               }`}
               title={sound?.isSoundEnabled ? 'Disable sound effects' : 'Enable sound effects'}
             >

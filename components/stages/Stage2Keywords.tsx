@@ -80,7 +80,7 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
     return (
       <React.Fragment key={rowKey}>
         <tr
-          className={`border-b border-border-subtle hover:bg-surface-hover transition-colors cursor-pointer ${isExpanded ? 'bg-surface-hover' : ''}`}
+          className={`border-b border-gray-100 hover:bg-gray-100 transition-colors cursor-pointer ${isExpanded ? 'bg-gray-100' : ''}`}
           onClick={() => toggleRow(rowKey)}
         >
           <td className="p-3">
@@ -88,14 +88,14 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
               {type}
             </Badge>
           </td>
-          <td className="p-3 font-medium text-text-primary">{kwSelection.keyword}</td>
-          <td className="p-3 font-mono text-text-secondary text-sm">{getVolume(kwSelection.keyword)}</td>
-          <td className="p-3 text-sm text-text-muted truncate max-w-[200px]">
+          <td className="p-3 font-medium text-gray-900">{kwSelection.keyword}</td>
+          <td className="p-3 font-mono text-gray-600 text-sm">{getVolume(kwSelection.keyword)}</td>
+          <td className="p-3 text-sm text-gray-400 truncate max-w-[200px]">
             {notePreview || <span className="italic">No notes</span>}
           </td>
           <td className="p-3 text-center">
             <div className="flex items-center gap-1">
-              <ChevronDownIcon className={`h-4 w-4 text-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              <ChevronDownIcon className={`h-4 w-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
               <Button
                 variant="ghost"
                 size="sm"
@@ -103,7 +103,7 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
                   e.stopPropagation();
                   handleRemoveKeyword(type.toLowerCase() as 'primary' | 'secondary', index);
                 }}
-                className="text-text-muted hover:text-status-error"
+                className="text-gray-400 hover:text-red-500"
               >
                 <XIcon className="h-4 w-4" />
               </Button>
@@ -111,7 +111,7 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
           </td>
         </tr>
         {isExpanded && (
-          <tr className="border-b border-border-subtle bg-surface-hover">
+          <tr className="border-b border-gray-100 bg-gray-100">
             <td colSpan={5} className="p-4">
               <Textarea
                 rows={3}
@@ -137,19 +137,19 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
       {strategy.reasoning && (
         <div className="flex items-center gap-2 mb-2">
           <AIReasoningIcon reasoning={strategy.reasoning} />
-          <span className="text-xs text-text-muted">AI has categorized your keywords with strategic notes</span>
+          <span className="text-xs text-gray-400">AI has categorized your keywords with strategic notes</span>
         </div>
       )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left">
-          <thead className="bg-surface-hover">
+          <thead className="bg-gray-100">
             <tr>
-              <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[15%]">Type</th>
-              <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[25%]">Keyword</th>
-              <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[15%]">Volume</th>
-              <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[35%]">Notes</th>
-              <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[10%]"></th>
+              <th className="p-3 text-xs font-heading font-semibold text-gray-600 uppercase tracking-wider w-[15%]">Type</th>
+              <th className="p-3 text-xs font-heading font-semibold text-gray-600 uppercase tracking-wider w-[25%]">Keyword</th>
+              <th className="p-3 text-xs font-heading font-semibold text-gray-600 uppercase tracking-wider w-[15%]">Volume</th>
+              <th className="p-3 text-xs font-heading font-semibold text-gray-600 uppercase tracking-wider w-[35%]">Notes</th>
+              <th className="p-3 text-xs font-heading font-semibold text-gray-600 uppercase tracking-wider w-[10%]"></th>
             </tr>
           </thead>
           <tbody>
@@ -164,7 +164,7 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
       </div>
 
       {strategy.primary_keywords?.length === 0 && strategy.secondary_keywords?.length === 0 && (
-        <div className="text-center py-8 text-text-muted">
+        <div className="text-center py-8 text-gray-400">
           <p>No keywords have been categorized yet.</p>
         </div>
       )}

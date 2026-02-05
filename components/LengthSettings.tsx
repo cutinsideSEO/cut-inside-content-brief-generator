@@ -56,9 +56,9 @@ const LengthSettings: React.FC<LengthSettingsProps> = ({ constraints, onChange, 
         <div className="flex items-center space-x-3">
           <HashIcon className="h-5 w-5 text-teal" />
           <div>
-            <h3 className="font-heading font-semibold text-grey">Word Count Target</h3>
+            <h3 className="font-heading font-semibold text-gray-600">Word Count Target</h3>
             {constraints.globalTarget ? (
-              <p className="text-sm text-grey/60">
+              <p className="text-sm text-gray-600/60">
                 Target: {constraints.globalTarget.toLocaleString()} words
                 {currentWordCount !== undefined && (
                   <span className="ml-2 text-teal">
@@ -67,12 +67,12 @@ const LengthSettings: React.FC<LengthSettingsProps> = ({ constraints, onChange, 
                 )}
               </p>
             ) : (
-              <p className="text-sm text-grey/60">No target set (AI decides)</p>
+              <p className="text-sm text-gray-600/60">No target set (AI decides)</p>
             )}
           </div>
         </div>
         <ChevronDownIcon
-          className={`h-5 w-5 text-grey/50 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          className={`h-5 w-5 text-gray-600/50 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -89,9 +89,9 @@ const LengthSettings: React.FC<LengthSettingsProps> = ({ constraints, onChange, 
                     : 'border-white/10 hover:border-white/30'
                 }`}
               >
-                <span className="block font-medium text-sm text-grey">{preset.label}</span>
+                <span className="block font-medium text-sm text-gray-600">{preset.label}</span>
                 {preset.value && (
-                  <span className="block text-xs text-grey/50">{preset.value.toLocaleString()}</span>
+                  <span className="block text-xs text-gray-600/50">{preset.value.toLocaleString()}</span>
                 )}
               </button>
             ))}
@@ -99,7 +99,7 @@ const LengthSettings: React.FC<LengthSettingsProps> = ({ constraints, onChange, 
 
           <div className="flex items-center space-x-4">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-grey/80 mb-1">
+              <label className="block text-sm font-medium text-gray-600/80 mb-1">
                 Custom Word Count
               </label>
               <input
@@ -109,7 +109,7 @@ const LengthSettings: React.FC<LengthSettingsProps> = ({ constraints, onChange, 
                 placeholder="e.g., 2000"
                 min="100"
                 max="20000"
-                className="w-full p-2 bg-black border border-white/20 rounded-md text-grey focus:ring-1 focus:ring-teal"
+                className="w-full p-2 bg-background border border-white/20 rounded-md text-gray-600 focus:ring-1 focus:ring-teal"
               />
             </div>
             <div className="flex items-center space-x-2 pt-6">
@@ -118,15 +118,15 @@ const LengthSettings: React.FC<LengthSettingsProps> = ({ constraints, onChange, 
                 id="strictMode"
                 checked={constraints.strictMode}
                 onChange={(e) => onChange({ ...constraints, strictMode: e.target.checked })}
-                className="w-4 h-4 rounded border-white/20 bg-black text-teal focus:ring-teal"
+                className="w-4 h-4 rounded border-white/20 bg-background text-teal focus:ring-teal"
               />
-              <label htmlFor="strictMode" className="text-sm text-grey/80">
+              <label htmlFor="strictMode" className="text-sm text-gray-600/80">
                 Strict limit
               </label>
             </div>
           </div>
 
-          <p className="text-xs text-grey/50">
+          <p className="text-xs text-gray-600/50">
             {constraints.strictMode
               ? 'Content will stay within the target word count.'
               : 'Target is a guideline - AI may adjust based on topic depth.'}

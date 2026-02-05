@@ -26,14 +26,11 @@ const DASHBOARD_SECTIONS = [
 
 interface SidebarProps {
   currentView: AppView;
-  // Briefing mode props
   briefingStep?: number;
-  // Dashboard mode props
   selectedSection?: number | null;
   onSelectSection?: (section: number | null) => void;
   staleSteps?: Set<number>;
   isUploadedBrief?: boolean;
-  // Brief list mode props
   clientName?: string;
   onBackToClients?: () => void;
   briefCounts?: { draft: number; in_progress: number; complete: number };
@@ -55,11 +52,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Brief list sidebar
   if (currentView === 'brief_list') {
     return (
-      <aside className="w-64 flex-shrink-0 bg-surface-elevated border-r border-border overflow-y-auto">
+      <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
-          {/* Back navigation */}
           {onBackToClients && (
-            <button onClick={onBackToClients} className="flex items-center gap-2 text-sm text-text-secondary hover:text-teal transition-colors mb-6 group">
+            <button onClick={onBackToClients} className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal transition-colors mb-6 group">
               <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
@@ -67,52 +63,49 @@ const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
-          {/* Client info */}
           <div className="mb-6">
-            <div className="w-10 h-10 bg-teal/10 rounded-radius-lg flex items-center justify-center mb-3">
+            <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center mb-3">
               <svg className="w-5 h-5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
             </div>
-            <h3 className="text-sm font-heading font-semibold text-text-primary">{clientName || 'Client'}</h3>
+            <h3 className="text-sm font-heading font-semibold text-foreground">{clientName || 'Client'}</h3>
           </div>
 
-          {/* Brief status counts */}
-          <h4 className="text-xs font-heading font-semibold text-text-muted uppercase tracking-wider mb-3">Overview</h4>
+          <h4 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-3">Overview</h4>
           <nav className="space-y-1">
-            <div className="flex items-center justify-between px-3 py-2 text-sm text-text-secondary rounded-radius-md">
+            <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
               <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-text-muted" />
+                <span className="w-2 h-2 rounded-full bg-gray-300" />
                 Drafts
               </span>
-              <span className="text-text-muted">{briefCounts?.draft || 0}</span>
+              <span className="text-gray-400">{briefCounts?.draft || 0}</span>
             </div>
-            <div className="flex items-center justify-between px-3 py-2 text-sm text-text-secondary rounded-radius-md">
+            <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
               <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-yellow" />
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
                 In Progress
               </span>
-              <span className="text-text-muted">{briefCounts?.in_progress || 0}</span>
+              <span className="text-gray-400">{briefCounts?.in_progress || 0}</span>
             </div>
-            <div className="flex items-center justify-between px-3 py-2 text-sm text-text-secondary rounded-radius-md">
+            <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
               <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-status-complete" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 Complete
               </span>
-              <span className="text-text-muted">{briefCounts?.complete || 0}</span>
+              <span className="text-gray-400">{briefCounts?.complete || 0}</span>
             </div>
           </nav>
 
-          {/* Article count */}
-          <div className="mt-4 pt-4 border-t border-border-subtle">
-            <div className="flex items-center justify-between px-3 py-2 text-sm text-text-secondary rounded-radius-md">
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
               <span className="flex items-center gap-2">
                 <svg className="w-3.5 h-3.5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 Articles
               </span>
-              <span className="text-text-muted">{articleCount || 0}</span>
+              <span className="text-gray-400">{articleCount || 0}</span>
             </div>
           </div>
         </div>
@@ -123,9 +116,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Briefing stepper
   if (currentView === 'briefing') {
     return (
-      <aside className="w-64 flex-shrink-0 bg-surface-elevated border-r border-border overflow-y-auto">
+      <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
-          <h3 className="text-xs font-heading font-semibold text-text-muted uppercase tracking-wider mb-4">Brief Progress</h3>
+          <h3 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-4">Brief Progress</h3>
           <nav aria-label="Progress">
             <ol role="list" className="space-y-1">
               {BRIEFING_STEPS.map((step, index) => {
@@ -136,34 +129,34 @@ const Sidebar: React.FC<SidebarProps> = ({
                     {index !== BRIEFING_STEPS.length - 1 && (
                       <div
                         className={`absolute left-[18px] top-10 h-[calc(100%-8px)] w-0.5 transition-colors duration-300 ${
-                          isCompleted ? 'bg-teal' : 'bg-border'
+                          isCompleted ? 'bg-teal' : 'bg-gray-200'
                         }`}
                         aria-hidden="true"
                       />
                     )}
-                    <div className={`relative flex items-center gap-3 p-2 rounded-radius-md transition-all duration-200 ${
-                      isActive ? 'bg-teal/10' : 'hover:bg-surface-hover'
+                    <div className={`relative flex items-center gap-3 p-2 rounded-md transition-all duration-200 ${
+                      isActive ? 'bg-teal-50' : 'hover:bg-gray-100'
                     }`}>
                       <span className={`relative z-10 w-9 h-9 flex items-center justify-center rounded-full border-2 transition-all duration-200 ${
                         isCompleted
                           ? 'bg-teal border-teal shadow-glow-teal-sm'
                           : isActive
-                            ? 'border-teal bg-surface-elevated'
-                            : 'border-border bg-surface-elevated'
+                            ? 'border-teal bg-white'
+                            : 'border-gray-200 bg-white'
                       }`}>
                         <span className={`transition-colors duration-200 ${
                           isCompleted
-                            ? 'text-surface-primary'
+                            ? 'text-white'
                             : isActive
                               ? 'text-teal'
-                              : 'text-text-muted'
+                              : 'text-gray-400'
                         }`}>
                           {isCompleted ? <CheckIcon className="h-4 w-4" /> : step.icon}
                         </span>
                       </span>
                       <div className="flex flex-col">
                         <span className={`text-sm font-heading font-medium transition-colors duration-200 ${
-                          isActive ? 'text-text-primary' : isCompleted ? 'text-text-secondary' : 'text-text-muted'
+                          isActive ? 'text-foreground' : isCompleted ? 'text-gray-600' : 'text-gray-400'
                         }`}>
                           {step.title}
                         </span>
@@ -185,17 +178,17 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Dashboard nav
   if (currentView === 'dashboard') {
     return (
-      <aside className="w-64 flex-shrink-0 bg-surface-elevated border-r border-border overflow-y-auto">
+      <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
-          <h3 className="text-xs font-heading font-semibold text-text-muted uppercase tracking-wider">Dashboard</h3>
+          <h3 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider">Dashboard</h3>
           <nav className="mt-2 space-y-1">
             <a
               href="#"
               onClick={(e) => { e.preventDefault(); onSelectSection?.(null); }}
-              className={`flex items-center px-3 py-2 text-sm font-semibold rounded-radius-md transition-colors ${
+              className={`flex items-center px-3 py-2 text-sm font-semibold rounded-md transition-colors ${
                 selectedSection === null
-                  ? 'bg-teal/20 text-teal'
-                  : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+                  ? 'bg-teal-50 text-teal'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               }`}
             >
               <HomeIcon className="mr-3 h-5 w-5" />
@@ -205,25 +198,25 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           {!isUploadedBrief && (
             <>
-              <h3 className="mt-6 text-xs font-heading font-semibold text-text-muted uppercase tracking-wider">Brief Sections</h3>
+              <h3 className="mt-6 text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider">Brief Sections</h3>
               <nav className="mt-2 space-y-1">
                 {DASHBOARD_SECTIONS.map(section => (
                   <a
                     key={section.logicalStep}
                     href="#"
                     onClick={(e) => { e.preventDefault(); onSelectSection?.(section.logicalStep); }}
-                    className={`flex items-center px-3 py-2 text-sm font-semibold rounded-radius-md transition-colors ${
+                    className={`flex items-center px-3 py-2 text-sm font-semibold rounded-md transition-colors ${
                       selectedSection === section.logicalStep
-                        ? 'bg-teal/20 text-teal'
-                        : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+                        ? 'bg-teal-50 text-teal'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                     }`}
                   >
                     <span className="mr-3">{section.icon}</span>
                     <span className="flex-1">{section.title}</span>
                     {staleSteps.has(section.logicalStep) && (
                       <div className="relative group">
-                        <AlertTriangleIcon className="h-4 w-4 text-yellow" />
-                        <span className="absolute right-0 -top-8 w-max bg-surface-elevated text-text-primary text-xs rounded-radius-sm py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg border border-border">
+                        <AlertTriangleIcon className="h-4 w-4 text-amber-500" />
+                        <span className="absolute right-0 -top-8 w-max bg-white text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg border border-gray-200">
                           This section is stale
                         </span>
                       </div>
@@ -238,7 +231,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   }
 
-  // For setup views (initial_input, context_input, visualization) - mini progress indicator
+  // Setup views
   if (currentView === 'initial_input' || currentView === 'context_input' || currentView === 'visualization') {
     const setupSteps = [
       { key: 'initial_input', label: 'Setup' },
@@ -248,9 +241,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     const currentIndex = setupSteps.findIndex(s => s.key === currentView);
 
     return (
-      <aside className="w-64 flex-shrink-0 bg-surface-elevated border-r border-border overflow-y-auto">
+      <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
-          <h3 className="text-xs font-heading font-semibold text-text-muted uppercase tracking-wider mb-4">Getting Started</h3>
+          <h3 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-4">Getting Started</h3>
           <nav>
             <ol className="space-y-1">
               {setupSteps.map((step, index) => {
@@ -258,20 +251,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                 const isActive = index === currentIndex;
                 return (
                   <li key={step.key}>
-                    <div className={`flex items-center gap-3 px-3 py-2.5 rounded-radius-md transition-all ${
-                      isActive ? 'bg-teal/10' : ''
+                    <div className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-all ${
+                      isActive ? 'bg-teal-50' : ''
                     }`}>
                       <span className={`w-7 h-7 flex items-center justify-center rounded-full border-2 text-xs font-medium transition-all ${
                         isCompleted
-                          ? 'bg-teal border-teal text-surface-primary'
+                          ? 'bg-teal border-teal text-white'
                           : isActive
                             ? 'border-teal text-teal bg-transparent'
-                            : 'border-border text-text-muted bg-transparent'
+                            : 'border-gray-200 text-gray-400 bg-transparent'
                       }`}>
                         {isCompleted ? <CheckIcon className="h-3.5 w-3.5" /> : index + 1}
                       </span>
                       <span className={`text-sm font-heading font-medium ${
-                        isActive ? 'text-text-primary' : isCompleted ? 'text-text-secondary' : 'text-text-muted'
+                        isActive ? 'text-foreground' : isCompleted ? 'text-gray-600' : 'text-gray-400'
                       }`}>
                         {step.label}
                       </span>
@@ -286,19 +279,18 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   }
 
-  // Content generation - progress indicator
+  // Content generation
   if (currentView === 'content_generation') {
     return (
-      <aside className="w-64 flex-shrink-0 bg-surface-elevated border-r border-border overflow-y-auto">
+      <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
-          <h3 className="text-xs font-heading font-semibold text-text-muted uppercase tracking-wider mb-4">Article Generation</h3>
-          <p className="text-sm text-text-secondary">Writing your article section by section...</p>
+          <h3 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-4">Article Generation</h3>
+          <p className="text-sm text-gray-500">Writing your article section by section...</p>
         </div>
       </aside>
     );
   }
 
-  // Fallback - no sidebar for brief_upload or unknown views
   return null;
 };
 

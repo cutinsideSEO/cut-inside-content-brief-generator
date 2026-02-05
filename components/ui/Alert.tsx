@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 export interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
   variant: 'error' | 'warning' | 'success' | 'info';
@@ -63,20 +64,24 @@ const Alert: React.FC<AlertProps> = ({
   ...props
 }) => {
   const variantStyles = {
-    error: 'bg-status-error/10 border-status-error/30 text-status-error',
-    warning: 'bg-status-generating/10 border-status-generating/30 text-status-generating',
-    success: 'bg-status-complete/10 border-status-complete/30 text-status-complete',
-    info: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
+    error: 'bg-red-50 border-red-200 text-red-700',
+    warning: 'bg-amber-50 border-amber-200 text-amber-700',
+    success: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    info: 'bg-blue-50 border-blue-200 text-blue-700',
   };
 
   const displayIcon = icon || defaultIcons[variant];
 
-  const baseStyles = 'border rounded-radius-lg p-4 transition-all duration-200';
-
-  const classes = [baseStyles, variantStyles[variant], className].filter(Boolean).join(' ');
-
   return (
-    <div className={classes} role="alert" {...props}>
+    <div
+      className={cn(
+        'border rounded-lg p-4 transition-all duration-200',
+        variantStyles[variant],
+        className
+      )}
+      role="alert"
+      {...props}
+    >
       <div className="flex items-start gap-3">
         <span className="flex-shrink-0 mt-0.5">{displayIcon}</span>
         <div className="flex-1 min-w-0">

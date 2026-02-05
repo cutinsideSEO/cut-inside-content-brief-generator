@@ -50,8 +50,8 @@ const BriefUploadScreen: React.FC<BriefUploadScreenProps> = ({ onFileUpload, isL
   return (
     <div className="max-w-3xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-heading font-bold text-grey">Upload Your Content Brief</h1>
-        <p className="text-lg text-grey/70 mt-2">Upload an existing brief in Markdown (.md) format to begin content generation.</p>
+        <h1 className="text-3xl font-heading font-bold text-gray-600">Upload Your Content Brief</h1>
+        <p className="text-lg text-gray-600/70 mt-2">Upload an existing brief in Markdown (.md) format to begin content generation.</p>
       </div>
 
       <div className="bg-black/30 rounded-lg shadow-lg p-6 md:p-8 space-y-6 border border-white/10">
@@ -64,11 +64,11 @@ const BriefUploadScreen: React.FC<BriefUploadScreenProps> = ({ onFileUpload, isL
             onDragOver={handleDragOver}
           >
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              <UploadCloudIcon className="w-12 h-12 mb-3 text-grey/40" />
-              <p className="text-md text-grey/60">
+              <UploadCloudIcon className="w-12 h-12 mb-3 text-gray-600/40" />
+              <p className="text-md text-gray-600/60">
                 <span className="font-semibold text-teal">Click to upload</span> or drag and drop
               </p>
-              <p className="text-xs text-grey/50">Markdown (.md) files only</p>
+              <p className="text-xs text-gray-600/50">Markdown (.md) files only</p>
             </div>
             <input
               type="file"
@@ -80,8 +80,8 @@ const BriefUploadScreen: React.FC<BriefUploadScreenProps> = ({ onFileUpload, isL
         ) : (
           <div className="bg-black/50 p-4 rounded-lg border border-white/10 text-center">
             <FileTextIcon className="h-12 w-12 text-teal mx-auto mb-2" />
-            <p className="font-semibold text-grey">{briefFile.name}</p>
-            <p className="text-xs text-grey/60">{Math.round(briefFile.size / 1024)} KB</p>
+            <p className="font-semibold text-gray-600">{briefFile.name}</p>
+            <p className="text-xs text-gray-600/60">{Math.round(briefFile.size / 1024)} KB</p>
             <Button onClick={() => setBriefFile(null)} variant="secondary" size="sm" className="mt-4 w-auto">
               Choose a different file
             </Button>

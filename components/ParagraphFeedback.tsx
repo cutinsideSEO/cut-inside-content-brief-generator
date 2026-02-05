@@ -47,7 +47,7 @@ const ParagraphFeedback: React.FC<ParagraphFeedbackProps> = ({
   return (
     <div className="space-y-4">
       {sectionTitle && (
-        <div className="flex items-center space-x-2 text-xs text-grey/50 mb-2">
+        <div className="flex items-center space-x-2 text-xs text-gray-600/50 mb-2">
           <EditIcon className="h-3 w-3" />
           <span>Click any paragraph to provide feedback</span>
         </div>
@@ -79,7 +79,7 @@ const ParagraphFeedback: React.FC<ParagraphFeedbackProps> = ({
                 }
               }}
             >
-              <p className={`text-grey text-sm ${isRegenerating ? 'opacity-50' : ''}`}>
+              <p className={`text-gray-600 text-sm ${isRegenerating ? 'opacity-50' : ''}`}>
                 {paragraph}
               </p>
 
@@ -91,7 +91,7 @@ const ParagraphFeedback: React.FC<ParagraphFeedbackProps> = ({
 
               {isHovered && !isActive && !isLoading && (
                 <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="bg-black/80 px-2 py-1 rounded text-xs text-grey/60">
+                  <div className="bg-black/80 px-2 py-1 rounded text-xs text-gray-600/60">
                     Click to edit
                   </div>
                 </div>
@@ -104,7 +104,7 @@ const ParagraphFeedback: React.FC<ParagraphFeedbackProps> = ({
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}
                   placeholder="What should change? e.g., 'Make it more concise', 'Add more technical detail', 'Change the tone to be friendlier'"
-                  className="w-full p-2 bg-black border border-white/20 rounded-md text-sm text-grey h-20 resize-none focus:ring-1 focus:ring-teal"
+                  className="w-full p-2 bg-background border border-white/20 rounded-md text-sm text-gray-600 h-20 resize-none focus:ring-1 focus:ring-teal"
                   disabled={isRegenerating}
                   autoFocus
                 />
@@ -130,7 +130,7 @@ const ParagraphFeedback: React.FC<ParagraphFeedbackProps> = ({
                   <button
                     onClick={handleCancelFeedback}
                     disabled={isRegenerating}
-                    className="p-2 text-grey/50 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+                    className="p-2 text-gray-600/50 hover:text-white rounded-full hover:bg-white/10 transition-colors"
                   >
                     <XIcon className="h-4 w-4" />
                   </button>

@@ -47,23 +47,23 @@ interface DashboardScreenProps {
 // Brief Validation Display Component
 const BriefValidationDisplay: React.FC<{ validation: BriefValidation }> = ({ validation }) => {
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-status-complete';
-    if (score >= 5) return 'text-yellow';
-    return 'text-status-error';
+    if (score >= 8) return 'text-emerald-500';
+    if (score >= 5) return 'text-amber-500';
+    return 'text-red-500';
   };
 
   const getScoreBgColor = (score: number) => {
-    if (score >= 8) return 'bg-status-complete/10';
-    if (score >= 5) return 'bg-yellow/10';
-    return 'bg-status-error/10';
+    if (score >= 8) return 'bg-emerald-500/10';
+    if (score >= 5) return 'bg-amber-400/10';
+    return 'bg-red-500/10';
   };
 
   return (
     <div className="space-y-4">
       {/* Overall Score */}
-      <div className="flex items-center justify-between p-4 bg-surface-hover rounded-radius-lg">
+      <div className="flex items-center justify-between p-4 bg-gray-100 rounded-lg">
         <div>
-          <p className="text-sm font-heading text-text-muted">Overall Score</p>
+          <p className="text-sm font-heading text-gray-400">Overall Score</p>
           <p className={`text-3xl font-bold ${getScoreColor(validation.overall_score)}`}>
             {validation.overall_score}/50
           </p>
@@ -79,8 +79,8 @@ const BriefValidationDisplay: React.FC<{ validation: BriefValidation }> = ({ val
       {/* Score Breakdown */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {(Object.entries(validation.scores) as [string, { score: number; explanation: string }][]).map(([key, scoreData]) => (
-          <div key={key} className={`p-3 rounded-radius-md ${getScoreBgColor(scoreData.score)}`}>
-            <p className="text-xs font-heading text-text-muted capitalize">{key.replace(/_/g, ' ')}</p>
+          <div key={key} className={`p-3 rounded-md ${getScoreBgColor(scoreData.score)}`}>
+            <p className="text-xs font-heading text-gray-400 capitalize">{key.replace(/_/g, ' ')}</p>
             <p className={`text-xl font-bold ${getScoreColor(scoreData.score)}`}>{scoreData.score}/10</p>
           </div>
         ))}
@@ -103,8 +103,8 @@ const BriefValidationDisplay: React.FC<{ validation: BriefValidation }> = ({ val
           <div className="space-y-3">
             {validation.improvements.map((improvement, i) => (
               <div key={i} className="text-sm">
-                <p className="text-text-primary font-medium">{improvement.section}: {improvement.issue}</p>
-                <p className="text-text-muted mt-1">→ {improvement.suggestion}</p>
+                <p className="text-gray-900 font-medium">{improvement.section}: {improvement.issue}</p>
+                <p className="text-gray-400 mt-1">→ {improvement.suggestion}</p>
               </div>
             ))}
           </div>
@@ -117,8 +117,8 @@ const BriefValidationDisplay: React.FC<{ validation: BriefValidation }> = ({ val
 // E-E-A-T Signals Display Component
 const EEATSignalsDisplay: React.FC<{ signals: EEATSignals }> = ({ signals }) => {
   const categories = [
-    { key: 'experience', label: 'Experience', borderColor: 'border-l-blue-500', bgColor: 'bg-blue-500/10', textColor: 'text-blue-400', items: signals.experience },
-    { key: 'expertise', label: 'Expertise', borderColor: 'border-l-status-complete', bgColor: 'bg-status-complete/10', textColor: 'text-status-complete', items: signals.expertise },
+    { key: 'experience', label: 'Experience', borderColor: 'border-l-blue-500', bgColor: 'bg-blue-50', textColor: 'text-blue-600', items: signals.experience },
+    { key: 'expertise', label: 'Expertise', borderColor: 'border-l-emerald-400', bgColor: 'bg-emerald-500/10', textColor: 'text-emerald-500', items: signals.expertise },
     { key: 'authority', label: 'Authority', borderColor: 'border-l-purple-500', bgColor: 'bg-purple-500/10', textColor: 'text-purple-400', items: signals.authority },
     { key: 'trust', label: 'Trust', borderColor: 'border-l-teal', bgColor: 'bg-teal/10', textColor: 'text-teal', items: signals.trust },
   ];
@@ -127,9 +127,9 @@ const EEATSignalsDisplay: React.FC<{ signals: EEATSignals }> = ({ signals }) => 
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {categories.map(({ key, label, borderColor, bgColor, textColor, items }) => (
-          <div key={key} className={`p-4 ${bgColor} border-l-4 ${borderColor} rounded-r-radius-md`}>
+          <div key={key} className={`p-4 ${bgColor} border-l-4 ${borderColor} rounded-r-md`}>
             <h4 className={`font-heading font-semibold ${textColor} mb-2`}>{label}</h4>
-            <ul className="space-y-2 text-sm text-text-secondary">
+            <ul className="space-y-2 text-sm text-gray-600">
               {items.map((item, i) => (
                 <li key={i} className="flex items-start gap-2">
                   <CheckIcon className={`h-4 w-4 ${textColor} flex-shrink-0 mt-0.5`} />
@@ -172,7 +172,7 @@ const BriefStrengthMeter: React.FC<Pick<DashboardScreenProps, 'briefData' | 'com
         <div className="flex flex-col items-center">
             <div className="relative inline-flex items-center justify-center overflow-hidden rounded-full">
                 <svg className="w-20 h-20">
-                    <circle className="text-border-subtle" strokeWidth="4" stroke="currentColor" fill="transparent" r="30" cx="40" cy="40"/>
+                    <circle className="text-gray-200" strokeWidth="4" stroke="currentColor" fill="transparent" r="30" cx="40" cy="40"/>
                     <circle
                         className="text-teal transition-all duration-500"
                         strokeWidth="4"
@@ -187,18 +187,18 @@ const BriefStrengthMeter: React.FC<Pick<DashboardScreenProps, 'briefData' | 'com
                         style={{ transform: 'rotate(-90deg)', transformOrigin: '40px 40px' }}
                     />
                 </svg>
-                <span className="absolute text-xl font-bold font-heading text-text-primary">{`${score}%`}</span>
+                <span className="absolute text-xl font-bold font-heading text-gray-900">{`${score}%`}</span>
             </div>
-            <p className="font-heading font-semibold text-text-secondary mt-2">Brief Strength</p>
+            <p className="font-heading font-semibold text-gray-600 mt-2">Brief Strength</p>
         </div>
     );
 };
 
 // Stat Card for dashboard overview
 const StatCard: React.FC<{ label: string; value: string | number; highlight?: boolean }> = ({ label, value, highlight }) => (
-    <div className="bg-surface-hover p-4 rounded-radius-lg">
-        <p className="text-sm font-heading text-text-muted">{label}</p>
-        <p className={`text-lg font-bold truncate ${highlight ? 'text-teal' : 'text-text-primary'}`} title={String(value)}>{value}</p>
+    <div className="bg-gray-100 p-4 rounded-lg">
+        <p className="text-sm font-heading text-gray-400">{label}</p>
+        <p className={`text-lg font-bold truncate ${highlight ? 'text-teal' : 'text-gray-900'}`} title={String(value)}>{value}</p>
     </div>
 );
 
@@ -260,14 +260,14 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                     <BriefStrengthMeter {...strengthProps} briefData={briefData} competitorData={competitorData} />
                 )}
                 <div>
-                    <p className="text-sm text-text-muted">Primary Keyword</p>
-                    <p className="text-text-primary font-heading font-semibold">{primaryKeyword}</p>
+                    <p className="text-sm text-gray-400">Primary Keyword</p>
+                    <p className="text-gray-900 font-heading font-semibold">{primaryKeyword}</p>
                 </div>
-                <div className="flex items-center gap-4 text-sm text-text-secondary">
+                <div className="flex items-center gap-4 text-sm text-gray-600">
                     <span>{wordCount} words</span>
-                    <span className="text-border">|</span>
+                    <span className="text-gray-300">|</span>
                     <span>{h2Count} sections</span>
-                    <span className="text-border">|</span>
+                    <span className="text-gray-300">|</span>
                     <span>{faqCount} FAQs</span>
                 </div>
             </div>
@@ -309,11 +309,11 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                         Export Brief
                     </Button>
                     {isExportOpen && (
-                        <div className="absolute top-full mt-2 w-48 bg-surface-elevated border border-border rounded-radius-md shadow-lg z-10 animate-fade-in overflow-hidden">
-                            <button onClick={() => { handleExport(false); setIsExportOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-text-primary hover:bg-surface-hover transition-colors">
+                        <div className="absolute top-full mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 animate-fade-in overflow-hidden">
+                            <button onClick={() => { handleExport(false); setIsExportOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-gray-900 hover:bg-gray-100 transition-colors">
                                 Full Brief
                             </button>
-                            <button onClick={() => { handleExport(true); setIsExportOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-text-primary hover:bg-surface-hover transition-colors">
+                            <button onClick={() => { handleExport(true); setIsExportOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-gray-900 hover:bg-gray-100 transition-colors">
                                 Concise Brief
                             </button>
                         </div>
@@ -327,7 +327,7 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
             {/* Writer Instructions for uploaded briefs */}
             {isUploadedBrief && (
                 <div>
-                    <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-2">Writer Instructions</h3>
+                    <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider mb-2">Writer Instructions</h3>
                     <Textarea
                         value={writerInstructions}
                         onChange={(e) => setWriterInstructions(e.target.value)}
@@ -388,7 +388,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
                 {/* Section header — simple, no Card */}
                 <div className="flex items-center gap-3 mb-6">
                     <div className="text-teal">{section.icon}</div>
-                    <h2 className="text-xl font-heading font-semibold text-text-primary">{section.title}</h2>
+                    <h2 className="text-xl font-heading font-semibold text-gray-900">{section.title}</h2>
                 </div>
 
                 {/* Stage content — directly rendered, no Card wrap */}
@@ -396,8 +396,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
 
                 {/* Feedback — simple bottom section */}
                 {!isUploadedBrief && (
-                    <div className="mt-8 pt-6 border-t border-border-subtle">
-                        <h3 className="text-sm font-heading font-semibold text-text-secondary mb-2">Feedback / Notes for Regeneration</h3>
+                    <div className="mt-8 pt-6 border-t border-gray-100">
+                        <h3 className="text-sm font-heading font-semibold text-gray-600 mb-2">Feedback / Notes for Regeneration</h3>
                         <Textarea
                             value={userFeedbacks[section.logicalStep] || ''}
                             onChange={(e) => onFeedbackChange(section.logicalStep, e.target.value)}
@@ -434,8 +434,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
         <div className="animate-fade-in">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-2xl font-heading font-bold text-text-primary">Content Brief Dashboard</h1>
-                <p className="text-text-secondary mt-1">
+                <h1 className="text-2xl font-heading font-bold text-gray-900">Content Brief Dashboard</h1>
+                <p className="text-gray-600 mt-1">
                     {isUploadedBrief ? "Your imported brief is ready." : "Your brief is ready."} Review, refine, and generate the article.
                 </p>
             </div>

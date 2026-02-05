@@ -281,8 +281,8 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   const renderSetupStep1 = () => (
     <div className="max-w-3xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-heading font-bold text-text-primary">What keywords should we target?</h2>
-        <p className="text-text-secondary mt-2">Upload a CSV or enter keywords manually to get started.</p>
+        <h2 className="text-2xl font-heading font-bold text-gray-900">What keywords should we target?</h2>
+        <p className="text-gray-600 mt-2">Upload a CSV or enter keywords manually to get started.</p>
       </div>
 
       <StepDots current={1} total={3} />
@@ -303,10 +303,10 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         {inputMethod === 'csv' && (
           <>
             {!csvFile ? (
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-radius-lg cursor-pointer bg-surface-hover hover:bg-surface-active transition-colors">
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-200 border-dashed rounded-lg cursor-pointer bg-gray-100 hover:bg-gray-200 transition-colors">
                 <div className="flex flex-col items-center justify-center py-6">
-                  <UploadCloudIcon className="w-10 h-10 mb-2 text-text-muted" />
-                  <p className="text-sm text-text-secondary">
+                  <UploadCloudIcon className="w-10 h-10 mb-2 text-gray-400" />
+                  <p className="text-sm text-gray-600">
                     <span className="font-semibold text-teal">Click to upload</span> or drag and drop
                   </p>
                 </div>
@@ -316,36 +316,36 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
               <Card variant="outline" padding="md">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-md bg-teal/10 flex items-center justify-center">
                       <FileCodeIcon className="h-5 w-5 text-teal"/>
                     </div>
                     <div>
-                      <p className="font-semibold text-text-primary">{csvFile.name}</p>
-                      <p className="text-xs text-text-muted">{formatBytes(csvFile.size)}</p>
+                      <p className="font-semibold text-gray-900">{csvFile.name}</p>
+                      <p className="text-xs text-gray-400">{formatBytes(csvFile.size)}</p>
                     </div>
                   </div>
                   <Button variant="ghost" size="sm" onClick={resetFileState}>
                     <XIcon className="h-4 w-4"/>
                   </Button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-border-subtle">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
                   <div>
-                    <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Keyword Column</label>
+                    <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">Keyword Column</label>
                     <select
                       value={keywordColumn}
                       onChange={(e) => setKeywordColumn(e.target.value)}
-                      className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                      className="w-full p-3 bg-white border border-gray-200 rounded-md text-gray-900 focus:ring-2 focus:ring-teal focus:border-teal transition-all"
                     >
                       <option value="" disabled>Select column...</option>
                       {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Volume Column</label>
+                    <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">Volume Column</label>
                     <select
                       value={volumeColumn}
                       onChange={(e) => setVolumeColumn(e.target.value)}
-                      className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                      className="w-full p-3 bg-white border border-gray-200 rounded-md text-gray-900 focus:ring-2 focus:ring-teal focus:border-teal transition-all"
                     >
                       <option value="" disabled>Select column...</option>
                       {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
@@ -384,8 +384,8 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   const renderSetupStep2 = () => (
     <div className="max-w-2xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-heading font-bold text-text-primary">Where are your readers?</h2>
-        <p className="text-text-secondary mt-2">Set the target market and language for your analysis.</p>
+        <h2 className="text-2xl font-heading font-bold text-gray-900">Where are your readers?</h2>
+        <p className="text-gray-600 mt-2">Set the target market and language for your analysis.</p>
       </div>
 
       <StepDots current={2} total={3} />
@@ -394,31 +394,31 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         <Card variant="default" padding="lg">
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">SERP Country</label>
+              <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">SERP Country</label>
               <select
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
-                className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                className="w-full p-3 bg-white border border-gray-200 rounded-md text-gray-900 focus:ring-2 focus:ring-teal focus:border-teal transition-all"
               >
                 {countries.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">SERP Language</label>
+              <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">SERP Language</label>
               <select
                 value={serpLanguage}
                 onChange={(e) => setSerpLanguage(e.target.value)}
-                className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                className="w-full p-3 bg-white border border-gray-200 rounded-md text-gray-900 focus:ring-2 focus:ring-teal focus:border-teal transition-all"
               >
                 {languages.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Brief Output Language</label>
+              <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">Brief Output Language</label>
               <select
                 value={outputLanguage}
                 onChange={(e) => setOutputLanguage(e.target.value)}
-                className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                className="w-full p-3 bg-white border border-gray-200 rounded-md text-gray-900 focus:ring-2 focus:ring-teal focus:border-teal transition-all"
               >
                 {languages.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
@@ -429,8 +429,8 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         {!hasDfsEnvCredentials && (
           <Card variant="default" padding="lg">
             <div className="mb-4">
-              <h3 className="font-heading font-semibold text-text-primary">DataForSEO Credentials</h3>
-              <p className="text-sm text-text-muted mt-1">Required to fetch SERP data for your keywords.</p>
+              <h3 className="font-heading font-semibold text-gray-900">DataForSEO Credentials</h3>
+              <p className="text-sm text-gray-400 mt-1">Required to fetch SERP data for your keywords.</p>
             </div>
             <div className="space-y-4">
               <Input
@@ -462,7 +462,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
       <div className="mt-6 flex items-center gap-4">
         <button
           onClick={() => { setLocalError(''); setSetupStep(1); }}
-          className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+          className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
         >
           Back
         </button>
@@ -478,8 +478,8 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   const renderSetupStep3 = () => (
     <div className="max-w-3xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-heading font-bold text-text-primary">Fine-tune your brief</h2>
-        <p className="text-text-secondary mt-2">Optional settings to customize the output. You can skip straight to analysis.</p>
+        <h2 className="text-2xl font-heading font-bold text-gray-900">Fine-tune your brief</h2>
+        <p className="text-gray-600 mt-2">Optional settings to customize the output. You can skip straight to analysis.</p>
       </div>
 
       <StepDots current={3} total={3} />
@@ -488,12 +488,12 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         {/* Template URL */}
         <Card variant="default" padding="lg">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-radius-md bg-teal/10 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-md bg-teal/10 flex items-center justify-center">
               <LinkIcon className="h-4 w-4 text-teal" />
             </div>
             <div>
-              <h3 className="font-heading font-semibold text-text-primary">Use Content as Template</h3>
-              <p className="text-xs text-text-muted">Extract heading structure from existing content</p>
+              <h3 className="font-heading font-semibold text-gray-900">Use Content as Template</h3>
+              <p className="text-xs text-gray-400">Extract heading structure from existing content</p>
             </div>
           </div>
           <Input
@@ -514,18 +514,18 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         <Card variant="outline" padding="none">
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-hover transition-colors rounded-radius-lg"
+            className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-100 transition-colors rounded-lg"
           >
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-radius-md bg-teal/10 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-md bg-teal/10 flex items-center justify-center">
                 <SettingsIcon className="h-4 w-4 text-teal" />
               </div>
               <div>
-                <h3 className="font-heading font-semibold text-text-primary">Advanced Settings</h3>
-                <p className="text-sm text-text-muted">AI model selection & configuration</p>
+                <h3 className="font-heading font-semibold text-gray-900">Advanced Settings</h3>
+                <p className="text-sm text-gray-400">AI model selection & configuration</p>
               </div>
             </div>
-            <ChevronDownIcon className={`h-5 w-5 text-text-muted transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+            <ChevronDownIcon className={`h-5 w-5 text-gray-400 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
           </button>
           {showAdvanced && (
             <div className="px-4 pb-4">
@@ -546,7 +546,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
       <div className="mt-6 flex items-center gap-4">
         <button
           onClick={() => { setLocalError(''); setSetupStep(2); }}
-          className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+          className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
         >
           Back
         </button>
@@ -574,8 +574,8 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
     <div className="animate-fade-in">
       {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-heading font-bold text-text-primary">Start Your Content Project</h1>
-        <p className="text-lg text-text-secondary mt-2">Choose your starting point.</p>
+        <h1 className="text-3xl font-heading font-bold text-gray-900">Start Your Content Project</h1>
+        <p className="text-lg text-gray-600 mt-2">Choose your starting point.</p>
       </div>
 
       {/* Flow Selection */}
@@ -589,11 +589,11 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
             onClick={() => setFlow('create')}
             className="text-center cursor-pointer"
           >
-            <div className="w-14 h-14 mx-auto mb-4 rounded-radius-lg bg-teal/10 flex items-center justify-center">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-lg bg-teal/10 flex items-center justify-center">
               <FileCodeIcon className="h-7 w-7 text-teal" />
             </div>
-            <h2 className="text-lg font-heading font-semibold text-text-primary">Create New Brief</h2>
-            <p className="text-sm text-text-muted mt-2">Start with keywords to generate a data-driven brief from scratch.</p>
+            <h2 className="text-lg font-heading font-semibold text-gray-900">Create New Brief</h2>
+            <p className="text-sm text-gray-400 mt-2">Start with keywords to generate a data-driven brief from scratch.</p>
           </Card>
           <Card
             variant="interactive"
@@ -603,11 +603,11 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
             onClick={onStartUpload}
             className="text-center cursor-pointer"
           >
-            <div className="w-14 h-14 mx-auto mb-4 rounded-radius-lg bg-teal/10 flex items-center justify-center">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-lg bg-teal/10 flex items-center justify-center">
               <BrainCircuitIcon className="h-7 w-7 text-teal" />
             </div>
-            <h2 className="text-lg font-heading font-semibold text-text-primary">Use Existing Brief</h2>
-            <p className="text-sm text-text-muted mt-2">Upload a pre-made brief in Markdown to generate the article content.</p>
+            <h2 className="text-lg font-heading font-semibold text-gray-900">Use Existing Brief</h2>
+            <p className="text-sm text-gray-400 mt-2">Upload a pre-made brief in Markdown to generate the article content.</p>
           </Card>
         </div>
       )}

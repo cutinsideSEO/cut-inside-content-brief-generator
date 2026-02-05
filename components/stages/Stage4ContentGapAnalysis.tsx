@@ -47,7 +47,7 @@ const Stage4ContentGapAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
       {gapData.reasoning && (
         <div className="flex items-center gap-2">
           <AIReasoningIcon reasoning={gapData.reasoning} />
-          <span className="text-xs text-text-muted">AI analysis of content gaps based on competitor coverage</span>
+          <span className="text-xs text-gray-400">AI analysis of content gaps based on competitor coverage</span>
         </div>
       )}
 
@@ -56,9 +56,9 @@ const Stage4ContentGapAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
         <div>
           <div className="flex items-center gap-2 mb-4">
             <div className="w-3 h-3 rounded-full bg-teal"></div>
-            <h3 className="text-sm font-heading font-semibold text-text-primary">Table Stakes (Must-Have Topics)</h3>
+            <h3 className="text-sm font-heading font-semibold text-gray-900">Table Stakes (Must-Have Topics)</h3>
           </div>
-          <p className="text-xs text-text-muted mb-4">Topics that all top competitors cover — essential for credibility</p>
+          <p className="text-xs text-gray-400 mb-4">Topics that all top competitors cover — essential for credibility</p>
           <div className="space-y-3">
             {gapData.table_stakes.map((item, index) => (
               <div key={index} className="group flex items-start gap-2">
@@ -77,14 +77,14 @@ const Stage4ContentGapAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
                   variant="ghost"
                   size="sm"
                   onClick={() => handleRemoveItem('table_stakes', index)}
-                  className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-status-error transition-opacity flex-shrink-0"
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity flex-shrink-0"
                 >
                   <XIcon className="h-3.5 w-3.5" />
                 </Button>
               </div>
             ))}
             {gapData.table_stakes.length === 0 && (
-              <p className="text-sm text-text-muted italic py-4 text-center">No table stakes identified yet</p>
+              <p className="text-sm text-gray-400 italic py-4 text-center">No table stakes identified yet</p>
             )}
           </div>
         </div>
@@ -92,14 +92,14 @@ const Stage4ContentGapAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
         {/* Strategic Opportunities */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-3 h-3 rounded-full bg-status-generating"></div>
-            <h3 className="text-sm font-heading font-semibold text-text-primary">Strategic Opportunities (Content Gaps)</h3>
+            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+            <h3 className="text-sm font-heading font-semibold text-gray-900">Strategic Opportunities (Content Gaps)</h3>
           </div>
-          <p className="text-xs text-text-muted mb-4">Topics competitors miss — your chance to differentiate</p>
+          <p className="text-xs text-gray-400 mb-4">Topics competitors miss — your chance to differentiate</p>
           <div className="space-y-3">
             {gapData.strategic_opportunities.map((item, index) => (
               <div key={index} className="group flex items-start gap-2">
-                <span className="text-status-generating mt-1 flex-shrink-0">
+                <span className="text-amber-500 mt-1 flex-shrink-0">
                   <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /></svg>
                 </span>
                 <div className="flex-1 min-w-0">
@@ -114,14 +114,14 @@ const Stage4ContentGapAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
                   variant="ghost"
                   size="sm"
                   onClick={() => handleRemoveItem('strategic_opportunities', index)}
-                  className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-status-error transition-opacity flex-shrink-0"
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity flex-shrink-0"
                 >
                   <XIcon className="h-3.5 w-3.5" />
                 </Button>
               </div>
             ))}
             {gapData.strategic_opportunities.length === 0 && (
-              <p className="text-sm text-text-muted italic py-4 text-center">No opportunities identified yet</p>
+              <p className="text-sm text-gray-400 italic py-4 text-center">No opportunities identified yet</p>
             )}
           </div>
         </div>

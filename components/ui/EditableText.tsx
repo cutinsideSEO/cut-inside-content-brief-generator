@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { cn } from '@/lib/utils';
 
 export interface EditableTextProps {
   value: string;
@@ -29,8 +30,8 @@ const EditableText: React.FC<EditableTextProps> = ({
   onChange,
   placeholder,
   multiline = true,
-  className = '',
-  textClassName = '',
+  className,
+  textClassName,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
@@ -116,17 +117,17 @@ const EditableText: React.FC<EditableTextProps> = ({
   const isEmpty = displayText.trim().length === 0;
   const displayPlaceholder = placeholder || 'Click to edit...';
 
-  const defaultTextClasses = 'text-text-primary text-sm leading-relaxed';
+  const defaultTextClasses = 'text-foreground text-sm leading-relaxed';
   const resolvedTextClasses = textClassName || defaultTextClasses;
 
   // Edit mode
   if (isEditing) {
     const editStyles =
-      'w-full bg-surface-elevated border border-border rounded-radius-md text-text-primary text-sm leading-relaxed py-3 px-4 focus:outline-none focus:border-teal resize-none';
+      'w-full bg-white border border-gray-200 rounded-md text-foreground text-sm leading-relaxed py-3 px-4 focus:outline-none focus:border-teal resize-none';
 
     if (multiline) {
       return (
-        <div className={className}>
+        <div className={cn(className)}>
           <textarea
             ref={textareaRef}
             value={editValue}
@@ -141,7 +142,7 @@ const EditableText: React.FC<EditableTextProps> = ({
     }
 
     return (
-      <div className={className}>
+      <div className={cn(className)}>
         <input
           ref={inputRef}
           type="text"
@@ -158,7 +159,7 @@ const EditableText: React.FC<EditableTextProps> = ({
   // Display mode
   return (
     <div
-      className={`group relative cursor-text ${className}`}
+      className={cn('group relative cursor-text', className)}
       onClick={enterEditMode}
       role="button"
       tabIndex={0}
@@ -170,16 +171,15 @@ const EditableText: React.FC<EditableTextProps> = ({
       }}
     >
       <p
-        className={`px-2 py-1.5 -mx-2 rounded-radius-sm transition-colors duration-150 group-hover:bg-surface-hover/50 ${
-          isEmpty
-            ? 'text-text-muted italic'
-            : resolvedTextClasses
-        }`}
+        className={cn(
+          'px-2 py-1.5 -mx-2 rounded-sm transition-colors duration-150 group-hover:bg-gray-100',
+          isEmpty ? 'text-gray-400 italic' : resolvedTextClasses
+        )}
       >
         {isEmpty ? displayPlaceholder : displayText}
       </p>
       <span className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-        <PencilSvg className="w-3.5 h-3.5 text-text-muted/50" />
+        <PencilSvg className="w-3.5 h-3.5 text-gray-300" />
       </span>
     </div>
   );

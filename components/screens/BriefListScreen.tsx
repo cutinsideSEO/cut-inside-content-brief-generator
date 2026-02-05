@@ -124,26 +124,12 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   ];
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <button
-            onClick={onBack}
-            className="mr-4 p-2 rounded-radius-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div>
-            <h1 className="text-2xl font-heading font-bold text-text-primary">
-              {clientName}
-            </h1>
-            <p className="text-text-secondary mt-0.5">
-              {briefs.length} {briefs.length === 1 ? 'brief' : 'briefs'}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-heading font-bold text-text-primary">{clientName}</h1>
+          <p className="text-text-secondary mt-0.5">{briefs.length} {briefs.length === 1 ? 'brief' : 'briefs'}</p>
         </div>
         <Button
           variant="primary"

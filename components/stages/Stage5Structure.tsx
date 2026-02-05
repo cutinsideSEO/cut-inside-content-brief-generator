@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import type { ContentBrief, OutlineItem, ArticleStructure } from '../../types';
-import { ListTreeIcon, XIcon, PuzzleIcon, ZapIcon, FileTextIcon, ChevronDownIcon } from '../Icon';
-import { Card, Badge, Callout, Textarea, Input, Tooltip } from '../ui';
+import { XIcon, PuzzleIcon, ZapIcon, FileTextIcon, ChevronDownIcon } from '../Icon';
+import { Badge, Input, AIReasoningIcon, EditableText } from '../ui';
 import Button from '../Button';
 
 const SNIPPET_FORMAT_LABELS: Record<string, { label: string; icon: string }> = {
@@ -38,8 +38,8 @@ const HeadingInsightsPopover: React.FC<{ keywords?: string[]; competitors?: stri
                 </div>
             )}
         </div>
-    )
-}
+    );
+};
 
 const OutlineNode: React.FC<{
   item: OutlineItem;
@@ -68,16 +68,12 @@ const OutlineNode: React.FC<{
 
   return (
     <div style={{ marginLeft: `${levelPadding}rem` }}>
-      <Card
-        variant="outline"
-        padding="none"
-        className={`border-l-4 ${levelColors[item.level] || 'border-l-border'} overflow-hidden`}
-      >
+      <div className={`border-l-2 ${levelColors[item.level] || 'border-l-border'}`}>
         {/* Compact header - always visible */}
         <button
           type="button"
           onClick={() => onToggleExpand(pathKey)}
-          className="w-full flex items-center gap-3 p-3 hover:bg-surface-hover transition-colors text-left"
+          className="w-full flex items-center gap-3 py-2.5 pl-4 pr-2 hover:bg-surface-hover/50 transition-colors text-left rounded-r-radius-sm"
         >
           <ChevronDownIcon className={`h-4 w-4 text-text-muted flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
           <Badge variant="teal" size="sm">{item.level}</Badge>
@@ -107,21 +103,36 @@ const OutlineNode: React.FC<{
 
         {/* Expanded details */}
         {isExpanded && (
-          <div className="px-4 pb-4 pt-2 border-t border-border-subtle space-y-4 animate-fade-in">
-            <div className="flex items-center justify-end">
+          <div className="pl-4 pr-2 pb-3 pt-1 space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {item.reasoning && <AIReasoningIcon reasoning={item.reasoning} />}
+                {hasSnippet && item.featured_snippet_target && (
+                  <span className="text-xs text-text-muted">
+                    Snippet: <Badge variant="default" size="sm">{SNIPPET_FORMAT_LABELS[item.featured_snippet_target.format]?.label}</Badge>
+                    {item.featured_snippet_target.target_query && (
+                      <span className="ml-1 text-teal">"{item.featured_snippet_target.target_query}"</span>
+                    )}
+                  </span>
+                )}
+                {item.additional_resources && item.additional_resources.length > 0 && (
+                  <span className="text-xs text-status-generating">
+                    {item.additional_resources.length} resource{item.additional_resources.length > 1 ? 's' : ''} needed
+                  </span>
+                )}
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => onRemove(path)}
                 className="text-text-muted hover:text-status-error"
               >
-                <XIcon className="h-4 w-4 mr-1" />
-                Remove
+                <XIcon className="h-3.5 w-3.5" />
               </Button>
             </div>
 
             <div>
-              <label className="block text-xs font-heading font-medium text-teal uppercase tracking-wider mb-2">Heading</label>
+              <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-1">Heading</label>
               <Input
                 value={item.heading}
                 onChange={(e) => handleInputChange('heading', e.target.value)}
@@ -130,61 +141,20 @@ const OutlineNode: React.FC<{
             </div>
 
             <div>
-              <label className="block text-xs font-heading font-medium text-teal uppercase tracking-wider mb-2">Guidelines</label>
-              <Textarea
-                rows={3}
+              <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-1">Guidelines</label>
+              <EditableText
                 value={item.guidelines.join('\n')}
-                onChange={(e) => handleInputChange('guidelines', e.target.value.split('\n'))}
+                onChange={(val) => handleInputChange('guidelines', val.split('\n'))}
                 placeholder="Enter guidelines, one per line."
               />
             </div>
-
-            {item.reasoning && (
-              <Callout variant="ai" title="AI Reasoning" collapsible defaultCollapsed>
-                {item.reasoning}
-              </Callout>
-            )}
-
-            {/* Featured Snippet Target */}
-            {hasSnippet && (
-              <Callout variant="tip" title="Featured Snippet Target">
-                <div className="flex items-center justify-between">
-                  <span>Format: <Badge variant="default" size="sm">{SNIPPET_FORMAT_LABELS[item.featured_snippet_target!.format]?.label}</Badge></span>
-                </div>
-                {item.featured_snippet_target!.target_query && (
-                  <p className="mt-2 text-text-secondary">
-                    Target query: <span className="text-teal font-medium">"{item.featured_snippet_target!.target_query}"</span>
-                  </p>
-                )}
-              </Callout>
-            )}
-
-            {/* Per-Section Word Count */}
-            {item.target_word_count && item.target_word_count > 0 && (
-              <div className="flex items-center gap-2 text-sm">
-                <FileTextIcon className="h-4 w-4 text-text-muted" />
-                <span className="text-text-muted">Target:</span>
-                <Badge variant="teal" size="sm">{item.target_word_count.toLocaleString()} words</Badge>
-              </div>
-            )}
-
-            {/* Additional Resources */}
-            {item.additional_resources && item.additional_resources.length > 0 && (
-              <Callout variant="warning" title="Additional Resources Needed">
-                <ul className="text-sm list-disc list-inside space-y-1">
-                  {item.additional_resources.map((resource, i) => (
-                    <li key={i}>{resource}</li>
-                  ))}
-                </ul>
-              </Callout>
-            )}
           </div>
         )}
-      </Card>
+      </div>
 
-      {/* Nested children - always visible to preserve hierarchy */}
+      {/* Nested children */}
       {item.children?.map((child, index) => (
-        <div className="mt-2" key={index}>
+        <div className="mt-1" key={index}>
           <OutlineNode
             item={child}
             path={[...path, index]}
@@ -204,7 +174,6 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
   const structure = briefData.article_structure || { word_count_target: 0, outline: [], reasoning: '' };
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
 
-  // Collect all paths for expand/collapse all
   const getAllPaths = useCallback((items: OutlineItem[], prefix: number[] = []): string[] => {
     const paths: string[] = [];
     items.forEach((item, index) => {
@@ -290,68 +259,55 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
 
   return (
     <div className="space-y-6">
-      <Card variant="default" padding="md">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
-            <ListTreeIcon className="h-5 w-5 text-teal" />
-          </div>
-          <div>
-            <h3 className="text-base font-heading font-semibold text-text-primary">Article Structure</h3>
-            <p className="text-sm text-text-muted">Set a target word count and define the content outline</p>
-          </div>
+      {/* Word count + reasoning */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <label htmlFor="word_count" className="text-sm font-heading font-medium text-text-secondary">Word Count Target</label>
+          {structure.reasoning && <AIReasoningIcon reasoning={structure.reasoning} />}
         </div>
+        <div className="w-40">
+          <Input
+            type="number"
+            id="word_count"
+            value={structure.word_count_target || ''}
+            onChange={(e) => handleWordCountChange(e.target.value)}
+            placeholder="e.g., 2000"
+            suffix="words"
+          />
+        </div>
+      </div>
 
-        {structure.reasoning && (
-          <Callout variant="ai" title="AI Reasoning" className="mb-6" collapsible defaultCollapsed>
-            {structure.reasoning}
-          </Callout>
-        )}
-
-        <div className="mb-6">
-          <label htmlFor="word_count" className="block text-xs font-heading font-medium text-text-secondary uppercase tracking-wider mb-2">Word Count Target</label>
-          <div className="max-w-xs">
-            <Input
-              type="number"
-              id="word_count"
-              value={structure.word_count_target || ''}
-              onChange={(e) => handleWordCountChange(e.target.value)}
-              placeholder="e.g., 2000"
-              suffix="words"
+      {/* Content Outline */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider">Content Outline</h3>
+          {structure.outline && structure.outline.length > 0 && (
+            <button
+              type="button"
+              onClick={isAllExpanded ? handleCollapseAll : handleExpandAll}
+              className="text-xs text-teal hover:text-teal/80 transition-colors font-medium"
+            >
+              {isAllExpanded ? 'Collapse All' : 'Expand All'}
+            </button>
+          )}
+        </div>
+        <div className="space-y-1">
+          {structure.outline?.map((item, index) => (
+            <OutlineNode
+              key={index}
+              item={item}
+              path={[index]}
+              onUpdate={handleOutlineChange}
+              onRemove={handleRemoveOutlineNode}
+              expandedPaths={expandedPaths}
+              onToggleExpand={handleToggleExpand}
             />
-          </div>
+          ))}
+          {structure.outline?.length === 0 && (
+            <p className="text-sm text-text-muted italic py-4 text-center">No outline sections yet</p>
+          )}
         </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-sm font-heading font-semibold text-text-primary">Content Outline</h4>
-            {structure.outline && structure.outline.length > 0 && (
-              <button
-                type="button"
-                onClick={isAllExpanded ? handleCollapseAll : handleExpandAll}
-                className="text-xs text-teal hover:text-teal/80 transition-colors font-medium"
-              >
-                {isAllExpanded ? 'Collapse All' : 'Expand All'}
-              </button>
-            )}
-          </div>
-          <div className="space-y-2">
-            {structure.outline?.map((item, index) => (
-              <OutlineNode
-                key={index}
-                item={item}
-                path={[index]}
-                onUpdate={handleOutlineChange}
-                onRemove={handleRemoveOutlineNode}
-                expandedPaths={expandedPaths}
-                onToggleExpand={handleToggleExpand}
-              />
-            ))}
-            {structure.outline?.length === 0 && (
-              <p className="text-sm text-text-muted italic py-4 text-center">No outline sections yet</p>
-            )}
-          </div>
-        </div>
-      </Card>
+      </div>
     </div>
   );
 };

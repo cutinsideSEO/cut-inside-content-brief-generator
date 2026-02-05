@@ -1,7 +1,6 @@
 import React from 'react';
 import type { ContentBrief } from '../../types';
-import { FileCodeIcon } from '../Icon';
-import { Card, Callout, Textarea, Input, Badge } from '../ui';
+import { Badge, Textarea, Input, AIReasoningIcon } from '../ui';
 
 interface StageProps {
   briefData: Partial<ContentBrief>;
@@ -45,7 +44,7 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
   };
 
   const getCharCountStatus = (count: number, max: number): { variant: 'success' | 'warning' | 'error'; label: string } => {
-    if (count > max) return { variant: 'error', label: `${count}/${max} (over limit)` };
+    if (count > max) return { variant: 'error', label: `${count}/${max}` };
     if (count > max * 0.9) return { variant: 'warning', label: `${count}/${max}` };
     return { variant: 'success', label: `${count}/${max}` };
   };
@@ -63,9 +62,9 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
     const charStatus = maxLength ? getCharCountStatus(value.length, maxLength) : null;
 
     return (
-      <Card variant="outline" padding="md">
-        <div className="flex items-center justify-between mb-2">
-          <label htmlFor={id} className="block text-sm font-heading font-semibold text-text-primary">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <label htmlFor={id} className="text-sm font-heading font-semibold text-text-primary">
             {label}
           </label>
           {charStatus && (
@@ -73,12 +72,14 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
               {charStatus.label}
             </Badge>
           )}
+          {reasoning && <AIReasoningIcon reasoning={reasoning} />}
         </div>
 
         {multiline ? (
           <Textarea
             id={id}
-            rows={3}
+            rows={2}
+            autoResize
             value={value}
             onChange={(e) => onChange(e.target.value)}
             maxLength={maxLength}
@@ -92,30 +93,16 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
             placeholder={placeholder}
           />
         )}
-
-        {reasoning && (
-          <Callout variant="ai" title="AI Reasoning" className="mt-3" collapsible defaultCollapsed>
-            {reasoning}
-          </Callout>
-        )}
-      </Card>
+      </div>
     );
   };
 
   return (
     <div className="space-y-6">
-      <Card variant="default" padding="md">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
-            <FileCodeIcon className="h-5 w-5 text-teal" />
-          </div>
-          <div>
-            <h3 className="text-base font-heading font-semibold text-text-primary">On-Page SEO Elements</h3>
-            <p className="text-sm text-text-muted">Craft the final SEO elements for the page</p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
+      {/* Core SEO */}
+      <div>
+        <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-4">Core SEO</h3>
+        <div className="space-y-5">
           <SeoField
             id="title_tag"
             label="Title Tag"
@@ -154,35 +141,35 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
             onChange={(value) => handleChange('url_slug', value)}
             placeholder="enter-url-slug"
           />
-
-          <div className="border-t border-border-subtle pt-4 mt-4">
-            <h4 className="text-sm font-heading font-semibold text-text-secondary mb-4">Social Media (Open Graph)</h4>
-
-            <div className="space-y-4">
-              <SeoField
-                id="og_title"
-                label="OG Title"
-                value={seoData.og_title.value}
-                reasoning={seoData.og_title.reasoning}
-                maxLength={70}
-                onChange={(value) => handleChange('og_title', value)}
-                placeholder="Enter OG title for social sharing..."
-              />
-
-              <SeoField
-                id="og_description"
-                label="OG Description"
-                value={seoData.og_description.value}
-                reasoning={seoData.og_description.reasoning}
-                maxLength={200}
-                multiline
-                onChange={(value) => handleChange('og_description', value)}
-                placeholder="Enter OG description for social sharing..."
-              />
-            </div>
-          </div>
         </div>
-      </Card>
+      </div>
+
+      {/* Social Media */}
+      <div className="border-t border-border-subtle pt-6">
+        <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-4">Social Media (Open Graph)</h3>
+        <div className="space-y-5">
+          <SeoField
+            id="og_title"
+            label="OG Title"
+            value={seoData.og_title.value}
+            reasoning={seoData.og_title.reasoning}
+            maxLength={70}
+            onChange={(value) => handleChange('og_title', value)}
+            placeholder="Enter OG title for social sharing..."
+          />
+
+          <SeoField
+            id="og_description"
+            label="OG Description"
+            value={seoData.og_description.value}
+            reasoning={seoData.og_description.reasoning}
+            maxLength={200}
+            multiline
+            onChange={(value) => handleChange('og_description', value)}
+            placeholder="Enter OG description for social sharing..."
+          />
+        </div>
+      </div>
     </div>
   );
 };

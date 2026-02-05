@@ -48,7 +48,7 @@ const BriefUploadScreen: React.FC<BriefUploadScreenProps> = ({ onFileUpload, isL
   };
 
   return (
-    <div className="max-w-2xl mx-auto animate-fade-in">
+    <div className="max-w-3xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-heading font-bold text-grey">Upload Your Content Brief</h1>
         <p className="text-lg text-grey/70 mt-2">Upload an existing brief in Markdown (.md) format to begin content generation.</p>

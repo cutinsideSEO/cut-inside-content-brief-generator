@@ -111,7 +111,7 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
 
   if (isFeelingLuckyFlow) {
     return (
-      <div className="max-w-2xl mx-auto animate-fade-in">
+      <div className="max-w-4xl mx-auto animate-fade-in">
         <Card variant="elevated" padding="lg" className="text-center">
           <div className="py-8">
             {/* Animated loader with glow */}

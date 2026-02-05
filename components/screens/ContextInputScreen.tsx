@@ -116,7 +116,7 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
   }
 
   return (
-    <div className="max-w-2xl mx-auto animate-fade-in">
+    <div className="max-w-3xl mx-auto animate-fade-in">
         {isLoading ? (
             <ThemedLoader header="Analyzing Competitors..." />
         ) : (

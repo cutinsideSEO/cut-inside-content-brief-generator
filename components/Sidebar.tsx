@@ -2,7 +2,7 @@ import React from 'react';
 import { FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircleIcon, FileCodeIcon, CheckIcon, HomeIcon, AlertTriangleIcon } from './Icon';
 import type { ContentBrief } from '../types';
 
-type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_upload';
+type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_upload' | 'brief_list';
 
 const BRIEFING_STEPS = [
   { uiStep: 1, title: 'Goal & Audience', icon: <FlagIcon className="h-4 w-4" /> },
@@ -33,6 +33,10 @@ interface SidebarProps {
   onSelectSection?: (section: number | null) => void;
   staleSteps?: Set<number>;
   isUploadedBrief?: boolean;
+  // Brief list mode props
+  clientName?: string;
+  onBackToClients?: () => void;
+  briefCounts?: { draft: number; in_progress: number; complete: number };
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -42,7 +46,65 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectSection,
   staleSteps = new Set(),
   isUploadedBrief = false,
+  clientName,
+  onBackToClients,
+  briefCounts,
 }) => {
+  // Brief list sidebar
+  if (currentView === 'brief_list') {
+    return (
+      <aside className="w-64 flex-shrink-0 bg-surface-elevated border-r border-border overflow-y-auto">
+        <div className="p-4">
+          {/* Back navigation */}
+          {onBackToClients && (
+            <button onClick={onBackToClients} className="flex items-center gap-2 text-sm text-text-secondary hover:text-teal transition-colors mb-6 group">
+              <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              All Clients
+            </button>
+          )}
+
+          {/* Client info */}
+          <div className="mb-6">
+            <div className="w-10 h-10 bg-teal/10 rounded-radius-lg flex items-center justify-center mb-3">
+              <svg className="w-5 h-5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            </div>
+            <h3 className="text-sm font-heading font-semibold text-text-primary">{clientName || 'Client'}</h3>
+          </div>
+
+          {/* Brief status counts */}
+          <h4 className="text-xs font-heading font-semibold text-text-muted uppercase tracking-wider mb-3">Overview</h4>
+          <nav className="space-y-1">
+            <div className="flex items-center justify-between px-3 py-2 text-sm text-text-secondary rounded-radius-md">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-text-muted" />
+                Drafts
+              </span>
+              <span className="text-text-muted">{briefCounts?.draft || 0}</span>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2 text-sm text-text-secondary rounded-radius-md">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-yellow" />
+                In Progress
+              </span>
+              <span className="text-text-muted">{briefCounts?.in_progress || 0}</span>
+            </div>
+            <div className="flex items-center justify-between px-3 py-2 text-sm text-text-secondary rounded-radius-md">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-status-complete" />
+                Complete
+              </span>
+              <span className="text-text-muted">{briefCounts?.complete || 0}</span>
+            </div>
+          </nav>
+        </div>
+      </aside>
+    );
+  }
+
   // Briefing stepper
   if (currentView === 'briefing') {
     return (

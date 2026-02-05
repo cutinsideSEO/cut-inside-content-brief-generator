@@ -57,3 +57,11 @@ export type { TooltipProps } from './Tooltip';
 // Toast
 export { default as Toast } from './Toast';
 export type { ToastProps } from './Toast';
+
+// AIReasoningIcon
+export { default as AIReasoningIcon } from './AIReasoningIcon';
+export type { AIReasoningIconProps } from './AIReasoningIcon';
+
+// EditableText
+export { default as EditableText } from './EditableText';
+export type { EditableTextProps } from './EditableText';

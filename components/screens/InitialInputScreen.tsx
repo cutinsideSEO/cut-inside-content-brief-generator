@@ -279,7 +279,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   };
 
   const renderSetupStep1 = () => (
-    <div className="max-w-2xl mx-auto animate-fade-in">
+    <div className="max-w-3xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-heading font-bold text-text-primary">What keywords should we target?</h2>
         <p className="text-text-secondary mt-2">Upload a CSV or enter keywords manually to get started.</p>
@@ -382,7 +382,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   );
 
   const renderSetupStep2 = () => (
-    <div className="max-w-lg mx-auto animate-fade-in">
+    <div className="max-w-2xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-heading font-bold text-text-primary">Where are your readers?</h2>
         <p className="text-text-secondary mt-2">Set the target market and language for your analysis.</p>
@@ -476,7 +476,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   );
 
   const renderSetupStep3 = () => (
-    <div className="max-w-2xl mx-auto animate-fade-in">
+    <div className="max-w-3xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-heading font-bold text-text-primary">Fine-tune your brief</h2>
         <p className="text-text-secondary mt-2">Optional settings to customize the output. You can skip straight to analysis.</p>
@@ -580,7 +580,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
 
       {/* Flow Selection */}
       {!flow && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
           <Card
             variant="interactive"
             padding="lg"

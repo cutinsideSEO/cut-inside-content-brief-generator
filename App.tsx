@@ -1310,7 +1310,7 @@ const App: React.FC<AppProps> = ({
               isUploadedBrief={isUploadedBrief}
             />
             <main className="flex-1 overflow-y-auto">
-              <div className="max-w-6xl mx-auto p-6 lg:p-8">
+              <div className="p-6 lg:p-8">
                 {renderCurrentView()}
               </div>
             </main>

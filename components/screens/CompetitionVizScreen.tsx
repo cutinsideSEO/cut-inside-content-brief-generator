@@ -84,7 +84,7 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
   };
 
   return (
-    <div className="max-w-7xl mx-auto animate-fade-in">
+    <div className="animate-fade-in">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
             <div className="w-12 h-12 rounded-radius-lg bg-teal/10 flex items-center justify-center">

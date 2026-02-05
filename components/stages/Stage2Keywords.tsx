@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { ContentBrief, KeywordSelection } from '../../types';
-import { KeyIcon, XIcon, ChevronDownIcon } from '../Icon';
-import { Card, Badge, Callout, Textarea } from '../ui';
+import { XIcon, ChevronDownIcon } from '../Icon';
+import { Badge, Textarea, AIReasoningIcon } from '../ui';
 import Button from '../Button';
 
 interface StageProps {
@@ -133,52 +133,41 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
   };
 
   return (
-    <div className="space-y-6">
-      <Card variant="default" padding="md">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
-            <KeyIcon className="h-5 w-5 text-teal" />
-          </div>
-          <div>
-            <h3 className="text-base font-heading font-semibold text-text-primary">Keyword Strategy</h3>
-            <p className="text-sm text-text-muted">The AI has categorized your keyword list and provided strategic notes</p>
-          </div>
+    <div className="space-y-4">
+      {strategy.reasoning && (
+        <div className="flex items-center gap-2 mb-2">
+          <AIReasoningIcon reasoning={strategy.reasoning} />
+          <span className="text-xs text-text-muted">AI has categorized your keywords with strategic notes</span>
         </div>
+      )}
 
-        {strategy.reasoning && (
-          <Callout variant="ai" title="AI Reasoning" className="mb-6" collapsible defaultCollapsed>
-            {strategy.reasoning}
-          </Callout>
-        )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead className="bg-surface-hover">
+            <tr>
+              <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[15%]">Type</th>
+              <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[25%]">Keyword</th>
+              <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[15%]">Volume</th>
+              <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[35%]">Notes</th>
+              <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[10%]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {strategy.primary_keywords?.map((kw, index) => (
+              renderKeywordRow(kw, 'Primary', index)
+            ))}
+            {strategy.secondary_keywords?.map((kw, index) => (
+              renderKeywordRow(kw, 'Secondary', index)
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-        <div className="overflow-x-auto rounded-radius-md border border-border">
-          <table className="w-full text-left">
-            <thead className="bg-surface-hover">
-              <tr>
-                <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[15%]">Type</th>
-                <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[25%]">Keyword</th>
-                <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[15%]">Volume</th>
-                <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[35%]">Notes</th>
-                <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[10%]"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {strategy.primary_keywords?.map((kw, index) => (
-                renderKeywordRow(kw, 'Primary', index)
-              ))}
-              {strategy.secondary_keywords?.map((kw, index) => (
-                renderKeywordRow(kw, 'Secondary', index)
-              ))}
-            </tbody>
-          </table>
+      {strategy.primary_keywords?.length === 0 && strategy.secondary_keywords?.length === 0 && (
+        <div className="text-center py-8 text-text-muted">
+          <p>No keywords have been categorized yet.</p>
         </div>
-
-        {strategy.primary_keywords?.length === 0 && strategy.secondary_keywords?.length === 0 && (
-          <div className="text-center py-8 text-text-muted">
-            <p>No keywords have been categorized yet.</p>
-          </div>
-        )}
-      </Card>
+      )}
     </div>
   );
 };

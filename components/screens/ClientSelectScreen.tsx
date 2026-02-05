@@ -32,7 +32,6 @@ interface GeneratingBrief {
 
 interface ClientSelectScreenProps {
   onSelectClient: (clientId: string, clientName: string) => void;
-  onLogout: () => void;
   // Background generation props - now supports multiple parallel generations
   generatingBriefs?: Record<string, GeneratingBrief>;
   onViewGeneratingBrief?: (briefId: string) => void;
@@ -40,7 +39,6 @@ interface ClientSelectScreenProps {
 
 const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   onSelectClient,
-  onLogout,
   generatingBriefs = {},
   onViewGeneratingBrief,
 }) => {
@@ -158,7 +156,7 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -178,9 +176,6 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
             }
           >
             New Client
-          </Button>
-          <Button variant="ghost" onClick={onLogout}>
-            Sign Out
           </Button>
         </div>
       </div>
@@ -218,7 +213,7 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
 
       {/* Loading state */}
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <Card key={i} padding="md">
               <div className="flex items-start">
@@ -271,7 +266,7 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
 
       {/* Client grid */}
       {!isLoading && !error && filteredClients.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredClients.map((client) => (
             <ClientCard
               key={client.id}

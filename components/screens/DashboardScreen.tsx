@@ -4,7 +4,7 @@ import { exportBriefToMarkdown } from '../../services/markdownService';
 import { validateBrief, generateEEATSignals } from '../../services/geminiService';
 import Button from '../Button';
 import Spinner from '../Spinner';
-import { Card, Badge, Callout, Textarea } from '../ui';
+import { Badge, Callout, Textarea } from '../ui';
 
 // Import stage components for inline rendering
 import Stage1Goal from '../stages/Stage1Goal';
@@ -16,7 +16,7 @@ import Stage6Faqs from '../stages/Stage6Faqs';
 import Stage7Seo from '../stages/Stage7Seo';
 
 // Import icons
-import { FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircleIcon, FileCodeIcon, BrainCircuitIcon, RefreshCwIcon, ChevronDownIcon, CheckIcon, StarIcon, TargetIcon } from '../Icon';
+import { FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircleIcon, FileCodeIcon, BrainCircuitIcon, RefreshCwIcon, ChevronDownIcon, CheckIcon, StarIcon } from '../Icon';
 
 interface DashboardScreenProps {
   briefData: Partial<ContentBrief>;
@@ -253,190 +253,105 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
     const faqCount = briefData.faqs?.questions?.length || 0;
 
     return (
-        <div className="space-y-6">
-            {/* Brief Overview Card */}
-            <Card variant="default" padding="lg">
-                <h2 className="text-xl font-heading font-semibold text-text-primary mb-4">Brief Overview</h2>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 items-center">
-                    <div className="md:col-span-1">
-                       {!isUploadedBrief && <BriefStrengthMeter {...strengthProps} briefData={briefData} competitorData={competitorData} />}
-                    </div>
-                    <StatCard label="Primary Keyword" value={primaryKeyword} highlight />
-                    <StatCard label="Word Count" value={wordCount} />
-                    <StatCard label="H2 Sections" value={h2Count} />
-                    <StatCard label="FAQs" value={faqCount} />
-                </div>
-                {staleSteps.size > 0 && (
-                    <div className="mt-4">
-                        <Callout variant="warning" title="Stale Sections Detected">
-                            <p className="text-sm">Some sections of the brief are out of date due to recent changes. It's recommended to regenerate them for consistency.</p>
-                        </Callout>
-                    </div>
+        <div className="animate-fade-in space-y-6">
+            {/* Compact header with key stats */}
+            <div className="flex items-center gap-6 flex-wrap">
+                {!isUploadedBrief && (
+                    <BriefStrengthMeter {...strengthProps} briefData={briefData} competitorData={competitorData} />
                 )}
-            </Card>
+                <div>
+                    <p className="text-sm text-text-muted">Primary Keyword</p>
+                    <p className="text-text-primary font-heading font-semibold">{primaryKeyword}</p>
+                </div>
+                <div className="flex items-center gap-4 text-sm text-text-secondary">
+                    <span>{wordCount} words</span>
+                    <span className="text-border">|</span>
+                    <span>{h2Count} sections</span>
+                    <span className="text-border">|</span>
+                    <span>{faqCount} FAQs</span>
+                </div>
+            </div>
 
-            {/* Brief Validation Section */}
-            {!isUploadedBrief && (
-                <Card variant="default" padding="lg">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
-                                <TargetIcon className="h-5 w-5 text-teal" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-heading font-semibold text-text-primary">Brief Validation</h2>
-                                <p className="text-sm text-text-muted">Analyze completeness and get improvement suggestions</p>
-                            </div>
-                        </div>
-                        {!briefData.validation && (
-                            <Button
-                                onClick={handleValidateBrief}
-                                disabled={isValidating}
-                                variant="outline"
-                                size="sm"
-                            >
-                                {isValidating ? (
-                                    <>
-                                        <Spinner className="h-4 w-4 mr-2" />
-                                        Validating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <CheckIcon className="h-4 w-4 mr-2" />
-                                        Validate Brief
-                                    </>
-                                )}
-                            </Button>
-                        )}
-                    </div>
-                    {validationError && (
-                        <Callout variant="error" className="mb-4">
-                            <p className="text-sm">{validationError}</p>
-                        </Callout>
-                    )}
-                    {briefData.validation ? (
-                        <BriefValidationDisplay validation={briefData.validation} />
-                    ) : (
-                        <p className="text-text-muted text-sm">Click "Validate Brief" to analyze your brief's completeness and get improvement suggestions.</p>
-                    )}
-                </Card>
+            {staleSteps.size > 0 && (
+                <Callout variant="warning" title="Stale Sections Detected">
+                    <p className="text-sm">Some sections of the brief are out of date due to recent changes. It's recommended to regenerate them for consistency.</p>
+                </Callout>
             )}
 
-            {/* E-E-A-T Signals Section */}
-            {!isUploadedBrief && (
-                <Card variant="default" padding="lg">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
-                                <StarIcon className="h-5 w-5 text-teal" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-heading font-semibold text-text-primary">E-E-A-T Signals</h2>
-                                <p className="text-sm text-text-muted">Experience, Expertise, Authority, and Trust signals</p>
-                            </div>
+            {/* Action buttons — horizontal row */}
+            <div className="flex items-center gap-3 flex-wrap">
+                <Button variant="primary" onClick={onStartContentGeneration} glow>
+                    <BrainCircuitIcon className="h-4 w-4 mr-2" />
+                    Generate Full Article
+                </Button>
+                {!isUploadedBrief && (
+                    <>
+                        <Button variant="secondary" onClick={handleValidateBrief} disabled={isValidating}>
+                            {isValidating ? (
+                                <><Spinner className="h-4 w-4 mr-2" /> Validating...</>
+                            ) : (
+                                <><CheckIcon className="h-4 w-4 mr-2" /> Validate Brief</>
+                            )}
+                        </Button>
+                        <Button variant="secondary" onClick={handleGenerateEEAT} disabled={isGeneratingEEAT}>
+                            {isGeneratingEEAT ? (
+                                <><Spinner className="h-4 w-4 mr-2" /> Generating...</>
+                            ) : (
+                                <><StarIcon className="h-4 w-4 mr-2" /> E-E-A-T Signals</>
+                            )}
+                        </Button>
+                    </>
+                )}
+                {/* Export dropdown */}
+                <div className="relative">
+                    <Button variant="ghost" onClick={() => setIsExportOpen(!isExportOpen)} disabled={isUploadedBrief}>
+                        <ChevronDownIcon className={`h-4 w-4 mr-1 transition-transform ${isExportOpen ? 'rotate-180' : ''}`} />
+                        Export Brief
+                    </Button>
+                    {isExportOpen && (
+                        <div className="absolute top-full mt-2 w-48 bg-surface-elevated border border-border rounded-radius-md shadow-lg z-10 animate-fade-in overflow-hidden">
+                            <button onClick={() => { handleExport(false); setIsExportOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-text-primary hover:bg-surface-hover transition-colors">
+                                Full Brief
+                            </button>
+                            <button onClick={() => { handleExport(true); setIsExportOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-text-primary hover:bg-surface-hover transition-colors">
+                                Concise Brief
+                            </button>
                         </div>
-                        {!briefData.eeat_signals && (
-                            <Button
-                                onClick={handleGenerateEEAT}
-                                disabled={isGeneratingEEAT}
-                                variant="outline"
-                                size="sm"
-                            >
-                                {isGeneratingEEAT ? (
-                                    <>
-                                        <Spinner className="h-4 w-4 mr-2" />
-                                        Generating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <BrainCircuitIcon className="h-4 w-4 mr-2" />
-                                        Generate E-E-A-T
-                                    </>
-                                )}
-                            </Button>
-                        )}
-                    </div>
-                    {eeatError && (
-                        <Callout variant="error" className="mb-4">
-                            <p className="text-sm">{eeatError}</p>
-                        </Callout>
                     )}
-                    {briefData.eeat_signals ? (
-                        <EEATSignalsDisplay signals={briefData.eeat_signals} />
-                    ) : (
-                        <p className="text-text-muted text-sm">Click "Generate E-E-A-T" to get recommendations for improving your content's credibility signals.</p>
-                    )}
-                </Card>
-            )}
+                </div>
+                <Button variant="ghost" onClick={onRestart}>
+                    Start New Brief
+                </Button>
+            </div>
 
             {/* Writer Instructions for uploaded briefs */}
             {isUploadedBrief && (
-                <Card variant="default" padding="lg">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
-                            <BrainCircuitIcon className="h-5 w-5 text-teal" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-heading font-semibold text-text-primary">Writer Instructions</h2>
-                            <p className="text-sm text-text-muted">Additional instructions for tone, style, etc.</p>
-                        </div>
-                    </div>
+                <div>
+                    <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-2">Writer Instructions</h3>
                     <Textarea
                         value={writerInstructions}
                         onChange={(e) => setWriterInstructions(e.target.value)}
                         placeholder="e.g., 'Write in a witty and conversational tone.' or 'Ensure all examples are from the financial services industry.'"
                         rows={4}
                     />
-                </Card>
+                </div>
             )}
 
-            {/* Actions Card */}
-            <Card variant="default" padding="lg">
-                <h2 className="text-xl font-heading font-semibold text-text-primary mb-4">Actions</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                    {/* Left Column: Primary Action */}
-                    <div className="space-y-2">
-                        <Button onClick={onStartContentGeneration} variant="primary" size="lg" glow fullWidth className="!py-4">
-                            <BrainCircuitIcon className="h-6 w-6 mr-2" />
-                            <span className="text-lg">Generate Full Article</span>
-                        </Button>
-                        <p className="text-sm text-text-muted text-center px-4">Use the finalized brief to generate a complete, SEO-optimized article.</p>
-                    </div>
+            {/* Validation results (if generated) */}
+            {validationError && (
+                <Callout variant="error">
+                    <p className="text-sm">{validationError}</p>
+                </Callout>
+            )}
+            {briefData.validation && <BriefValidationDisplay validation={briefData.validation} />}
 
-                    {/* Right Column: Secondary Actions */}
-                    <div className="space-y-4">
-                        {/* Export Dropdown */}
-                        <div className="relative">
-                            <Button
-                                onClick={() => setIsExportOpen(!isExportOpen)}
-                                variant="outline"
-                                fullWidth
-                                className="flex items-center justify-between"
-                                disabled={isUploadedBrief}
-                                title={isUploadedBrief ? "Export is disabled for uploaded briefs" : ""}
-                            >
-                                <span>Export Brief (Markdown)</span>
-                                <ChevronDownIcon className={`h-5 w-5 transition-transform ${isExportOpen ? 'rotate-180' : ''}`} />
-                            </Button>
-                            {isExportOpen && (
-                                <div className="absolute top-full mt-2 w-full bg-surface-elevated backdrop-blur-sm border border-border rounded-radius-md shadow-lg z-10 animate-fade-in overflow-hidden">
-                                    <button onClick={() => { handleExport(false); setIsExportOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-text-primary hover:bg-surface-hover transition-colors">
-                                        Export Full Brief
-                                    </button>
-                                    <button onClick={() => { handleExport(true); setIsExportOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-text-primary hover:bg-surface-hover transition-colors">
-                                        Export Concise Brief
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Restart Button */}
-                        <Button onClick={onRestart} variant="secondary" fullWidth>
-                            Start New Brief
-                        </Button>
-                    </div>
-                </div>
-            </Card>
+            {/* E-E-A-T results (if generated) */}
+            {eeatError && (
+                <Callout variant="error">
+                    <p className="text-sm">{eeatError}</p>
+                </Callout>
+            )}
+            {briefData.eeat_signals && <EEATSignalsDisplay signals={briefData.eeat_signals} />}
         </div>
     )
 }
@@ -469,18 +384,19 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
         const isLoadingThisSection = isLoading && loadingStep === section.logicalStep;
 
         return (
-            <Card variant="default" padding="none" className="animate-fade-in overflow-hidden">
-                <div className="p-4 border-b border-border flex justify-between items-center bg-surface-hover">
-                    <div className="flex items-center gap-3">
-                        <div className="text-teal">{section.icon}</div>
-                        <h2 className="text-lg font-heading font-semibold text-text-primary">{section.title}</h2>
-                    </div>
+            <div className="animate-fade-in">
+                {/* Section header — simple, no Card */}
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="text-teal">{section.icon}</div>
+                    <h2 className="text-xl font-heading font-semibold text-text-primary">{section.title}</h2>
                 </div>
-                <div className="p-6">
-                    {section.component}
-                </div>
+
+                {/* Stage content — directly rendered, no Card wrap */}
+                {section.component}
+
+                {/* Feedback — simple bottom section */}
                 {!isUploadedBrief && (
-                    <div className="p-4 border-t border-border bg-surface-hover">
+                    <div className="mt-8 pt-6 border-t border-border-subtle">
                         <h3 className="text-sm font-heading font-semibold text-text-secondary mb-2">Feedback / Notes for Regeneration</h3>
                         <Textarea
                             value={userFeedbacks[section.logicalStep] || ''}
@@ -510,7 +426,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
                         </div>
                     </div>
                 )}
-            </Card>
+            </div>
         )
     };
 

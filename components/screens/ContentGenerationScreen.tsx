@@ -380,7 +380,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
   }
 
   return (
-    <div className="max-w-7xl mx-auto animate-fade-in">
+    <div className="max-w-5xl mx-auto animate-fade-in">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-4">

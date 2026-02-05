@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { isSupabaseConfigured } from './services/supabaseClient';
 import { createBrief, getBrief, updateBriefProgress, updateBriefStatus } from './services/briefService';
 import { saveCompetitors, getCompetitorsForBrief, toCompetitorPages } from './services/competitorService';
-import { createArticle } from './services/articleService';
+import { createArticle, getArticleCountForClient } from './services/articleService';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
 import type { Brief, AppView as DatabaseAppView } from './types/database';
@@ -14,6 +14,7 @@ import type { SaveStatus } from './types/appState';
 import LoginScreen from './components/screens/LoginScreen';
 import ClientSelectScreen from './components/screens/ClientSelectScreen';
 import BriefListScreen from './components/screens/BriefListScreen';
+import ArticleViewScreen from './components/screens/ArticleViewScreen';
 import PreWizardHeader from './components/PreWizardHeader';
 import Sidebar from './components/Sidebar';
 
@@ -47,6 +48,9 @@ interface WrapperState {
 
   // Background generation tracking - now supports multiple parallel generations
   generatingBriefs: Record<string, GeneratingBrief>;
+
+  // Article viewer
+  selectedArticleId: string | null;
 }
 
 // Inner component that uses auth context
@@ -65,10 +69,21 @@ const AppWrapperInner: React.FC = () => {
     saveStatus: 'saved',
     lastSavedAt: null,
     generatingBriefs: {},
+    selectedArticleId: null,
   });
 
   // Brief data for auto-save (will be populated when loading a brief)
   const [briefDataForSave, setBriefDataForSave] = useState<any>(null);
+
+  // Article count for sidebar
+  const [articleCount, setArticleCount] = useState(0);
+
+  // Fetch article count when in brief_list mode
+  useEffect(() => {
+    if (state.mode === 'brief_list' && state.selectedClientId) {
+      getArticleCountForClient(state.selectedClientId).then(setArticleCount);
+    }
+  }, [state.mode, state.selectedClientId]);
 
   // Determine initial mode based on auth and config
   useEffect(() => {
@@ -103,6 +118,7 @@ const AppWrapperInner: React.FC = () => {
       saveStatus: 'saved',
       lastSavedAt: null,
       generatingBriefs: {},
+      selectedArticleId: null,
     });
   }, [logout]);
 
@@ -237,6 +253,22 @@ const AppWrapperInner: React.FC = () => {
     alert('Template feature coming soon! For now, you can manually copy the brief structure.');
   }, []);
 
+  // Handle viewing an article
+  const handleViewArticle = useCallback((articleId: string) => {
+    setState(prev => ({
+      ...prev,
+      selectedArticleId: articleId,
+    }));
+  }, []);
+
+  // Handle back from article view
+  const handleBackFromArticle = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      selectedArticleId: null,
+    }));
+  }, []);
+
   // Handle save status changes from the brief editor
   const handleSaveStatusChange = useCallback((status: SaveStatus, savedAt?: Date) => {
     setState((prev) => ({
@@ -359,19 +391,28 @@ const AppWrapperInner: React.FC = () => {
                 clientName={state.selectedClientName || undefined}
                 onBackToClients={handleBackToClients}
                 briefCounts={{ draft: 0, in_progress: 0, complete: 0 }}
+                articleCount={articleCount}
               />
               <main className="flex-1 overflow-y-auto">
                 <div className="px-6 lg:px-8 py-8">
-                  <BriefListScreen
-                    clientId={state.selectedClientId!}
-                    clientName={state.selectedClientName!}
-                    onBack={handleBackToClients}
-                    onCreateBrief={handleCreateBrief}
-                    onContinueBrief={handleContinueBrief}
-                    onEditBrief={handleEditBrief}
-                    onUseAsTemplate={handleUseAsTemplate}
-                    generatingBriefs={state.generatingBriefs}
-                  />
+                  {state.selectedArticleId ? (
+                    <ArticleViewScreen
+                      articleId={state.selectedArticleId}
+                      onBack={handleBackFromArticle}
+                    />
+                  ) : (
+                    <BriefListScreen
+                      clientId={state.selectedClientId!}
+                      clientName={state.selectedClientName!}
+                      onBack={handleBackToClients}
+                      onCreateBrief={handleCreateBrief}
+                      onContinueBrief={handleContinueBrief}
+                      onEditBrief={handleEditBrief}
+                      onUseAsTemplate={handleUseAsTemplate}
+                      generatingBriefs={state.generatingBriefs}
+                      onViewArticle={handleViewArticle}
+                    />
+                  )}
                 </div>
               </main>
             </div>

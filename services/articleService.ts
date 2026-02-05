@@ -4,6 +4,7 @@ import type {
   BriefArticle,
   BriefArticleInsert,
   BriefArticleUpdate,
+  ArticleWithBrief,
   ApiResponse,
 } from '../types/database';
 import type { ModelSettings, LengthConstraints } from '../types';
@@ -285,4 +286,59 @@ export async function getArticleVersionCount(briefId: string): Promise<number> {
     .eq('brief_id', briefId);
 
   return count || 0;
+}
+
+/**
+ * Get all articles for a client (across all briefs)
+ */
+export async function getArticlesForClient(clientId: string): Promise<ApiResponse<ArticleWithBrief[]>> {
+  try {
+    const { data, error } = await supabase
+      .from('brief_articles')
+      .select(`
+        *,
+        brief:briefs!inner(name, status, client_id)
+      `)
+      .eq('brief.client_id', clientId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    // Transform to flatten the brief join
+    const articles: ArticleWithBrief[] = (data || []).map((item: any) => ({
+      id: item.id,
+      brief_id: item.brief_id,
+      title: item.title,
+      content: item.content,
+      version: item.version,
+      is_current: item.is_current,
+      generation_settings: item.generation_settings,
+      writer_instructions: item.writer_instructions,
+      created_at: item.created_at,
+      brief_name: item.brief?.name || 'Unknown Brief',
+      brief_status: item.brief?.status || 'draft',
+    }));
+
+    return { data: articles, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    return { data: null, error: message };
+  }
+}
+
+/**
+ * Get total article count for a client
+ */
+export async function getArticleCountForClient(clientId: string): Promise<number> {
+  try {
+    const { count } = await supabase
+      .from('brief_articles')
+      .select('*, brief:briefs!inner(client_id)', { count: 'exact', head: true })
+      .eq('brief.client_id', clientId);
+    return count || 0;
+  } catch {
+    return 0;
+  }
 }

@@ -1,8 +1,10 @@
 // Brief List Screen - View and manage briefs for a client
 import React, { useState, useEffect } from 'react';
 import { getBriefsForClient, archiveBrief, createBrief } from '../../services/briefService';
-import type { BriefWithClient } from '../../types/database';
+import { getArticlesForClient, deleteArticle } from '../../services/articleService';
+import type { BriefWithClient, ArticleWithBrief } from '../../types/database';
 import BriefListCard from '../briefs/BriefListCard';
+import ArticleListCard from '../articles/ArticleListCard';
 import Button from '../Button';
 import { Card, Input, Alert, Tabs, Skeleton } from '../ui';
 
@@ -27,6 +29,8 @@ interface BriefListScreenProps {
   onUseAsTemplate: (briefId: string) => void;
   // Background generation props - now supports multiple parallel generations
   generatingBriefs?: Record<string, GeneratingBrief>;
+  // Article navigation
+  onViewArticle: (articleId: string) => void;
 }
 
 type FilterStatus = 'all' | 'draft' | 'in_progress' | 'complete';
@@ -40,12 +44,16 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   onEditBrief,
   onUseAsTemplate,
   generatingBriefs = {},
+  onViewArticle,
 }) => {
   const [briefs, setBriefs] = useState<BriefWithClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [activeTab, setActiveTab] = useState<'briefs' | 'articles'>('briefs');
+  const [articles, setArticles] = useState<ArticleWithBrief[]>([]);
+  const [articlesLoading, setArticlesLoading] = useState(false);
 
   // Fetch briefs on mount and when clientId changes
   useEffect(() => {
@@ -80,6 +88,29 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
     // Remove from local list
     setBriefs((prev) => prev.filter((b) => b.id !== briefId));
+  };
+
+  // Load articles when articles tab is active
+  useEffect(() => {
+    if (activeTab === 'articles') {
+      loadArticles();
+    }
+  }, [activeTab, clientId]);
+
+  const loadArticles = async () => {
+    setArticlesLoading(true);
+    const { data, error: fetchError } = await getArticlesForClient(clientId);
+    if (!fetchError && data) {
+      setArticles(data);
+    }
+    setArticlesLoading(false);
+  };
+
+  const handleDeleteArticle = async (articleId: string) => {
+    const { error: deleteError } = await deleteArticle(articleId);
+    if (!deleteError) {
+      setArticles(prev => prev.filter(a => a.id !== articleId));
+    }
   };
 
   // Filter and search briefs
@@ -144,6 +175,52 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         </Button>
       </div>
 
+      {/* Top-level Briefs / Articles toggle */}
+      <div className="flex items-center gap-4 mb-6">
+        <Tabs
+          items={[
+            { id: 'briefs', label: 'Briefs', count: briefs.length },
+            { id: 'articles', label: 'Articles', count: articles.length },
+          ]}
+          activeId={activeTab}
+          onChange={(id) => setActiveTab(id as 'briefs' | 'articles')}
+          variant="pills"
+        />
+      </div>
+
+      {/* Articles tab */}
+      {activeTab === 'articles' && (
+        <div>
+          {articlesLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <Card key={i} padding="md">
+                  <Skeleton variant="text" width="60%" height={24} className="mb-2" />
+                  <Skeleton variant="text" width="30%" height={16} />
+                </Card>
+              ))}
+            </div>
+          ) : articles.length === 0 ? (
+            <Card variant="default" padding="lg" className="text-center">
+              <p className="text-text-secondary py-8">No articles generated yet for this client.</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {articles.map(article => (
+                <ArticleListCard
+                  key={article.id}
+                  article={article}
+                  onView={onViewArticle}
+                  onDelete={handleDeleteArticle}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Briefs tab content */}
+      {activeTab === 'briefs' && (<>
       {/* Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="flex-1">
@@ -346,6 +423,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           )}
         </div>
       )}
+      </>)}
     </div>
   );
 };

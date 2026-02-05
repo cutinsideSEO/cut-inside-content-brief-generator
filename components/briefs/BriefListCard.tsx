@@ -19,6 +19,8 @@ interface BriefListCardProps {
   isGenerating?: boolean;
   generationStatus?: GenerationStatus;
   generationStep?: number | null;
+  // Article indicator
+  articleCount?: number;
 }
 
 const BriefListCard: React.FC<BriefListCardProps> = ({
@@ -31,6 +33,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   isGenerating = false,
   generationStatus = 'idle',
   generationStep = null,
+  articleCount,
 }) => {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -175,6 +178,14 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
             <span className="text-text-muted">Updated:</span>{' '}
             {formatDate(brief.updated_at)} at {formatTime(brief.updated_at)}
           </span>
+          {articleCount !== undefined && articleCount > 0 && (
+            <>
+              <span className="text-text-muted ml-3">|</span>
+              <span className="ml-3">
+                <span className="text-teal">{articleCount} article{articleCount > 1 ? 's' : ''}</span>
+              </span>
+            </>
+          )}
         </div>
       )}
 

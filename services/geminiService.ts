@@ -658,9 +658,15 @@ interface ArticleSectionParams {
     language: string;
     writerInstructions?: string;
     onStream?: (chunk: string) => void;  // Streaming callback
+    // Word budget context
+    globalWordTarget?: number | null;
+    wordsWrittenSoFar?: number;
+    totalSections?: number;
+    currentSectionIndex?: number;
+    strictMode?: boolean;
 }
 
-export const generateArticleSection = async ({ brief, contentSoFar, sectionToWrite, upcomingHeadings, language, writerInstructions, onStream }: ArticleSectionParams): Promise<string> => {
+export const generateArticleSection = async ({ brief, contentSoFar, sectionToWrite, upcomingHeadings, language, writerInstructions, onStream, globalWordTarget, wordsWrittenSoFar, totalSections, currentSectionIndex, strictMode }: ArticleSectionParams): Promise<string> => {
     const systemInstruction = getContentGenerationPrompt(language, writerInstructions);
     const modelName = currentModelSettings.model;
 
@@ -692,6 +698,42 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
         **📏 WORD COUNT TARGET:**
         Write approximately **${sectionToWrite.target_word_count} words** for this section.
         `;
+    }
+
+    // Build global word budget instruction
+    let wordBudgetInstruction = '';
+    if (globalWordTarget && globalWordTarget > 0) {
+        const wordsRemaining = Math.max(0, globalWordTarget - (wordsWrittenSoFar || 0));
+        const sectionsRemaining = Math.max(1, (totalSections || 1) - (currentSectionIndex || 0));
+        const suggestedWords = Math.round(wordsRemaining / sectionsRemaining);
+
+        // Section-level target takes priority if set, otherwise use calculated budget
+        const effectiveTarget = (sectionToWrite.target_word_count && sectionToWrite.target_word_count > 0)
+            ? sectionToWrite.target_word_count
+            : suggestedWords;
+
+        if (strictMode) {
+            wordBudgetInstruction = `
+---
+
+**STRICT WORD COUNT LIMIT — THIS IS MANDATORY:**
+- Total article target: ${globalWordTarget} words
+- Words written so far: ${wordsWrittenSoFar || 0}
+- Words remaining in budget: ${wordsRemaining}
+- **YOU MUST write approximately ${effectiveTarget} words for this section. Do NOT exceed this.**
+- Going over budget will make the article too long. Be concise and focused.
+- If you need to cut content, prioritize the most valuable information.
+`;
+        } else {
+            wordBudgetInstruction = `
+---
+
+**WORD COUNT GUIDANCE:**
+- Total article target: ${globalWordTarget} words
+- Words written so far: ${wordsWrittenSoFar || 0}
+- Aim for approximately **${effectiveTarget} words** for this section.
+`;
+        }
     }
 
     // Build additional resources instruction if available
@@ -727,6 +769,7 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
         ${featuredSnippetInstruction}
         ${wordCountInstruction}
         ${resourcesInstruction}
+        ${wordBudgetInstruction}
 
         ---
 

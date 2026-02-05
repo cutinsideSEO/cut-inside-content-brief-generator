@@ -945,8 +945,14 @@ const App: React.FC<AppProps> = ({
       return flatList;
     };
 
+    const countWords = (text: string): number => text.trim().split(/\s+/).filter(Boolean).length;
+
     const allSections = flattenOutline(briefData.article_structure.outline);
     let fullContent = '';
+
+    // Extract word count constraints
+    const globalWordTarget = lengthConstraints.globalTarget;
+    const isStrictMode = lengthConstraints.strictMode;
 
     // Initialize with H1
     const initialTitle = briefData.on_page_seo?.h1?.value || briefData.keyword_strategy?.primary_keywords?.[0]?.keyword || "Untitled Article";
@@ -979,6 +985,11 @@ const App: React.FC<AppProps> = ({
           upcomingHeadings,
           language: outputLanguage,
           writerInstructions: isUploadedBrief ? writerInstructions : undefined,
+          globalWordTarget,
+          wordsWrittenSoFar: countWords(fullContent),
+          totalSections: allSections.length,
+          currentSectionIndex: i,
+          strictMode: isStrictMode,
           onStream: (chunk) => {
             fullContent += chunk;
             setGeneratedArticle({ title: initialTitle, content: fullContent });
@@ -1029,6 +1040,11 @@ const App: React.FC<AppProps> = ({
                 upcomingHeadings: [],
                 language: outputLanguage,
                 writerInstructions: isUploadedBrief ? writerInstructions : undefined,
+                globalWordTarget,
+                wordsWrittenSoFar: countWords(fullContent),
+                totalSections: allSections.length + briefData.faqs.questions.length,
+                currentSectionIndex: allSections.length + i,
+                strictMode: isStrictMode,
                 onStream: (chunk) => {
                   fullContent += chunk;
                   setGeneratedArticle({ title: initialTitle, content: fullContent });

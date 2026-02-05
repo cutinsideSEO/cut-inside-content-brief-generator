@@ -172,6 +172,12 @@ export interface BriefArticle {
 export type BriefArticleInsert = Omit<BriefArticle, 'id' | 'created_at'>;
 export type BriefArticleUpdate = Partial<Omit<BriefArticle, 'id' | 'created_at' | 'brief_id'>>;
 
+// Article with parent brief info
+export interface ArticleWithBrief extends BriefArticle {
+    brief_name: string;
+    brief_status: BriefStatus;
+}
+
 // ============================================
 // Joined/Extended Types
 // ============================================

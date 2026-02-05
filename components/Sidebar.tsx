@@ -37,6 +37,7 @@ interface SidebarProps {
   clientName?: string;
   onBackToClients?: () => void;
   briefCounts?: { draft: number; in_progress: number; complete: number };
+  articleCount?: number;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -49,6 +50,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   clientName,
   onBackToClients,
   briefCounts,
+  articleCount,
 }) => {
   // Brief list sidebar
   if (currentView === 'brief_list') {
@@ -100,6 +102,19 @@ const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-text-muted">{briefCounts?.complete || 0}</span>
             </div>
           </nav>
+
+          {/* Article count */}
+          <div className="mt-4 pt-4 border-t border-border-subtle">
+            <div className="flex items-center justify-between px-3 py-2 text-sm text-text-secondary rounded-radius-md">
+              <span className="flex items-center gap-2">
+                <svg className="w-3.5 h-3.5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Articles
+              </span>
+              <span className="text-text-muted">{articleCount || 0}</span>
+            </div>
+          </div>
         </div>
       </aside>
     );

@@ -205,7 +205,8 @@ export const getContentGenerationPrompt = (language: string, writerInstructions?
     4.  Ensure your writing flows naturally from the 'Content Written So Far'.
     5.  You will see a list of 'Upcoming Headings' to help you anticipate the article's flow and write a good transition.
     6.  Your entire response must be only the text (one or more paragraphs) for the current section. Do not add any extra formatting, titles, or conversational text.
-    7.  Your entire response MUST be in **${language}**.`;
+    7.  Your entire response MUST be in **${language}**.
+    8.  **WORD COUNT DISCIPLINE:** When a word count target is specified, you MUST respect it. Count your output mentally as you write. It is better to be concise and impactful than to pad with filler content. If a strict limit is set, DO NOT exceed it under any circumstances.`;
 
     if (writerInstructions && writerInstructions.trim()) {
         prompt += `

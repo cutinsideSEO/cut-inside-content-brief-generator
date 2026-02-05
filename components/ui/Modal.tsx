@@ -1,5 +1,7 @@
-import React, { useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -12,6 +14,13 @@ export interface ModalProps {
   closeOnEscape?: boolean;
 }
 
+const sizeStyles = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+};
+
 const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
@@ -22,103 +31,54 @@ const Modal: React.FC<ModalProps> = ({
   closeOnBackdrop = true,
   closeOnEscape = true,
 }) => {
-  const modalRef = useRef<HTMLDivElement>(null);
-  const previousActiveElement = useRef<Element | null>(null);
+  return (
+    <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm animate-fade-in" />
+        <DialogPrimitive.Content
+          className={cn(
+            'fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%]',
+            'w-full',
+            sizeStyles[size],
+            'bg-card border border-gray-200',
+            'rounded-xl shadow-card-elevated',
+            'animate-scale-in',
+            'focus:outline-none'
+          )}
+          onPointerDownOutside={(e) => { if (!closeOnBackdrop) e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { if (!closeOnEscape) e.preventDefault(); }}
+        >
+          {/* Header */}
+          {title && (
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <DialogPrimitive.Title className="font-heading font-semibold text-lg text-foreground">
+                {title}
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Close
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1 -m-1 rounded-md hover:bg-gray-100"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </DialogPrimitive.Close>
+            </div>
+          )}
 
-  const sizeStyles = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-  };
+          {/* Visually-hidden title for accessibility when no visible title */}
+          {!title && (
+            <DialogPrimitive.Title className="sr-only">Dialog</DialogPrimitive.Title>
+          )}
 
-  const handleEscape = useCallback(
-    (e: KeyboardEvent) => {
-      if (closeOnEscape && e.key === 'Escape') {
-        onClose();
-      }
-    },
-    [closeOnEscape, onClose]
+          {/* Body */}
+          <div className="p-5 custom-scrollbar max-h-[70vh] overflow-y-auto">{children}</div>
+
+          {/* Footer */}
+          {footer && (
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-200">{footer}</div>
+          )}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (closeOnBackdrop && e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      previousActiveElement.current = document.activeElement;
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-      modalRef.current?.focus();
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = '';
-      if (previousActiveElement.current instanceof HTMLElement) {
-        previousActiveElement.current.focus();
-      }
-    };
-  }, [isOpen, handleEscape]);
-
-  if (!isOpen) return null;
-
-  const modalContent = (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={handleBackdropClick}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={title ? 'modal-title' : undefined}
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-surface-overlay backdrop-blur-modal animate-fade-in" />
-
-      {/* Modal panel */}
-      <div
-        ref={modalRef}
-        tabIndex={-1}
-        className={`
-          relative w-full ${sizeStyles[size]}
-          bg-surface-primary border border-border
-          rounded-radius-xl shadow-card-elevated
-          animate-scale-in
-        `}
-      >
-        {/* Header */}
-        {title && (
-          <div className="flex items-center justify-between p-5 border-b border-border">
-            <h2 id="modal-title" className="font-heading font-semibold text-lg text-text-primary">
-              {title}
-            </h2>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-text-muted hover:text-text-secondary transition-colors p-1 -m-1 rounded-radius-md hover:bg-surface-hover"
-              aria-label="Close modal"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
-
-        {/* Body */}
-        <div className="p-5 custom-scrollbar max-h-[70vh] overflow-y-auto">{children}</div>
-
-        {/* Footer */}
-        {footer && (
-          <div className="flex items-center justify-end gap-3 p-5 border-t border-border">{footer}</div>
-        )}
-      </div>
-    </div>
-  );
-
-  return createPortal(modalContent, document.body);
 };
 
 export default Modal;

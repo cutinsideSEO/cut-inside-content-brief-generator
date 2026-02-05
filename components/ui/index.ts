@@ -42,17 +42,9 @@ export type { ModalProps } from './Modal';
 export { default as Tabs } from './Tabs';
 export type { TabsProps, TabItem } from './Tabs';
 
-// Dropdown
-export { default as Dropdown } from './Dropdown';
-export type { DropdownProps, DropdownOption } from './Dropdown';
-
 // Alert
 export { default as Alert } from './Alert';
 export type { AlertProps } from './Alert';
-
-// Tooltip
-export { default as Tooltip } from './Tooltip';
-export type { TooltipProps } from './Tooltip';
 
 // Toast
 export { default as Toast } from './Toast';
@@ -65,3 +57,41 @@ export type { AIReasoningIconProps } from './AIReasoningIcon';
 // EditableText
 export { default as EditableText } from './EditableText';
 export type { EditableTextProps } from './EditableText';
+
+// --- New shadcn primitives (direct re-exports) ---
+
+// Label
+export { Label } from './primitives/label';
+
+// Separator
+export { Separator } from './primitives/separator';
+
+// ScrollArea
+export { ScrollArea, ScrollBar } from './primitives/scroll-area';
+
+// Table
+export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption } from './primitives/table';
+
+// Accordion
+export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from './primitives/accordion';
+
+// DropdownMenu
+export { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from './primitives/dropdown-menu';
+
+// Switch
+export { Switch } from './primitives/switch';
+
+// Breadcrumb
+export { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from './primitives/breadcrumb';
+
+// Tooltip
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './primitives/tooltip';
+
+// Popover
+export { Popover, PopoverTrigger, PopoverContent } from './primitives/popover';
+
+// Collapsible
+export { Collapsible, CollapsibleTrigger, CollapsibleContent } from './primitives/collapsible';
+
+// Sonner (Toaster)
+export { Toaster } from './primitives/sonner';

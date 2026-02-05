@@ -1,4 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React from 'react';
+import * as PopoverPrimitive from '@radix-ui/react-popover';
+import { cn } from '@/lib/utils';
 
 export interface AIReasoningIconProps {
   reasoning: string;
@@ -26,71 +28,41 @@ const SparkleSvg: React.FC<{ className?: string }> = ({ className }) => (
 
 const AIReasoningIcon: React.FC<AIReasoningIconProps> = ({
   reasoning,
-  className = '',
+  className,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const handleClickOutside = useCallback((event: MouseEvent) => {
-    if (
-      containerRef.current &&
-      !containerRef.current.contains(event.target as Node)
-    ) {
-      setIsOpen(false);
-    }
-  }, []);
-
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      setIsOpen(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleKeyDown);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, handleClickOutside, handleKeyDown]);
-
-  const togglePopover = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsOpen((prev) => !prev);
-  };
-
   return (
-    <div ref={containerRef} className={`relative inline-flex ${className}`}>
-      <button
-        type="button"
-        onClick={togglePopover}
-        className={`transition-colors duration-200 ${
-          isOpen ? 'text-teal' : 'text-teal/50 hover:text-teal'
-        }`}
-        aria-label="View AI reasoning"
-        aria-expanded={isOpen}
-      >
-        <SparkleSvg className="w-4 h-4" />
-      </button>
+    <PopoverPrimitive.Root>
+      <div className={cn('relative inline-flex', className)}>
+        <PopoverPrimitive.Trigger asChild>
+          <button
+            type="button"
+            className="text-teal/40 hover:text-teal data-[state=open]:text-teal transition-colors duration-200"
+            aria-label="View AI reasoning"
+          >
+            <SparkleSvg className="w-4 h-4" />
+          </button>
+        </PopoverPrimitive.Trigger>
 
-      {isOpen && (
-        <div className="absolute z-50 bottom-full left-0 mb-2 w-80 max-h-60 overflow-y-auto p-3 bg-surface-elevated border border-border rounded-radius-md shadow-lg custom-scrollbar">
-          <div className="flex items-center gap-1.5 mb-2">
-            <SparkleSvg className="w-3.5 h-3.5 text-teal" />
-            <span className="text-xs font-heading font-semibold text-text-muted uppercase tracking-wider">
-              AI Reasoning
-            </span>
-          </div>
-          <p className="text-text-secondary text-sm leading-relaxed whitespace-pre-wrap">
-            {reasoning}
-          </p>
-        </div>
-      )}
-    </div>
+        <PopoverPrimitive.Portal>
+          <PopoverPrimitive.Content
+            side="top"
+            align="start"
+            sideOffset={8}
+            className="z-50 w-80 max-h-60 overflow-y-auto p-3 bg-white border border-gray-200 rounded-md shadow-lg custom-scrollbar animate-scale-in"
+          >
+            <div className="flex items-center gap-1.5 mb-2">
+              <SparkleSvg className="w-3.5 h-3.5 text-teal" />
+              <span className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider">
+                AI Reasoning
+              </span>
+            </div>
+            <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
+              {reasoning}
+            </p>
+          </PopoverPrimitive.Content>
+        </PopoverPrimitive.Portal>
+      </div>
+    </PopoverPrimitive.Root>
   );
 };
 

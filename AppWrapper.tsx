@@ -21,6 +21,10 @@ import Sidebar from './components/Sidebar';
 // Import the original App component
 import OriginalApp from './App';
 
+// Import TooltipProvider for Radix tooltips
+import { TooltipProvider } from './components/ui/primitives/tooltip';
+import { ToastProvider } from './contexts/ToastContext';
+
 // Generation status type
 type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
 
@@ -291,7 +295,7 @@ const AppWrapperInner: React.FC = () => {
   // Render loading state
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal"></div>
       </div>
     );
@@ -302,13 +306,13 @@ const AppWrapperInner: React.FC = () => {
     case 'client_select':
       if (!isAuthenticated) {
         return (
-          <div className="min-h-screen bg-black text-grey font-sans flex">
+          <div className="min-h-screen bg-background text-gray-600 font-sans flex">
             {/* Brand Panel — Left Half (hidden on mobile) */}
-            <div className="hidden lg:flex lg:w-1/2 bg-surface-elevated border-r border-border items-center justify-center relative overflow-hidden">
+            <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-teal-600 to-teal-800 items-center justify-center relative overflow-hidden">
               <div className="relative z-10 text-center px-12">
-                <img src="https://cutinside.com/llm-perception-tool/logo.png" alt="CUT INSIDE" className="h-12 w-auto mx-auto mb-6" />
-                <h1 className="text-3xl font-heading font-bold text-text-primary mb-3">Content Brief Generator</h1>
-                <p className="text-text-secondary text-lg max-w-md mx-auto">AI-powered SEO content strategy for data-driven briefs</p>
+                <img src="https://cutinside.com/llm-perception-tool/logo.png" alt="CUT INSIDE" className="h-12 w-auto mx-auto mb-6 brightness-0 invert" />
+                <h1 className="text-3xl font-heading font-bold text-white mb-3">Content Brief Generator</h1>
+                <p className="text-teal-100 text-lg max-w-md mx-auto">AI-powered SEO content strategy for data-driven briefs</p>
               </div>
             </div>
             {/* Login Form — Right Half */}
@@ -324,7 +328,7 @@ const AppWrapperInner: React.FC = () => {
       const hasGeneratingBriefs = generatingBriefIds.length > 0;
       return (
         <>
-          <div className="min-h-screen bg-black text-grey font-sans flex flex-col">
+          <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
             <PreWizardHeader onLogout={handleLogout} userName={userName} />
             <main className="flex-1 overflow-y-auto">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -381,7 +385,7 @@ const AppWrapperInner: React.FC = () => {
       const hasGeneratingBriefsInList = generatingBriefIdsInList.length > 0;
       return (
         <>
-          <div className="min-h-screen bg-black text-grey font-sans flex flex-col">
+          <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
             <PreWizardHeader
               clientName={state.selectedClientName}
               onClientClick={handleBackToClients}
@@ -501,7 +505,11 @@ const AppWrapperInner: React.FC = () => {
 const AppWrapper: React.FC = () => {
   return (
     <AuthProvider>
-      <AppWrapperInner />
+      <TooltipProvider delayDuration={300}>
+        <ToastProvider>
+          <AppWrapperInner />
+        </ToastProvider>
+      </TooltipProvider>
     </AuthProvider>
   );
 };

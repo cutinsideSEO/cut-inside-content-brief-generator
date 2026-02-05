@@ -1,4 +1,6 @@
 import React from 'react';
+import * as TabsPrimitive from '@radix-ui/react-tabs';
+import { cn } from '@/lib/utils';
 
 export interface TabItem {
   id: string;
@@ -26,30 +28,28 @@ const Tabs: React.FC<TabsProps> = ({
   className = '',
 }) => {
   const baseContainerStyles = {
-    pills: 'flex gap-2 p-1 bg-surface-elevated rounded-radius-lg border border-border',
-    underline: 'flex gap-6 border-b border-border',
-    boxed: 'inline-flex rounded-radius-lg border border-border overflow-hidden',
+    pills: 'flex gap-2 p-1 bg-gray-100 rounded-lg border border-gray-200',
+    underline: 'flex gap-6 border-b border-gray-200',
+    boxed: 'inline-flex rounded-lg border border-gray-200 overflow-hidden',
   };
 
   const baseTabStyles = {
-    pills: 'rounded-radius-md transition-all duration-200',
+    pills: 'rounded-md transition-all duration-200',
     underline: 'pb-3 border-b-2 -mb-px transition-all duration-200',
-    boxed: 'border-r border-border last:border-r-0 transition-all duration-200',
+    boxed: 'border-r border-gray-200 last:border-r-0 transition-all duration-200',
   };
 
   const activeTabStyles = {
-    pills: 'bg-teal text-brand-white shadow-sm',
-    underline: 'border-teal text-teal',
-    boxed: 'bg-teal text-brand-white',
+    pills: 'bg-primary text-primary-foreground shadow-sm',
+    underline: 'border-primary text-primary',
+    boxed: 'bg-primary text-primary-foreground',
   };
 
   const inactiveTabStyles = {
-    pills: 'text-text-secondary hover:text-text-primary hover:bg-surface-hover',
-    underline: 'border-transparent text-text-secondary hover:text-text-primary hover:border-border-emphasis',
-    boxed: 'text-text-secondary hover:text-text-primary hover:bg-surface-hover',
+    pills: 'text-muted-foreground hover:text-foreground hover:bg-gray-50',
+    underline: 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-400',
+    boxed: 'text-muted-foreground hover:text-foreground hover:bg-gray-50',
   };
-
-  const disabledTabStyles = 'opacity-50 cursor-not-allowed';
 
   const sizeStyles = {
     sm: 'px-3 py-1.5 text-sm',
@@ -57,47 +57,41 @@ const Tabs: React.FC<TabsProps> = ({
   };
 
   return (
-    <div className={`${baseContainerStyles[variant]} ${className}`} role="tablist">
-      {items.map((item) => {
-        const isActive = item.id === activeId;
-        const isDisabled = item.disabled;
+    <TabsPrimitive.Root value={activeId} onValueChange={onChange}>
+      <TabsPrimitive.List className={cn(baseContainerStyles[variant], className)}>
+        {items.map((item) => {
+          const isActive = item.id === activeId;
 
-        const tabClasses = [
-          'flex items-center gap-2 font-medium',
-          baseTabStyles[variant],
-          sizeStyles[size],
-          isActive ? activeTabStyles[variant] : inactiveTabStyles[variant],
-          isDisabled ? disabledTabStyles : 'cursor-pointer',
-        ]
-          .filter(Boolean)
-          .join(' ');
-
-        return (
-          <button
-            key={item.id}
-            role="tab"
-            aria-selected={isActive}
-            aria-disabled={isDisabled}
-            tabIndex={isDisabled ? -1 : 0}
-            className={tabClasses}
-            onClick={() => !isDisabled && onChange(item.id)}
-          >
-            {item.icon && <span className="flex-shrink-0">{item.icon}</span>}
-            <span>{item.label}</span>
-            {item.count !== undefined && (
-              <span
-                className={`
-                  ml-1 px-1.5 py-0.5 text-xs rounded-radius-sm
-                  ${isActive ? 'bg-white/20' : 'bg-surface-hover'}
-                `}
-              >
-                {item.count}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
+          return (
+            <TabsPrimitive.Trigger
+              key={item.id}
+              value={item.id}
+              disabled={item.disabled}
+              className={cn(
+                'flex items-center gap-2 font-medium',
+                baseTabStyles[variant],
+                sizeStyles[size],
+                isActive ? activeTabStyles[variant] : inactiveTabStyles[variant],
+                item.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+              )}
+            >
+              {item.icon && <span className="flex-shrink-0">{item.icon}</span>}
+              <span>{item.label}</span>
+              {item.count !== undefined && (
+                <span
+                  className={cn(
+                    'ml-1 px-1.5 py-0.5 text-xs rounded',
+                    isActive ? 'bg-white/20' : 'bg-gray-200'
+                  )}
+                >
+                  {item.count}
+                </span>
+              )}
+            </TabsPrimitive.Trigger>
+          );
+        })}
+      </TabsPrimitive.List>
+    </TabsPrimitive.Root>
   );
 };
 

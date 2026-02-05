@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
+import * as CollapsiblePrimitive from '@radix-ui/react-collapsible';
+import { cn } from '@/lib/utils';
 
 export interface CalloutProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'info' | 'tip' | 'warning' | 'ai';
@@ -52,6 +54,20 @@ const defaultIcons = {
   ),
 };
 
+const variantStyles = {
+  info: 'border-l-blue-400 bg-blue-50',
+  tip: 'border-l-emerald-400 bg-emerald-50',
+  warning: 'border-l-amber-400 bg-amber-50',
+  ai: 'border-l-teal bg-teal-50',
+};
+
+const iconColors = {
+  info: 'text-blue-500',
+  tip: 'text-emerald-500',
+  warning: 'text-amber-500',
+  ai: 'text-teal',
+};
+
 const Callout: React.FC<CalloutProps> = ({
   variant = 'info',
   icon,
@@ -59,62 +75,73 @@ const Callout: React.FC<CalloutProps> = ({
   children,
   collapsible = false,
   defaultCollapsed = false,
-  className = '',
+  className,
   ...props
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
-
-  const variantStyles = {
-    info: 'border-l-blue-500 bg-blue-500/5',
-    tip: 'border-l-green-500 bg-green-500/5',
-    warning: 'border-l-status-generating bg-status-generating/5',
-    ai: 'border-l-teal bg-teal/5',
-  };
-
-  const iconColors = {
-    info: 'text-blue-400',
-    tip: 'text-green-400',
-    warning: 'text-status-generating',
-    ai: 'text-teal',
-  };
-
   const displayIcon = icon || defaultIcons[variant];
 
-  const baseStyles =
-    'border-l-4 rounded-radius-md p-4 transition-all duration-200';
+  const content = <div className="text-muted-foreground text-sm">{children}</div>;
 
-  const classes = [baseStyles, variantStyles[variant], className].filter(Boolean).join(' ');
+  if (collapsible) {
+    return (
+      <CollapsiblePrimitive.Root defaultOpen={!defaultCollapsed}>
+        <div
+          className={cn(
+            'border-l-4 rounded-md p-4 transition-all duration-200',
+            variantStyles[variant],
+            className
+          )}
+          {...props}
+        >
+          <div className="flex items-start gap-3">
+            <span className={cn('flex-shrink-0', iconColors[variant])}>{displayIcon}</span>
+            <div className="flex-1 min-w-0">
+              {title && (
+                <div className="flex items-center justify-between">
+                  <h4 className="font-heading font-semibold text-foreground mb-1">{title}</h4>
+                  <CollapsiblePrimitive.Trigger asChild>
+                    <button
+                      type="button"
+                      className="text-gray-400 hover:text-gray-600 transition-colors ml-2"
+                    >
+                      <svg
+                        className="w-4 h-4 transition-transform data-[state=open]:rotate-180"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </CollapsiblePrimitive.Trigger>
+                </div>
+              )}
+              <CollapsiblePrimitive.Content>
+                {content}
+              </CollapsiblePrimitive.Content>
+            </div>
+          </div>
+        </div>
+      </CollapsiblePrimitive.Root>
+    );
+  }
 
   return (
-    <div className={classes} {...props}>
+    <div
+      className={cn(
+        'border-l-4 rounded-md p-4 transition-all duration-200',
+        variantStyles[variant],
+        className
+      )}
+      {...props}
+    >
       <div className="flex items-start gap-3">
-        <span className={`flex-shrink-0 ${iconColors[variant]}`}>{displayIcon}</span>
+        <span className={cn('flex-shrink-0', iconColors[variant])}>{displayIcon}</span>
         <div className="flex-1 min-w-0">
           {title && (
-            <div className="flex items-center justify-between">
-              <h4 className="font-heading font-semibold text-text-primary mb-1">{title}</h4>
-              {collapsible && (
-                <button
-                  type="button"
-                  onClick={() => setIsCollapsed(!isCollapsed)}
-                  className="text-text-muted hover:text-text-secondary transition-colors ml-2"
-                  aria-label={isCollapsed ? 'Expand' : 'Collapse'}
-                >
-                  <svg
-                    className={`w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-180'}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              )}
-            </div>
+            <h4 className="font-heading font-semibold text-foreground mb-1">{title}</h4>
           )}
-          {(!collapsible || !isCollapsed) && (
-            <div className="text-text-secondary text-sm">{children}</div>
-          )}
+          {content}
         </div>
       </div>
     </div>

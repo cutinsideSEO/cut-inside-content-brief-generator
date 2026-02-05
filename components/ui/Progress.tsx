@@ -1,4 +1,6 @@
 import React from 'react';
+import * as ProgressPrimitive from '@radix-ui/react-progress';
+import { cn } from '@/lib/utils';
 
 export interface ProgressProps extends React.HTMLAttributes<HTMLDivElement> {
   value: number;
@@ -18,23 +20,23 @@ const Progress: React.FC<ProgressProps> = ({
   color = 'teal',
   showLabel = false,
   label,
-  className = '',
+  className,
   ...props
 }) => {
   const percentage = Math.min(100, Math.max(0, (value / max) * 100));
 
   const colorStyles = {
-    teal: 'bg-teal',
-    yellow: 'bg-status-generating',
-    green: 'bg-status-complete',
-    red: 'bg-status-error',
+    teal: 'bg-primary',
+    yellow: 'bg-amber-500',
+    green: 'bg-emerald-500',
+    red: 'bg-red-500',
   };
 
   const trackColorStyles = {
-    teal: 'bg-teal/20',
-    yellow: 'bg-status-generating/20',
-    green: 'bg-status-complete/20',
-    red: 'bg-status-error/20',
+    teal: 'bg-teal-100',
+    yellow: 'bg-amber-100',
+    green: 'bg-emerald-100',
+    red: 'bg-red-100',
   };
 
   if (variant === 'circular') {
@@ -50,14 +52,14 @@ const Progress: React.FC<ProgressProps> = ({
     const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
     const strokeColors = {
-      teal: '#008080',
-      yellow: '#EAB308',
-      green: '#14B8A6',
+      teal: '#0D9488',
+      yellow: '#F59E0B',
+      green: '#10B981',
       red: '#EF4444',
     };
 
     return (
-      <div className={`relative inline-flex items-center justify-center ${className}`} {...props}>
+      <div className={cn('relative inline-flex items-center justify-center', className)} {...props}>
         <svg width={svgSize} height={svgSize} className="-rotate-90">
           <circle
             cx={svgSize / 2}
@@ -66,7 +68,7 @@ const Progress: React.FC<ProgressProps> = ({
             fill="none"
             stroke="currentColor"
             strokeWidth={stroke}
-            className="text-surface-hover"
+            className="text-gray-200"
           />
           <circle
             cx={svgSize / 2}
@@ -82,7 +84,7 @@ const Progress: React.FC<ProgressProps> = ({
           />
         </svg>
         {showLabel && (
-          <span className="absolute text-xs font-medium text-text-secondary">
+          <span className="absolute text-xs font-medium text-muted-foreground">
             {label || `${Math.round(percentage)}%`}
           </span>
         )}
@@ -97,19 +99,22 @@ const Progress: React.FC<ProgressProps> = ({
   };
 
   return (
-    <div className={className} {...props}>
+    <div className={cn(className)} {...props}>
       {(showLabel || label) && (
         <div className="flex justify-between items-center mb-1.5">
-          {label && <span className="text-sm text-text-secondary">{label}</span>}
-          {showLabel && <span className="text-sm text-text-muted">{Math.round(percentage)}%</span>}
+          {label && <span className="text-sm text-muted-foreground">{label}</span>}
+          {showLabel && <span className="text-sm text-gray-400">{Math.round(percentage)}%</span>}
         </div>
       )}
-      <div className={`w-full ${linearSizes[size]} ${trackColorStyles[color]} rounded-full overflow-hidden`}>
-        <div
-          className={`h-full ${colorStyles[color]} rounded-full transition-all duration-300 ease-out`}
+      <ProgressPrimitive.Root
+        value={percentage}
+        className={cn('w-full rounded-full overflow-hidden', linearSizes[size], trackColorStyles[color])}
+      >
+        <ProgressPrimitive.Indicator
+          className={cn('h-full rounded-full transition-all duration-300 ease-out', colorStyles[color])}
           style={{ width: `${percentage}%` }}
         />
-      </div>
+      </ProgressPrimitive.Root>
     </div>
   );
 };

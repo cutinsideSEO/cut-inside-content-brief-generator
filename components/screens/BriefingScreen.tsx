@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Spinner from '../Spinner';
 import Button from '../Button';
-import { AlertCircleIcon, FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircleIcon, FileCodeIcon, CheckIcon } from '../Icon';
+import { AlertCircleIcon, CheckIcon } from '../Icon';
 import type { ContentBrief, CompetitorPage } from '../../types';
 import { UI_TO_LOGICAL_STEP_MAP, THEMED_LOADING_MESSAGES } from '../../constants';
 import { useSound } from '../../App';
-import { Card, Progress, Textarea, Badge, Alert } from '../ui';
+import { Card, Progress, Textarea, Badge } from '../ui';
 
 // Import all stage components
 import Stage1Goal from '../stages/Stage1Goal';
@@ -15,16 +15,6 @@ import Stage4ContentGapAnalysis from '../stages/Stage4ContentGapAnalysis';
 import Stage5Structure from '../stages/Stage5Structure';
 import Stage6Faqs from '../stages/Stage6Faqs';
 import Stage7Seo from '../stages/Stage7Seo';
-
-const STEPS = [
-    { uiStep: 1, logicalStep: 1, title: 'Goal & Audience', icon: <FlagIcon className="h-4 w-4" /> },
-    { uiStep: 2, logicalStep: 3, title: 'Comp. Analysis', icon: <FileSearchIcon className="h-4 w-4" /> },
-    { uiStep: 3, logicalStep: 2, title: 'Keywords', icon: <KeyIcon className="h-4 w-4" /> },
-    { uiStep: 4, logicalStep: 4, title: 'Content Gaps', icon: <PuzzleIcon className="h-4 w-4" /> },
-    { uiStep: 5, logicalStep: 5, title: 'Structure', icon: <ListTreeIcon className="h-4 w-4" /> },
-    { uiStep: 6, logicalStep: 6, title: 'FAQs', icon: <HelpCircleIcon className="h-4 w-4" /> },
-    { uiStep: 7, logicalStep: 7, title: 'On-Page SEO', icon: <FileCodeIcon className="h-4 w-4" /> },
-];
 
 interface BriefingScreenProps {
   currentStep: number;
@@ -70,113 +60,6 @@ const ThemedLoader: React.FC<{ header: string; step?: number }> = ({ header, ste
         </div>
     );
 };
-
-const VerticalStepper: React.FC<{ currentStep: number }> = ({ currentStep }) => (
-    <Card variant="default" padding="md" className="sticky top-24">
-        <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-4">Brief Progress</h3>
-        <nav aria-label="Progress">
-            <ol role="list" className="space-y-1">
-                {STEPS.map((step, index) => {
-                    const isCompleted = currentStep > step.uiStep;
-                    const isActive = currentStep === step.uiStep;
-                    return (
-                        <li key={step.title} className="relative">
-                            {index !== STEPS.length - 1 && (
-                                <div
-                                    className={`absolute left-[18px] top-10 h-[calc(100%-8px)] w-0.5 transition-colors duration-300 ${
-                                        isCompleted ? 'bg-teal' : 'bg-border'
-                                    }`}
-                                    aria-hidden="true"
-                                />
-                            )}
-                            <div className={`relative flex items-center gap-3 p-2 rounded-radius-md transition-all duration-200 ${
-                                isActive ? 'bg-teal/10' : 'hover:bg-surface-hover'
-                            }`}>
-                                <span className={`relative z-10 w-9 h-9 flex items-center justify-center rounded-full border-2 transition-all duration-200 ${
-                                    isCompleted
-                                        ? 'bg-teal border-teal shadow-glow-teal-sm'
-                                        : isActive
-                                            ? 'border-teal bg-surface-elevated'
-                                            : 'border-border bg-surface-elevated'
-                                }`}>
-                                    <span className={`transition-colors duration-200 ${
-                                        isCompleted
-                                            ? 'text-surface-primary'
-                                            : isActive
-                                                ? 'text-teal'
-                                                : 'text-text-muted'
-                                    }`}>
-                                        {isCompleted ? <CheckIcon className="h-4 w-4" /> : step.icon}
-                                    </span>
-                                </span>
-                                <div className="flex flex-col">
-                                    <span className={`text-sm font-heading font-medium transition-colors duration-200 ${
-                                        isActive ? 'text-text-primary' : isCompleted ? 'text-text-secondary' : 'text-text-muted'
-                                    }`}>
-                                        {step.title}
-                                    </span>
-                                    {isActive && (
-                                        <span className="text-xs text-teal">Current step</span>
-                                    )}
-                                </div>
-                            </div>
-                        </li>
-                    );
-                })}
-            </ol>
-        </nav>
-    </Card>
-);
-
-const BriefSummaryPanel: React.FC<{ briefData: Partial<ContentBrief>, currentStep: number }> = ({ briefData, currentStep }) => {
-    const hasAnyData = (currentStep > 1 && briefData.page_goal) ||
-                       (currentStep > 3 && briefData.keyword_strategy) ||
-                       (currentStep > 4 && briefData.content_gap_analysis);
-
-    return (
-        <Card variant="default" padding="md" className="sticky top-24">
-            <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-4">Brief Summary</h3>
-
-            {!hasAnyData && (
-                <p className="text-sm text-text-muted italic">Summary will appear as you complete steps...</p>
-            )}
-
-            <div className="space-y-4">
-                {currentStep > 1 && briefData.page_goal && (
-                    <div className="border-l-2 border-teal pl-3">
-                        <p className="text-xs font-heading font-medium text-teal uppercase tracking-wider">Page Goal</p>
-                        <p className="text-sm text-text-secondary mt-1 line-clamp-3">{briefData.page_goal.value}</p>
-                    </div>
-                )}
-
-                {currentStep > 3 && briefData.keyword_strategy && (
-                    <div className="border-l-2 border-teal pl-3">
-                        <p className="text-xs font-heading font-medium text-teal uppercase tracking-wider">Primary Keywords</p>
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                            {briefData.keyword_strategy.primary_keywords.slice(0, 3).map(kw => (
-                                <Badge key={kw.keyword} variant="teal" size="sm">{kw.keyword}</Badge>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {currentStep > 4 && briefData.content_gap_analysis && (
-                    <div className="border-l-2 border-teal pl-3">
-                        <p className="text-xs font-heading font-medium text-teal uppercase tracking-wider">Strategic Opportunities</p>
-                        <ul className="mt-2 space-y-1.5">
-                            {briefData.content_gap_analysis.strategic_opportunities.slice(0, 3).map((op, idx) => (
-                                <li key={op.value} className="text-sm text-text-secondary flex items-start gap-2">
-                                    <span className="text-teal mt-0.5">•</span>
-                                    <span className="line-clamp-2">{op.value}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-            </div>
-        </Card>
-    );
-}
 
 const BriefingScreen: React.FC<BriefingScreenProps> = ({
   currentStep,
@@ -283,7 +166,7 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
       </div>
     );
   }
-  
+
   const renderContent = () => {
     if (isLoading) {
       return <ThemedLoader header={`AI is working on ${stepNames[currentStep]}...`} step={currentStep} />;
@@ -325,80 +208,65 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
   const logicalCurrentStep = UI_TO_LOGICAL_STEP_MAP[currentStep] || 1;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-        {/* Left Panel: Stepper */}
-        <div className="lg:col-span-3 order-2 lg:order-1">
-            <VerticalStepper currentStep={currentStep} />
-        </div>
-
-        {/* Center Panel: Content & Actions */}
-        <div className="lg:col-span-6 order-1 lg:order-2 space-y-6">
-            {/* Step header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Badge variant="teal" size="sm">Step {currentStep}/7</Badge>
-                    <h2 className="text-xl font-heading font-semibold text-text-primary">
-                        {stepNames[currentStep]}
-                    </h2>
-                </div>
-                {briefingStepHasData(currentStep, briefData) && (
-                    <Badge variant="success" size="sm">
-                        <CheckIcon className="h-3 w-3 mr-1" />
-                        Generated
-                    </Badge>
-                )}
+    <div className="space-y-6 animate-fade-in">
+        {/* Step header */}
+        <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <Badge variant="teal" size="sm">Step {currentStep}/7</Badge>
+                <h2 className="text-xl font-heading font-semibold text-text-primary">
+                    {stepNames[currentStep]}
+                </h2>
             </div>
-
-            {/* Main content card */}
-            <Card variant="default" padding="lg">
-                {renderContent()}
-            </Card>
-
-            {/* Feedback and actions */}
-            {currentStep <= 7 && !isLoading && (
-                <Card variant="default" padding="md">
-                    <div className="space-y-4">
-                        <div>
-                            <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-3">
-                                Feedback for Regeneration
-                            </h3>
-                            <Textarea
-                                value={userFeedback}
-                                onChange={(e) => setUserFeedback(e.target.value)}
-                                placeholder="e.g., 'Make the tone more technical' or 'Add a section about X'"
-                                rows={3}
-                                hint="Optional: Provide guidance if you want to regenerate this step"
-                            />
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                            <Button
-                                variant="primary"
-                                onClick={() => onNextStep(userFeedback)}
-                                disabled={isLoading}
-                                className="flex-1"
-                                glow
-                            >
-                                {currentStep === 7 ? 'Accept & View Dashboard' : 'Accept & Continue'}
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => onRegenerate(logicalCurrentStep, userFeedback)}
-                                disabled={isLoading}
-                                className="flex-1"
-                            >
-                                Regenerate Step
-                            </Button>
-                        </div>
-                    </div>
-                </Card>
+            {briefingStepHasData(currentStep, briefData) && (
+                <Badge variant="success" size="sm">
+                    <CheckIcon className="h-3 w-3 mr-1" />
+                    Generated
+                </Badge>
             )}
         </div>
 
-        {/* Right Panel: Summary */}
-        <div className="lg:col-span-3 order-3">
-            <BriefSummaryPanel briefData={briefData} currentStep={currentStep} />
-        </div>
+        {/* Main content */}
+        {renderContent()}
+
+        {/* Feedback and actions */}
+        {currentStep <= 7 && !isLoading && (
+            <Card variant="default" padding="md">
+                <div className="space-y-4">
+                    <div>
+                        <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-3">
+                            Feedback for Regeneration
+                        </h3>
+                        <Textarea
+                            value={userFeedback}
+                            onChange={(e) => setUserFeedback(e.target.value)}
+                            placeholder="e.g., 'Make the tone more technical' or 'Add a section about X'"
+                            rows={3}
+                            hint="Optional: Provide guidance if you want to regenerate this step"
+                        />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                        <Button
+                            variant="primary"
+                            onClick={() => onNextStep(userFeedback)}
+                            disabled={isLoading}
+                            className="flex-1"
+                            glow
+                        >
+                            {currentStep === 7 ? 'Accept & View Dashboard' : 'Accept & Continue'}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => onRegenerate(logicalCurrentStep, userFeedback)}
+                            disabled={isLoading}
+                            className="flex-1"
+                        >
+                            Regenerate Step
+                        </Button>
+                    </div>
+                </div>
+            </Card>
+        )}
     </div>
   );
 };

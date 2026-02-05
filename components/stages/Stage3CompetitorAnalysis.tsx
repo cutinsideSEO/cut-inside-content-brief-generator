@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ContentBrief, CompetitorPage } from '../../types';
-import { FileSearchIcon, ExternalLinkIcon } from '../Icon';
+import { FileSearchIcon, ExternalLinkIcon, ChevronDownIcon } from '../Icon';
 import { Card, Badge, Callout, Textarea } from '../ui';
 
 interface StageProps {
@@ -10,6 +10,8 @@ interface StageProps {
 }
 
 const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefData, competitorData }) => {
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+
   const insights = briefData.competitor_insights || {
     competitor_breakdown: [],
     differentiation_summary: { value: '', reasoning: '' }
@@ -43,6 +45,10 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
     });
   };
 
+  const toggleExpanded = (index: number) => {
+    setExpandedIndex(prev => prev === index ? null : index);
+  };
+
   return (
     <div className="space-y-6">
       <Card variant="default" padding="md">
@@ -67,82 +73,100 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
             placeholder="Summary of key differentiators..."
           />
           {insights.differentiation_summary.reasoning && (
-            <Callout variant="ai" title="AI Reasoning" className="mt-4">
+            <Callout variant="ai" title="AI Reasoning" className="mt-4" collapsible defaultCollapsed>
               {insights.differentiation_summary.reasoning}
             </Callout>
           )}
         </Card>
 
-        {/* Competitor Breakdowns */}
+        {/* Competitor Breakdowns - Accordion */}
         <div>
           <h4 className="text-sm font-heading font-semibold text-text-primary mb-4">Competitor Breakdowns</h4>
-          <div className="space-y-4">
+          <div className="space-y-2">
             {insights.competitor_breakdown.map((item, index) => {
               const fullCompetitor = competitorData.find(c => c.URL === item.url);
               const bestRank = fullCompetitor?.rankings?.sort((a, b) => a.rank - b.rank)[0];
+              const isExpanded = expandedIndex === index;
 
               return (
-                <Card key={index} variant="outline" padding="md">
-                  <div className="flex items-center justify-between mb-3">
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-teal font-heading font-semibold hover:underline flex items-center gap-2 truncate max-w-[80%]"
-                      title={item.url}
-                    >
-                      <span className="truncate">{item.url}</span>
-                      <ExternalLinkIcon className="h-4 w-4 flex-shrink-0" />
-                    </a>
-                    {fullCompetitor && (
-                      <Badge variant="teal" size="sm">
-                        Score: {fullCompetitor.Weighted_Score.toLocaleString()}
-                      </Badge>
-                    )}
-                  </div>
+                <Card key={index} variant="outline" padding="none" className="overflow-hidden">
+                  {/* Collapsed header row */}
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(index)}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-surface-hover transition-colors text-left"
+                  >
+                    <ChevronDownIcon className={`h-4 w-4 text-text-muted flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    <span className="text-sm font-heading font-semibold text-teal truncate flex-1" title={item.url}>
+                      {item.url}
+                    </span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {bestRank && (
+                        <span className="text-xs text-text-muted">
+                          #{bestRank.rank} for "{bestRank.keyword}"
+                        </span>
+                      )}
+                      {fullCompetitor && (
+                        <Badge variant="teal" size="sm">
+                          {fullCompetitor.Weighted_Score.toLocaleString()}
+                        </Badge>
+                      )}
+                    </div>
+                  </button>
 
-                  {fullCompetitor && bestRank && (
-                    <div className="mb-4 text-xs text-text-muted border-b border-border-subtle pb-3">
-                      Best Rank: <span className="font-semibold text-text-secondary">#{bestRank.rank}</span> for "{bestRank.keyword}"
+                  {/* Expanded content */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 pt-2 border-t border-border-subtle animate-fade-in">
+                      <div className="flex items-center justify-between mb-3">
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-teal text-sm hover:underline flex items-center gap-1"
+                        >
+                          Open in new tab
+                          <ExternalLinkIcon className="h-3 w-3" />
+                        </a>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Description</label>
+                          <Textarea
+                            rows={2}
+                            value={item.description}
+                            onChange={(e) => handleBreakdownChange(index, 'description', e.target.value)}
+                            placeholder="Brief description of this competitor..."
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-heading font-medium text-status-complete uppercase tracking-wider mb-2">
+                              The Good (What we should replicate)
+                            </label>
+                            <Textarea
+                              rows={3}
+                              value={item.good_points.join('\n')}
+                              onChange={(e) => handleBreakdownChange(index, 'good_points', e.target.value.split('\n'))}
+                              placeholder="One point per line..."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-heading font-medium text-status-generating uppercase tracking-wider mb-2">
+                              The Bad (Where we can improve)
+                            </label>
+                            <Textarea
+                              rows={3}
+                              value={item.bad_points.join('\n')}
+                              onChange={(e) => handleBreakdownChange(index, 'bad_points', e.target.value.split('\n'))}
+                              placeholder="One point per line..."
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Description</label>
-                      <Textarea
-                        rows={2}
-                        value={item.description}
-                        onChange={(e) => handleBreakdownChange(index, 'description', e.target.value)}
-                        placeholder="Brief description of this competitor..."
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-heading font-medium text-status-complete uppercase tracking-wider mb-2">
-                          The Good (What we should replicate)
-                        </label>
-                        <Textarea
-                          rows={3}
-                          value={item.good_points.join('\n')}
-                          onChange={(e) => handleBreakdownChange(index, 'good_points', e.target.value.split('\n'))}
-                          placeholder="One point per line..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-heading font-medium text-status-generating uppercase tracking-wider mb-2">
-                          The Bad (Where we can improve)
-                        </label>
-                        <Textarea
-                          rows={3}
-                          value={item.bad_points.join('\n')}
-                          onChange={(e) => handleBreakdownChange(index, 'bad_points', e.target.value.split('\n'))}
-                          placeholder="One point per line..."
-                        />
-                      </div>
-                    </div>
-                  </div>
                 </Card>
               )
             })}

@@ -16,7 +16,7 @@ import Stage6Faqs from '../stages/Stage6Faqs';
 import Stage7Seo from '../stages/Stage7Seo';
 
 // Import icons
-import { FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircleIcon, FileCodeIcon, BrainCircuitIcon, RefreshCwIcon, AlertTriangleIcon, HomeIcon, ChevronDownIcon, CheckIcon, StarIcon, TargetIcon } from '../Icon';
+import { FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircleIcon, FileCodeIcon, BrainCircuitIcon, RefreshCwIcon, ChevronDownIcon, CheckIcon, StarIcon, TargetIcon } from '../Icon';
 
 interface DashboardScreenProps {
   briefData: Partial<ContentBrief>;
@@ -39,6 +39,9 @@ interface DashboardScreenProps {
   brandInfo: string;
   contextFiles: File[];
   outputLanguage?: string;
+  // Lifted sidebar state
+  selectedSection?: number | null;
+  onSelectSection?: (section: number | null) => void;
 }
 
 // Brief Validation Display Component
@@ -139,7 +142,7 @@ const EEATSignalsDisplay: React.FC<{ signals: EEATSignals }> = ({ signals }) => 
       </div>
 
       {signals.reasoning && (
-        <Callout variant="info" title="AI Reasoning">
+        <Callout variant="info" title="AI Reasoning" collapsible defaultCollapsed>
           <p className="text-sm italic">{signals.reasoning}</p>
         </Callout>
       )}
@@ -440,8 +443,10 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
 
 
 const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
-    const { briefData, setBriefData, staleSteps, userFeedbacks, onFeedbackChange, onRegenerate, isLoading, loadingStep, competitorData, keywordVolumeMap, isUploadedBrief, outputLanguage } = props;
-    const [selectedSection, setSelectedSection] = useState<number | null>(null);
+    const { briefData, setBriefData, staleSteps, userFeedbacks, onFeedbackChange, onRegenerate, isLoading, loadingStep, competitorData, keywordVolumeMap, isUploadedBrief, outputLanguage, selectedSection: externalSelectedSection, onSelectSection: externalOnSelectSection } = props;
+    const [internalSelectedSection, setInternalSelectedSection] = useState<number | null>(null);
+    const selectedSection = externalSelectedSection !== undefined ? externalSelectedSection : internalSelectedSection;
+    const setSelectedSection = externalOnSelectSection || setInternalSelectedSection;
 
     const sections = [
         { logicalStep: 1, title: 'Goal & Audience', icon: <FlagIcon className="h-5 w-5" />, component: <Stage1Goal briefData={briefData} setBriefData={setBriefData} /> },
@@ -510,75 +515,16 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto animate-fade-in">
+        <div className="animate-fade-in">
             {/* Header */}
-            <div className="text-center mb-8">
-                <h1 className="text-3xl font-heading font-bold text-text-primary">Content Brief Dashboard</h1>
-                <p className="text-lg text-text-secondary mt-2">
+            <div className="mb-8">
+                <h1 className="text-2xl font-heading font-bold text-text-primary">Content Brief Dashboard</h1>
+                <p className="text-text-secondary mt-1">
                     {isUploadedBrief ? "Your imported brief is ready." : "Your brief is ready."} Review, refine, and generate the article.
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Sidebar */}
-                <aside className="lg:col-span-3">
-                    <Card variant="default" padding="sm" className="sticky top-24">
-                        <div className="p-2">
-                            <h3 className="px-3 text-xs font-heading font-semibold text-text-muted uppercase tracking-wider">Dashboard</h3>
-                            <nav className="mt-2 space-y-1">
-                                <a
-                                    href="#"
-                                    onClick={(e) => { e.preventDefault(); setSelectedSection(null); }}
-                                    className={`flex items-center px-3 py-2 text-sm font-semibold rounded-radius-md transition-colors ${
-                                        selectedSection === null
-                                            ? 'bg-teal/20 text-teal'
-                                            : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
-                                    }`}
-                                >
-                                    <HomeIcon className="mr-3 h-5 w-5" />
-                                    <span>Overview</span>
-                                </a>
-                            </nav>
-
-                            {!isUploadedBrief && (
-                                <>
-                                    <h3 className="mt-6 px-3 text-xs font-heading font-semibold text-text-muted uppercase tracking-wider">Brief Sections</h3>
-                                    <nav className="mt-2 space-y-1">
-                                        {sections.map(section => (
-                                            <a
-                                                key={section.logicalStep}
-                                                href="#"
-                                                onClick={(e) => { e.preventDefault(); setSelectedSection(section.logicalStep); }}
-                                                className={`flex items-center px-3 py-2 text-sm font-semibold rounded-radius-md transition-colors ${
-                                                    selectedSection === section.logicalStep
-                                                        ? 'bg-teal/20 text-teal'
-                                                        : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
-                                                }`}
-                                            >
-                                                <span className="mr-3">{section.icon}</span>
-                                                <span className="flex-1">{section.title}</span>
-                                                {staleSteps.has(section.logicalStep) && (
-                                                    <div className="relative group">
-                                                        <AlertTriangleIcon className="h-4 w-4 text-yellow"/>
-                                                        <span className="absolute right-0 -top-8 w-max bg-surface-elevated text-text-primary text-xs rounded-radius-sm py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg border border-border">
-                                                            This section is stale
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </a>
-                                        ))}
-                                    </nav>
-                                </>
-                            )}
-                        </div>
-                    </Card>
-                </aside>
-
-                {/* Main Content */}
-                <main className="lg:col-span-9">
-                    {renderMainContent()}
-                </main>
-            </div>
+            {renderMainContent()}
         </div>
     );
 };

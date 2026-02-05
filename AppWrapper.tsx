@@ -265,11 +265,9 @@ const AppWrapperInner: React.FC = () => {
     case 'client_select':
       if (!isAuthenticated) {
         return (
-          <div className="min-h-screen bg-black text-grey font-sans">
-            <div className="container mx-auto p-4 md:p-6 lg:p-8">
-              <div className="bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
-                <LoginScreen onLoginSuccess={handleLoginSuccess} />
-              </div>
+          <div className="min-h-screen bg-black text-grey font-sans flex items-center justify-center">
+            <div className="w-full max-w-lg p-6">
+              <LoginScreen onLoginSuccess={handleLoginSuccess} />
             </div>
           </div>
         );
@@ -278,27 +276,25 @@ const AppWrapperInner: React.FC = () => {
       const hasGeneratingBriefs = generatingBriefIds.length > 0;
       return (
         <>
-          <div className="min-h-screen bg-black text-grey font-sans">
-            <div className="container mx-auto p-4 md:p-6 lg:p-8">
-              <div className="bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
-                <ClientSelectScreen
-                  onSelectClient={handleSelectClient}
-                  onLogout={handleLogout}
-                  generatingBriefs={state.generatingBriefs}
-                  onViewGeneratingBrief={(briefId) => {
-                    const brief = state.generatingBriefs[briefId];
-                    if (brief) {
-                      setState((prev) => ({
-                        ...prev,
-                        mode: 'brief_editor',
-                        currentBriefId: briefId,
-                        selectedClientId: brief.clientId,
-                        selectedClientName: brief.clientName,
-                      }));
-                    }
-                  }}
-                />
-              </div>
+          <div className="min-h-screen bg-black text-grey font-sans flex items-center justify-center">
+            <div className="w-full max-w-5xl p-6">
+              <ClientSelectScreen
+                onSelectClient={handleSelectClient}
+                onLogout={handleLogout}
+                generatingBriefs={state.generatingBriefs}
+                onViewGeneratingBrief={(briefId) => {
+                  const brief = state.generatingBriefs[briefId];
+                  if (brief) {
+                    setState((prev) => ({
+                      ...prev,
+                      mode: 'brief_editor',
+                      currentBriefId: briefId,
+                      selectedClientId: brief.clientId,
+                      selectedClientName: brief.clientName,
+                    }));
+                  }
+                }}
+              />
             </div>
           </div>
           {/* Keep App components mounted but hidden during background generation */}
@@ -335,20 +331,18 @@ const AppWrapperInner: React.FC = () => {
       const hasGeneratingBriefsInList = generatingBriefIdsInList.length > 0;
       return (
         <>
-          <div className="min-h-screen bg-black text-grey font-sans">
-            <div className="container mx-auto p-4 md:p-6 lg:p-8">
-              <div className="bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
-                <BriefListScreen
-                  clientId={state.selectedClientId!}
-                  clientName={state.selectedClientName!}
-                  onBack={handleBackToClients}
-                  onCreateBrief={handleCreateBrief}
-                  onContinueBrief={handleContinueBrief}
-                  onEditBrief={handleEditBrief}
-                  onUseAsTemplate={handleUseAsTemplate}
-                  generatingBriefs={state.generatingBriefs}
-                />
-              </div>
+          <div className="min-h-screen bg-black text-grey font-sans flex items-center justify-center">
+            <div className="w-full max-w-5xl p-6">
+              <BriefListScreen
+                clientId={state.selectedClientId!}
+                clientName={state.selectedClientName!}
+                onBack={handleBackToClients}
+                onCreateBrief={handleCreateBrief}
+                onContinueBrief={handleContinueBrief}
+                onEditBrief={handleEditBrief}
+                onUseAsTemplate={handleUseAsTemplate}
+                generatingBriefs={state.generatingBriefs}
+              />
             </div>
           </div>
           {/* Keep App components mounted but hidden during background generation */}

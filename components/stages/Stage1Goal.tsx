@@ -67,7 +67,7 @@ const SearchIntentDisplay: React.FC<{ searchIntent?: SearchIntent }> = ({ search
 
       {/* Reasoning */}
       {searchIntent.reasoning && (
-        <Callout variant="ai" title="AI Reasoning" className="mt-4">
+        <Callout variant="ai" title="AI Reasoning" className="mt-4" collapsible defaultCollapsed>
           {searchIntent.reasoning}
         </Callout>
       )}
@@ -111,7 +111,7 @@ const Stage1Goal: React.FC<StageProps> = ({ briefData, setBriefData }) => {
           hint="Be specific about the action or knowledge the reader should gain"
         />
         {briefData.page_goal?.reasoning && (
-          <Callout variant="ai" title="AI Reasoning" className="mt-4">
+          <Callout variant="ai" title="AI Reasoning" className="mt-4" collapsible defaultCollapsed>
             {briefData.page_goal.reasoning}
           </Callout>
         )}
@@ -137,7 +137,7 @@ const Stage1Goal: React.FC<StageProps> = ({ briefData, setBriefData }) => {
           hint="Consider demographics, experience level, and what they're trying to achieve"
         />
         {briefData.target_audience?.reasoning && (
-          <Callout variant="ai" title="AI Reasoning" className="mt-4">
+          <Callout variant="ai" title="AI Reasoning" className="mt-4" collapsible defaultCollapsed>
             {briefData.target_audience.reasoning}
           </Callout>
         )}

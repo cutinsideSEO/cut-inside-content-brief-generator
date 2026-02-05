@@ -47,7 +47,7 @@ const GapItem: React.FC<{
         placeholder={isTableStakes ? "Essential topic to cover..." : "Strategic opportunity to explore..."}
       />
       {item.reasoning && (
-        <Callout variant="ai" title="AI Reasoning" className="mt-3">
+        <Callout variant="ai" title="AI Reasoning" className="mt-3" collapsible defaultCollapsed>
           {item.reasoning}
         </Callout>
       )}
@@ -102,7 +102,7 @@ const Stage4ContentGapAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
         </div>
 
         {gapData.reasoning && (
-          <Callout variant="ai" title="AI Reasoning" className="mb-6">
+          <Callout variant="ai" title="AI Reasoning" className="mb-6" collapsible defaultCollapsed>
             {gapData.reasoning}
           </Callout>
         )}

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ContentBrief, KeywordSelection } from '../../types';
-import { KeyIcon, XIcon } from '../Icon';
+import { KeyIcon, XIcon, ChevronDownIcon } from '../Icon';
 import { Card, Badge, Callout, Textarea } from '../ui';
 import Button from '../Button';
 
@@ -11,6 +11,8 @@ interface StageProps {
 }
 
 const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keywordVolumeMap }) => {
+  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+
   const strategy = briefData.keyword_strategy || {
     primary_keywords: [],
     secondary_keywords: [],
@@ -65,42 +67,68 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
     return volume ? volume.toLocaleString() : 'N/A';
   }
 
+  const toggleRow = (rowKey: string) => {
+    setExpandedRowKey(prev => prev === rowKey ? null : rowKey);
+  };
+
   const renderKeywordRow = (kwSelection: KeywordSelection, type: 'Primary' | 'Secondary', index: number) => {
     const isPrimary = type === 'Primary';
+    const rowKey = `${type}-${index}`;
+    const isExpanded = expandedRowKey === rowKey;
+    const notePreview = kwSelection.notes ? kwSelection.notes.substring(0, 60) + (kwSelection.notes.length > 60 ? '...' : '') : '';
+
     return (
-      <tr key={`${type}-${index}`} className="border-b border-border-subtle align-top hover:bg-surface-hover transition-colors">
-        <td className="p-3">
-          <Badge variant={isPrimary ? 'teal' : 'default'} size="sm">
-            {type}
-          </Badge>
-        </td>
-        <td className="p-3 font-medium text-text-primary">{kwSelection.keyword}</td>
-        <td className="p-3 font-mono text-text-secondary text-sm">{getVolume(kwSelection.keyword)}</td>
-        <td className="p-3">
-          <Textarea
-            rows={2}
-            value={kwSelection.notes}
-            onChange={(e) => {
-              if (isPrimary) {
-                handlePrimaryNotesChange(index, e.target.value);
-              } else {
-                handleSecondaryNotesChange(index, e.target.value);
-              }
-            }}
-            placeholder="AI notes on keyword usage..."
-          />
-        </td>
-        <td className="p-3 text-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleRemoveKeyword(type.toLowerCase() as 'primary' | 'secondary', index)}
-            className="text-text-muted hover:text-status-error"
-          >
-            <XIcon className="h-4 w-4" />
-          </Button>
-        </td>
-      </tr>
+      <React.Fragment key={rowKey}>
+        <tr
+          className={`border-b border-border-subtle hover:bg-surface-hover transition-colors cursor-pointer ${isExpanded ? 'bg-surface-hover' : ''}`}
+          onClick={() => toggleRow(rowKey)}
+        >
+          <td className="p-3">
+            <Badge variant={isPrimary ? 'teal' : 'default'} size="sm">
+              {type}
+            </Badge>
+          </td>
+          <td className="p-3 font-medium text-text-primary">{kwSelection.keyword}</td>
+          <td className="p-3 font-mono text-text-secondary text-sm">{getVolume(kwSelection.keyword)}</td>
+          <td className="p-3 text-sm text-text-muted truncate max-w-[200px]">
+            {notePreview || <span className="italic">No notes</span>}
+          </td>
+          <td className="p-3 text-center">
+            <div className="flex items-center gap-1">
+              <ChevronDownIcon className={`h-4 w-4 text-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveKeyword(type.toLowerCase() as 'primary' | 'secondary', index);
+                }}
+                className="text-text-muted hover:text-status-error"
+              >
+                <XIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          </td>
+        </tr>
+        {isExpanded && (
+          <tr className="border-b border-border-subtle bg-surface-hover">
+            <td colSpan={5} className="p-4">
+              <Textarea
+                rows={3}
+                value={kwSelection.notes}
+                onChange={(e) => {
+                  if (isPrimary) {
+                    handlePrimaryNotesChange(index, e.target.value);
+                  } else {
+                    handleSecondaryNotesChange(index, e.target.value);
+                  }
+                }}
+                placeholder="AI notes on keyword usage..."
+              />
+            </td>
+          </tr>
+        )}
+      </React.Fragment>
     );
   };
 
@@ -118,7 +146,7 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
         </div>
 
         {strategy.reasoning && (
-          <Callout variant="ai" title="AI Reasoning" className="mb-6">
+          <Callout variant="ai" title="AI Reasoning" className="mb-6" collapsible defaultCollapsed>
             {strategy.reasoning}
           </Callout>
         )}
@@ -130,8 +158,8 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
                 <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[15%]">Type</th>
                 <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[25%]">Keyword</th>
                 <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[15%]">Volume</th>
-                <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[40%]">AI Notes</th>
-                <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[5%]"></th>
+                <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[35%]">Notes</th>
+                <th className="p-3 text-xs font-heading font-semibold text-text-secondary uppercase tracking-wider w-[10%]"></th>
               </tr>
             </thead>
             <tbody>

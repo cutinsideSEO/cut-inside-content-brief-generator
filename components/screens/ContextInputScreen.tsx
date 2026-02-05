@@ -71,6 +71,7 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [urlInput, setUrlInput] = useState('');
+  const [showLog, setShowLog] = useState(false);
 
   useEffect(() => {
     if (logContainerRef.current) {
@@ -115,172 +116,208 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
   }
 
   return (
-    <div className="max-w-7xl mx-auto animate-fade-in">
+    <div className="max-w-2xl mx-auto animate-fade-in">
         {isLoading ? (
             <ThemedLoader header="Analyzing Competitors..." />
         ) : (
             <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-12 h-12 bg-status-complete/10 rounded-full mb-4">
-                    <CheckIcon className="h-6 w-6 text-status-complete" />
-                </div>
-                <h1 className="text-2xl font-heading font-bold text-text-primary">Analysis Complete</h1>
-                <p className="text-md text-text-secondary mt-2">You may now add optional context for the AI or continue to the next step.</p>
+                <h1 className="text-2xl font-heading font-bold text-text-primary">Add context for the AI</h1>
+                <p className="text-md text-text-secondary mt-2">Optional - provide additional information to improve the brief</p>
             </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Panel: Analysis Log */}
-            <div className="lg:col-span-3">
-                <Card variant="default" padding="md" className="sticky top-24">
-                    <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-3">Analysis Log</h3>
-                    <div
-                        ref={logContainerRef}
-                        className="h-96 bg-surface-hover rounded-radius-md p-3 border border-border-subtle overflow-y-auto font-mono text-xs"
+        <div className="space-y-6">
+            {/* Collapsible Analysis Log */}
+            {analysisLogs.length > 0 && (
+                <div>
+                    <button
+                        type="button"
+                        onClick={() => setShowLog(!showLog)}
+                        className="flex items-center gap-2 text-sm text-text-muted hover:text-text-secondary transition-colors"
                     >
-                        {analysisLogs.map((log, index) => (
-                            <p
-                                key={index}
-                                className={`${log.toLowerCase().includes('error') ? 'text-status-error' : 'text-text-muted'}`}
+                        <svg
+                            className={`h-4 w-4 transition-transform duration-200 ${showLog ? 'rotate-90' : ''}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span className="font-heading font-semibold uppercase tracking-wider">Analysis Log ({analysisLogs.length})</span>
+                    </button>
+                    {showLog && (
+                        <div className="mt-2">
+                            <div
+                                ref={logContainerRef}
+                                className="h-48 bg-surface-hover rounded-radius-md p-3 border border-border-subtle overflow-y-auto font-mono text-xs"
                             >
-                                {log}
-                            </p>
-                        ))}
-                    </div>
-                </Card>
-            </div>
-
-            {/* Center Panel: Main Inputs */}
-            <div className="lg:col-span-6 space-y-6">
-                <Card variant="default" padding="lg">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
-                            <FileTextIcon className="h-5 w-5 text-teal" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-heading font-semibold text-text-primary">Subject Matter Details</h2>
-                            <p className="text-sm text-text-muted">Optional: Provide extra details about the topic for the AI</p>
-                        </div>
-                    </div>
-                    <Textarea
-                        value={subjectInfo}
-                        onChange={(e) => setSubjectInfo(e.target.value)}
-                        placeholder="e.g., Explain the core concepts, mention specific technologies to include..."
-                        rows={5}
-                        hint="Write details, upload files, or both"
-                    />
-                </Card>
-
-                <Card variant="default" padding="lg">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
-                            <svg className="h-5 w-5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-heading font-semibold text-text-primary">Brand Information</h2>
-                            <p className="text-sm text-text-muted">Optional: Describe the brand voice, style, and target audience</p>
-                        </div>
-                    </div>
-                    <Textarea
-                        value={brandInfo}
-                        onChange={(e) => setBrandInfo(e.target.value)}
-                        placeholder="e.g., We are a B2B SaaS company. Our tone is professional yet approachable. Avoid jargon..."
-                        rows={5}
-                    />
-                </Card>
-
-                <Button onClick={onContinue} disabled={isLoading} fullWidth glow size="lg">
-                    {isLoading ? "Analyzing..." : "Continue to Competitor Visualization"}
-                </Button>
-            </div>
-
-            {/* Right Panel: Context Uploaders */}
-            <div className="lg:col-span-3 space-y-6">
-                {/* File Upload */}
-                <Card variant="default" padding="md">
-                    <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-1">Upload Context Files</h3>
-                    <p className="text-xs text-text-muted mb-3">PDF, DOCX, TXT, or MD.</p>
-                    <label
-                        className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-radius-lg cursor-pointer transition-all ${
-                            isDragOver
-                                ? 'border-teal bg-teal/10'
-                                : 'border-border bg-surface-hover hover:bg-surface-active hover:border-border-emphasis'
-                        }`}
-                        onDrop={handleDrop}
-                        onDragEnter={handleDragEnter}
-                        onDragLeave={handleDragLeave}
-                        onDragOver={handleDragOver}
-                    >
-                        <div className="flex flex-col items-center justify-center py-4">
-                            <UploadCloudIcon className="w-8 h-8 mb-2 text-text-muted" />
-                            <p className="text-sm text-text-secondary"><span className="font-semibold text-teal">Click to upload</span></p>
-                        </div>
-                        <input type="file" className="hidden" accept=".pdf,.docx,.txt,.md" onChange={handleFileChange} multiple />
-                    </label>
-
-                    {contextFiles.length > 0 && (
-                        <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
-                            {contextFiles.map(file => {
-                                const status = fileContents.get(file.name);
-                                return (
-                                    <div key={file.name} className="bg-surface-hover p-2 rounded-radius-md border border-border-subtle flex items-center justify-between">
-                                        <div className="flex items-center gap-2 overflow-hidden">
-                                            <FileTextIcon className="h-4 w-4 text-teal flex-shrink-0" />
-                                            <p className="text-xs font-medium text-text-primary truncate">{file.name}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {status?.status === 'parsing' && <MiniSpinner className="h-4 w-4 text-text-muted" />}
-                                            {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-status-complete" />}
-                                            {status?.status === 'done' && status.error && <AlertTriangleIcon className="h-4 w-4 text-status-error" />}
-                                            <Button variant="ghost" size="sm" onClick={() => onRemoveFile(file.name)} className="!p-1">
-                                                <XIcon className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                {analysisLogs.map((log, index) => (
+                                    <p
+                                        key={index}
+                                        className={`${log.toLowerCase().includes('error') ? 'text-status-error' : 'text-text-muted'}`}
+                                    >
+                                        {log}
+                                    </p>
+                                ))}
+                            </div>
                         </div>
                     )}
-                </Card>
+                </div>
+            )}
 
-                {/* URL Scraper */}
-                <Card variant="default" padding="md">
-                    <h3 className="text-sm font-heading font-semibold text-text-secondary uppercase tracking-wider mb-1">Scrape Context URLs</h3>
-                    <p className="text-xs text-text-muted mb-3">Add URLs to include their content</p>
-                    <div className="flex items-center gap-2">
-                        <Input
-                            type="url"
-                            value={urlInput}
-                            onChange={(e) => setUrlInput(e.target.value)}
-                            placeholder="https://..."
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleAddUrl(); }}
-                            size="sm"
-                        />
-                        <Button onClick={handleAddUrl} variant="secondary" size="sm">Add</Button>
+            {/* Subject Matter Details */}
+            <Card variant="default" padding="lg">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                        <FileTextIcon className="h-5 w-5 text-teal" />
                     </div>
+                    <div>
+                        <h2 className="text-lg font-heading font-semibold text-text-primary">Subject Matter Details</h2>
+                        <p className="text-sm text-text-muted">Provide extra details about the topic for the AI</p>
+                    </div>
+                </div>
+                <Textarea
+                    value={subjectInfo}
+                    onChange={(e) => setSubjectInfo(e.target.value)}
+                    placeholder="e.g., Explain the core concepts, mention specific technologies to include..."
+                    rows={5}
+                    hint="Write details, upload files, or both"
+                />
+            </Card>
 
-                    {Array.from(urlContents.keys()).length > 0 && (
-                        <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
-                            {Array.from(urlContents.entries()).map(([url, status]) => (
-                                <div key={url} className="bg-surface-hover p-2 rounded-radius-md border border-border-subtle flex items-center justify-between">
+            {/* Brand Information */}
+            <Card variant="default" padding="lg">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                        <svg className="h-5 w-5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-heading font-semibold text-text-primary">Brand Information</h2>
+                        <p className="text-sm text-text-muted">Describe the brand voice, style, and target audience</p>
+                    </div>
+                </div>
+                <Textarea
+                    value={brandInfo}
+                    onChange={(e) => setBrandInfo(e.target.value)}
+                    placeholder="e.g., We are a B2B SaaS company. Our tone is professional yet approachable. Avoid jargon..."
+                    rows={5}
+                />
+            </Card>
+
+            {/* File Upload */}
+            <Card variant="default" padding="lg">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                        <UploadCloudIcon className="h-5 w-5 text-teal" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-heading font-semibold text-text-primary">Upload Context Files</h2>
+                        <p className="text-sm text-text-muted">PDF, DOCX, TXT, or MD files with relevant information</p>
+                    </div>
+                </div>
+                <label
+                    className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-radius-lg cursor-pointer transition-all ${
+                        isDragOver
+                            ? 'border-teal bg-teal/10'
+                            : 'border-border bg-surface-hover hover:bg-surface-active hover:border-border-emphasis'
+                    }`}
+                    onDrop={handleDrop}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                >
+                    <div className="flex flex-col items-center justify-center py-4">
+                        <UploadCloudIcon className="w-8 h-8 mb-2 text-text-muted" />
+                        <p className="text-sm text-text-secondary"><span className="font-semibold text-teal">Click to upload</span> or drag and drop</p>
+                    </div>
+                    <input type="file" className="hidden" accept=".pdf,.docx,.txt,.md" onChange={handleFileChange} multiple />
+                </label>
+
+                {contextFiles.length > 0 && (
+                    <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                        {contextFiles.map(file => {
+                            const status = fileContents.get(file.name);
+                            return (
+                                <div key={file.name} className="bg-surface-hover p-2 rounded-radius-md border border-border-subtle flex items-center justify-between">
                                     <div className="flex items-center gap-2 overflow-hidden">
-                                        <LinkIcon className="h-4 w-4 text-teal flex-shrink-0" />
-                                        <p className="text-xs font-medium text-text-primary truncate">{url}</p>
+                                        <FileTextIcon className="h-4 w-4 text-teal flex-shrink-0" />
+                                        <p className="text-xs font-medium text-text-primary truncate">{file.name}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {status?.status === 'scraping' && <MiniSpinner className="h-4 w-4 text-text-muted" />}
+                                        {status?.status === 'parsing' && <MiniSpinner className="h-4 w-4 text-text-muted" />}
                                         {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-status-complete" />}
                                         {status?.status === 'done' && status.error && <AlertTriangleIcon className="h-4 w-4 text-status-error" />}
-                                        <Button variant="ghost" size="sm" onClick={() => onRemoveUrl(url)} className="!p-1">
+                                        <Button variant="ghost" size="sm" onClick={() => onRemoveFile(file.name)} className="!p-1">
                                             <XIcon className="h-3 w-3" />
                                         </Button>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </Card>
+                            );
+                        })}
+                    </div>
+                )}
+            </Card>
+
+            {/* URL Scraper */}
+            <Card variant="default" padding="lg">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                        <LinkIcon className="h-5 w-5 text-teal" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-heading font-semibold text-text-primary">Scrape Context URLs</h2>
+                        <p className="text-sm text-text-muted">Add URLs to include their content as context</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Input
+                        type="url"
+                        value={urlInput}
+                        onChange={(e) => setUrlInput(e.target.value)}
+                        placeholder="https://..."
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddUrl(); }}
+                        size="sm"
+                    />
+                    <Button onClick={handleAddUrl} variant="secondary" size="sm">Add</Button>
+                </div>
+
+                {Array.from(urlContents.keys()).length > 0 && (
+                    <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                        {Array.from(urlContents.entries()).map(([url, status]) => (
+                            <div key={url} className="bg-surface-hover p-2 rounded-radius-md border border-border-subtle flex items-center justify-between">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                    <LinkIcon className="h-4 w-4 text-teal flex-shrink-0" />
+                                    <p className="text-xs font-medium text-text-primary truncate">{url}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {status?.status === 'scraping' && <MiniSpinner className="h-4 w-4 text-text-muted" />}
+                                    {status?.status === 'done' && !status.error && <CheckIcon className="h-4 w-4 text-status-complete" />}
+                                    {status?.status === 'done' && status.error && <AlertTriangleIcon className="h-4 w-4 text-status-error" />}
+                                    <Button variant="ghost" size="sm" onClick={() => onRemoveUrl(url)} className="!p-1">
+                                        <XIcon className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </Card>
+
+            {/* Bottom Actions */}
+            <div className="flex flex-col items-center gap-3 pt-2 pb-4">
+                <Button onClick={onContinue} disabled={isLoading} fullWidth glow size="lg">
+                    {isLoading ? "Analyzing..." : "Continue"}
+                </Button>
+                <button
+                    type="button"
+                    onClick={onContinue}
+                    disabled={isLoading}
+                    className="text-sm text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Skip this step
+                </button>
             </div>
         </div>
     </div>

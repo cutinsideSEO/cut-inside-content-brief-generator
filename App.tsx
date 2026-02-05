@@ -19,6 +19,7 @@ import BriefUploadScreen from './components/screens/BriefUploadScreen';
 
 // Import Supabase integration components
 import SaveStatusIndicator from './components/SaveStatusIndicator';
+import Sidebar from './components/Sidebar';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
 import { saveBriefState, updateBriefProgress, updateBriefStatus, updateBrief } from './services/briefService';
@@ -190,6 +191,7 @@ const App: React.FC<AppProps> = ({
   const [loadingStep, setLoadingStep] = useState<number | null>(null);
   const [isUploadedBrief, setIsUploadedBrief] = useState<boolean>(false);
   const [writerInstructions, setWriterInstructions] = useState<string>('');
+  const [dashboardSection, setDashboardSection] = useState<number | null>(null);
 
   // Content generation state
   const [generatedArticle, setGeneratedArticle] = useState<{ title: string; content: string } | null>(null);
@@ -1261,6 +1263,9 @@ const App: React.FC<AppProps> = ({
                   brandInfo={brandInfo}
                   contextFiles={Array.from(contextFiles.values())}
                   outputLanguage={outputLanguage}
+                  // Lifted sidebar state
+                  selectedSection={dashboardSection}
+                  onSelectSection={setDashboardSection}
                 />;
       case 'content_generation':
           return <ContentGenerationScreen
@@ -1287,37 +1292,29 @@ const App: React.FC<AppProps> = ({
 
   return (
     <SoundProvider>
-        <div className="min-h-screen bg-black text-grey font-sans">
-        <Header />
-        <main className="container mx-auto p-4 md:p-6 lg:p-8">
-            {/* Supabase mode header bar */}
-            {isSupabaseMode && (
-              <div className="flex items-center justify-between mb-4 -mt-2">
-                <div className="flex items-center gap-3">
-                  {onBackToBriefList && (
-                    <button
-                      onClick={onBackToBriefList}
-                      className="flex items-center gap-1.5 text-sm text-grey hover:text-brand-white transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                      Back to Briefs
-                    </button>
-                  )}
-                  {clientName && (
-                    <span className="text-grey/60 text-sm">
-                      {clientName}
-                    </span>
-                  )}
-                </div>
-                <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
-              </div>
-            )}
-            <div className="bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl shadow-2xl p-4 sm:p-6 lg:p-8">
+        <div className="min-h-screen bg-black text-grey font-sans flex flex-col">
+        <Header
+          isSupabaseMode={isSupabaseMode}
+          clientName={clientName}
+          onBackToBriefList={onBackToBriefList}
+          saveStatus={saveStatus}
+          lastSavedAt={lastSavedAt}
+        />
+        <div className="flex-1 flex overflow-hidden">
+            <Sidebar
+              currentView={currentView}
+              briefingStep={briefingStep}
+              selectedSection={dashboardSection}
+              onSelectSection={setDashboardSection}
+              staleSteps={staleSteps}
+              isUploadedBrief={isUploadedBrief}
+            />
+            <main className="flex-1 overflow-y-auto">
+              <div className="max-w-6xl mx-auto p-6 lg:p-8">
                 {renderCurrentView()}
-            </div>
-        </main>
+              </div>
+            </main>
+        </div>
         <div className="toast-container">
             {toasts.map(toast => (
             <Toast key={toast.id} {...toast} onDismiss={() => removeToast(toast.id)} />

@@ -55,6 +55,14 @@ const dfsEnvLogin = import.meta.env.VITE_DATAFORSEO_LOGIN || '';
 const dfsEnvPassword = import.meta.env.VITE_DATAFORSEO_PASSWORD || '';
 const hasDfsEnvCredentials = Boolean(dfsEnvLogin && dfsEnvPassword);
 
+const StepDots = ({ current, total }: { current: number; total: number }) => (
+  <div className="flex items-center justify-center gap-2 mb-8">
+    {Array.from({ length: total }, (_, i) => (
+      <div key={i} className={`w-2 h-2 rounded-full transition-colors ${i + 1 === current ? 'bg-teal' : i + 1 < current ? 'bg-teal/50' : 'bg-border'}`} />
+    ))}
+  </div>
+);
+
 const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis, isLoading, error, onStartUpload }) => {
   const [login, setLogin] = useState(dfsEnvLogin);
   const [password, setPassword] = useState(dfsEnvPassword);
@@ -71,6 +79,9 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   const [manualKeywordRows, setManualKeywordRows] = useState<KeywordRow[]>([
     { id: '1', keyword: '', volume: '' }
   ]);
+
+  // Sub-step state for the create flow
+  const [setupStep, setSetupStep] = useState<1 | 2 | 3>(1);
 
   // Feature 6: Model settings
   const [modelSettings, setModelSettings] = useState<ModelSettings>({
@@ -229,271 +240,335 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   }
 
-  const renderCreateFlow = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-        {/* Left Panel: Form */}
-        <div className="space-y-6">
-          {/* Step 1: Keywords */}
-          <Card variant="default" padding="lg">
-            <div className="flex items-center gap-3 mb-4">
-              <Badge variant="teal" size="md">1</Badge>
-              <div>
-                <h2 className="text-lg font-heading font-semibold text-text-primary">Provide Keywords</h2>
-                <p className="text-sm text-text-muted">Choose your preferred method to input keywords</p>
-              </div>
-            </div>
+  // Validation for step 1: keywords must be provided
+  const isStep1Valid = (): boolean => {
+    if (inputMethod === 'csv') {
+      return Boolean(csvFile && keywordColumn && volumeColumn);
+    }
+    // Manual: at least one row with both keyword and volume filled
+    return manualKeywordRows.some(row => row.keyword.trim() !== '' && row.volume.trim() !== '');
+  };
 
-            {/* Input method toggle */}
-            <Tabs
-              variant="pills"
-              items={[
-                { id: 'csv', label: 'Upload CSV' },
-                { id: 'manual', label: 'Manual Input' }
-              ]}
-              activeId={inputMethod}
-              onChange={(id) => setInputMethod(id as 'csv' | 'manual')}
-              className="mb-4"
-            />
+  // Validation for step 2: credentials must exist
+  const isStep2Valid = (): boolean => {
+    return Boolean(login && password);
+  };
 
-            {inputMethod === 'csv' && (
-              <>
-                {!csvFile ? (
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-radius-lg cursor-pointer bg-surface-hover hover:bg-surface-active transition-colors">
-                    <div className="flex flex-col items-center justify-center py-6">
-                      <UploadCloudIcon className="w-10 h-10 mb-2 text-text-muted" />
-                      <p className="text-sm text-text-secondary">
-                        <span className="font-semibold text-teal">Click to upload</span> or drag and drop
-                      </p>
-                    </div>
-                    <input type="file" className="hidden" accept=".csv" onChange={handleFileChange} />
-                  </label>
-                ) : (
-                  <Card variant="outline" padding="md">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
-                          <FileCodeIcon className="h-5 w-5 text-teal"/>
-                        </div>
-                        <div>
-                          <p className="font-semibold text-text-primary">{csvFile.name}</p>
-                          <p className="text-xs text-text-muted">{formatBytes(csvFile.size)}</p>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={resetFileState}>
-                        <XIcon className="h-4 w-4"/>
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-border-subtle">
-                      <div>
-                        <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Keyword Column</label>
-                        <select
-                          value={keywordColumn}
-                          onChange={(e) => setKeywordColumn(e.target.value)}
-                          className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
-                        >
-                          <option value="" disabled>Select column...</option>
-                          {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Volume Column</label>
-                        <select
-                          value={volumeColumn}
-                          onChange={(e) => setVolumeColumn(e.target.value)}
-                          className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
-                        >
-                          <option value="" disabled>Select column...</option>
-                          {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-              </>
-            )}
+  const handleNextFromStep1 = () => {
+    setLocalError('');
+    if (!isStep1Valid()) {
+      if (inputMethod === 'csv') {
+        setLocalError('Please upload a CSV file and select the keyword and volume columns.');
+      } else {
+        setLocalError('Please enter at least one keyword with its search volume.');
+      }
+      return;
+    }
+    setLocalError('');
+    setSetupStep(2);
+  };
 
-            {inputMethod === 'manual' && (
-              <KeywordTableInput
-                value={manualKeywordRows}
-                onChange={setManualKeywordRows}
-              />
-            )}
-          </Card>
+  const handleNextFromStep2 = () => {
+    setLocalError('');
+    if (!isStep2Valid()) {
+      setLocalError('Please enter your DataForSEO credentials to continue.');
+      return;
+    }
+    setLocalError('');
+    setSetupStep(3);
+  };
 
-          {/* Step 2: Credentials (if not env configured) */}
-          {!hasDfsEnvCredentials && (
-            <Card variant="default" padding="lg">
-              <div className="flex items-center gap-3 mb-4">
-                <Badge variant="teal" size="md">2</Badge>
-                <div>
-                  <h2 className="text-lg font-heading font-semibold text-text-primary">Enter Credentials</h2>
-                  <p className="text-sm text-text-muted">Your DataForSEO API credentials</p>
+  const renderSetupStep1 = () => (
+    <div className="max-w-2xl mx-auto animate-fade-in">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-heading font-bold text-text-primary">What keywords should we target?</h2>
+        <p className="text-text-secondary mt-2">Upload a CSV or enter keywords manually to get started.</p>
+      </div>
+
+      <StepDots current={1} total={3} />
+
+      <Card variant="default" padding="lg">
+        {/* Input method toggle */}
+        <Tabs
+          variant="pills"
+          items={[
+            { id: 'csv', label: 'Upload CSV' },
+            { id: 'manual', label: 'Manual Input' }
+          ]}
+          activeId={inputMethod}
+          onChange={(id) => setInputMethod(id as 'csv' | 'manual')}
+          className="mb-6"
+        />
+
+        {inputMethod === 'csv' && (
+          <>
+            {!csvFile ? (
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-radius-lg cursor-pointer bg-surface-hover hover:bg-surface-active transition-colors">
+                <div className="flex flex-col items-center justify-center py-6">
+                  <UploadCloudIcon className="w-10 h-10 mb-2 text-text-muted" />
+                  <p className="text-sm text-text-secondary">
+                    <span className="font-semibold text-teal">Click to upload</span> or drag and drop
+                  </p>
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="DataForSEO Login"
-                  value={login}
-                  onChange={(e) => setLogin(e.target.value)}
-                  placeholder="Enter login..."
-                />
-                <Input
-                  type="password"
-                  label="DataForSEO Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password..."
-                />
-              </div>
-            </Card>
-          )}
+                <input type="file" className="hidden" accept=".csv" onChange={handleFileChange} />
+              </label>
+            ) : (
+              <Card variant="outline" padding="md">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                      <FileCodeIcon className="h-5 w-5 text-teal"/>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-text-primary">{csvFile.name}</p>
+                      <p className="text-xs text-text-muted">{formatBytes(csvFile.size)}</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={resetFileState}>
+                    <XIcon className="h-4 w-4"/>
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-border-subtle">
+                  <div>
+                    <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Keyword Column</label>
+                    <select
+                      value={keywordColumn}
+                      onChange={(e) => setKeywordColumn(e.target.value)}
+                      className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                    >
+                      <option value="" disabled>Select column...</option>
+                      {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Volume Column</label>
+                    <select
+                      value={volumeColumn}
+                      onChange={(e) => setVolumeColumn(e.target.value)}
+                      className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+                    >
+                      <option value="" disabled>Select column...</option>
+                      {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </>
+        )}
 
-          {/* Step 3: Analysis Settings */}
+        {inputMethod === 'manual' && (
+          <KeywordTableInput
+            value={manualKeywordRows}
+            onChange={setManualKeywordRows}
+          />
+        )}
+      </Card>
+
+      {(error || localError) && (
+        <div className="mt-4">
+          <Alert variant="error" title="Error">
+            {error || localError}
+          </Alert>
+        </div>
+      )}
+
+      <div className="mt-6">
+        <Button onClick={handleNextFromStep1} fullWidth size="lg">
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderSetupStep2 = () => (
+    <div className="max-w-lg mx-auto animate-fade-in">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-heading font-bold text-text-primary">Where are your readers?</h2>
+        <p className="text-text-secondary mt-2">Set the target market and language for your analysis.</p>
+      </div>
+
+      <StepDots current={2} total={3} />
+
+      <div className="space-y-6">
+        <Card variant="default" padding="lg">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">SERP Country</label>
+              <select
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+              >
+                {countries.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">SERP Language</label>
+              <select
+                value={serpLanguage}
+                onChange={(e) => setSerpLanguage(e.target.value)}
+                className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+              >
+                {languages.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Brief Output Language</label>
+              <select
+                value={outputLanguage}
+                onChange={(e) => setOutputLanguage(e.target.value)}
+                className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
+              >
+                {languages.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+          </div>
+        </Card>
+
+        {!hasDfsEnvCredentials && (
           <Card variant="default" padding="lg">
-            <div className="flex items-center gap-3 mb-4">
-              <Badge variant="teal" size="md">{hasDfsEnvCredentials ? '2' : '3'}</Badge>
-              <div>
-                <h2 className="text-lg font-heading font-semibold text-text-primary">Configure Analysis</h2>
-                <p className="text-sm text-text-muted">Define the target market and output language</p>
-              </div>
+            <div className="mb-4">
+              <h3 className="font-heading font-semibold text-text-primary">DataForSEO Credentials</h3>
+              <p className="text-sm text-text-muted mt-1">Required to fetch SERP data for your keywords.</p>
             </div>
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">SERP Country</label>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
-                >
-                  {countries.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">SERP Language</label>
-                  <select
-                    value={serpLanguage}
-                    onChange={(e) => setSerpLanguage(e.target.value)}
-                    className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
-                  >
-                    {languages.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-heading font-medium text-text-muted uppercase tracking-wider mb-2">Brief Output Language</label>
-                  <select
-                    value={outputLanguage}
-                    onChange={(e) => setOutputLanguage(e.target.value)}
-                    className="w-full p-3 bg-surface-elevated border border-border rounded-radius-md text-text-primary focus:ring-2 focus:ring-teal focus:border-teal transition-all"
-                  >
-                    {languages.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-              </div>
+              <Input
+                label="DataForSEO Login"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                placeholder="Enter login..."
+              />
+              <Input
+                type="password"
+                label="DataForSEO Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password..."
+              />
             </div>
           </Card>
+        )}
+      </div>
 
-          {/* Template URL */}
-          <Card variant="outline" padding="md">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-radius-md bg-teal/10 flex items-center justify-center">
-                <LinkIcon className="h-4 w-4 text-teal" />
-              </div>
-              <div>
-                <h3 className="font-heading font-semibold text-text-primary">Use Content as Template</h3>
-                <p className="text-xs text-text-muted">Extract heading structure from existing content</p>
-              </div>
+      {(error || localError) && (
+        <div className="mt-4">
+          <Alert variant="error" title="Error">
+            {error || localError}
+          </Alert>
+        </div>
+      )}
+
+      <div className="mt-6 flex items-center gap-4">
+        <button
+          onClick={() => { setLocalError(''); setSetupStep(1); }}
+          className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+        >
+          Back
+        </button>
+        <div className="flex-1">
+          <Button onClick={handleNextFromStep2} fullWidth size="lg">
+            Next
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSetupStep3 = () => (
+    <div className="max-w-2xl mx-auto animate-fade-in">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-heading font-bold text-text-primary">Fine-tune your brief</h2>
+        <p className="text-text-secondary mt-2">Optional settings to customize the output. You can skip straight to analysis.</p>
+      </div>
+
+      <StepDots current={3} total={3} />
+
+      <div className="space-y-6">
+        {/* Template URL */}
+        <Card variant="default" padding="lg">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-radius-md bg-teal/10 flex items-center justify-center">
+              <LinkIcon className="h-4 w-4 text-teal" />
             </div>
-            <Input
-              type="url"
-              placeholder="https://example.com/article-to-use-as-template"
-              value={templateUrl}
-              onChange={(e) => setTemplateUrl(e.target.value)}
-            />
-          </Card>
-
-          {/* Length Constraints */}
-          <LengthSettings
-            constraints={lengthConstraints}
-            onChange={setLengthConstraints}
+            <div>
+              <h3 className="font-heading font-semibold text-text-primary">Use Content as Template</h3>
+              <p className="text-xs text-text-muted">Extract heading structure from existing content</p>
+            </div>
+          </div>
+          <Input
+            type="url"
+            placeholder="https://example.com/article-to-use-as-template"
+            value={templateUrl}
+            onChange={(e) => setTemplateUrl(e.target.value)}
           />
+        </Card>
 
-          {/* Advanced Settings */}
-          <Card variant="outline" padding="none">
-            <button
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-hover transition-colors rounded-radius-lg"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-radius-md bg-teal/10 flex items-center justify-center">
-                  <SettingsIcon className="h-4 w-4 text-teal" />
-                </div>
-                <div>
-                  <h3 className="font-heading font-semibold text-text-primary">Advanced Settings</h3>
-                  <p className="text-sm text-text-muted">AI model selection & configuration</p>
-                </div>
-              </div>
-              <ChevronDownIcon className={`h-5 w-5 text-text-muted transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-            </button>
-            {showAdvanced && (
-              <div className="px-4 pb-4">
-                <ModelSelector settings={modelSettings} onChange={setModelSettings} />
-              </div>
-            )}
-          </Card>
+        {/* Length Constraints */}
+        <LengthSettings
+          constraints={lengthConstraints}
+          onChange={setLengthConstraints}
+        />
 
-          {/* Submit Button */}
+        {/* Advanced Settings */}
+        <Card variant="outline" padding="none">
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-hover transition-colors rounded-radius-lg"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-radius-md bg-teal/10 flex items-center justify-center">
+                <SettingsIcon className="h-4 w-4 text-teal" />
+              </div>
+              <div>
+                <h3 className="font-heading font-semibold text-text-primary">Advanced Settings</h3>
+                <p className="text-sm text-text-muted">AI model selection & configuration</p>
+              </div>
+            </div>
+            <ChevronDownIcon className={`h-5 w-5 text-text-muted transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+          </button>
+          {showAdvanced && (
+            <div className="px-4 pb-4">
+              <ModelSelector settings={modelSettings} onChange={setModelSettings} />
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {(error || localError) && (
+        <div className="mt-4">
+          <Alert variant="error" title="Error">
+            {error || localError}
+          </Alert>
+        </div>
+      )}
+
+      <div className="mt-6 flex items-center gap-4">
+        <button
+          onClick={() => { setLocalError(''); setSetupStep(2); }}
+          className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+        >
+          Back
+        </button>
+        <div className="flex-1">
           <Button onClick={handleSubmit} disabled={isLoading} fullWidth glow size="lg">
             {isLoading ? 'Starting Analysis...' : 'Start Analysis'}
           </Button>
-
-          {(error || localError) && (
-            <Alert variant="error" title="Error">
-              {error || localError}
-            </Alert>
-          )}
         </div>
-
-        {/* Right Panel: Info */}
-        <div className="lg:sticky lg:top-24 lg:self-start">
-          <Card variant="elevated" padding="lg">
-            <h2 className="text-2xl font-heading font-bold text-text-primary mb-4">The Strategist's Studio</h2>
-            <p className="text-text-secondary mb-6">
-              This tool transforms raw keyword data into a comprehensive, actionable content brief designed to dominate search rankings.
-            </p>
-            <div className="space-y-5">
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded-full bg-teal flex items-center justify-center flex-shrink-0">
-                  <span className="text-surface-primary font-heading font-bold text-sm">1</span>
-                </div>
-                <div>
-                  <h3 className="font-heading font-semibold text-text-primary">Analyze & Strategize</h3>
-                  <p className="text-sm text-text-muted mt-1">We analyze the top 10 SERP results for your keywords, identifying what top-ranking content does right and where the strategic gaps are.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded-full bg-teal flex items-center justify-center flex-shrink-0">
-                  <span className="text-surface-primary font-heading font-bold text-sm">2</span>
-                </div>
-                <div>
-                  <h3 className="font-heading font-semibold text-text-primary">Build Your Brief</h3>
-                  <p className="text-sm text-text-muted mt-1">Collaborate with the AI to build a hierarchical article structure, define on-page SEO, and generate FAQs based on the data.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded-full bg-teal flex items-center justify-center flex-shrink-0">
-                  <span className="text-surface-primary font-heading font-bold text-sm">3</span>
-                </div>
-                <div>
-                  <h3 className="font-heading font-semibold text-text-primary">Generate Content</h3>
-                  <p className="text-sm text-text-muted mt-1">Once the brief is finalized, the AI will write a full-length, SEO-optimized article based on your strategic blueprint.</p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
+      </div>
     </div>
   );
+
+  const renderCreateFlow = () => {
+    switch (setupStep) {
+      case 1:
+        return renderSetupStep1();
+      case 2:
+        return renderSetupStep2();
+      case 3:
+        return renderSetupStep3();
+    }
+  };
 
   return (
     <div className="animate-fade-in">

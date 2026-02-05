@@ -94,7 +94,7 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
         )}
 
         {reasoning && (
-          <Callout variant="ai" title="AI Reasoning" className="mt-3">
+          <Callout variant="ai" title="AI Reasoning" className="mt-3" collapsible defaultCollapsed>
             {reasoning}
           </Callout>
         )}

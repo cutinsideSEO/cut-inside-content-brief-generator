@@ -57,7 +57,7 @@ const Stage6Faqs: React.FC<StageProps> = ({ briefData, setBriefData }) => {
         </div>
 
         {faqsData.reasoning && (
-          <Callout variant="ai" title="AI Reasoning" className="mb-6">
+          <Callout variant="ai" title="AI Reasoning" className="mb-6" collapsible defaultCollapsed>
             {faqsData.reasoning}
           </Callout>
         )}

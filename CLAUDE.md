@@ -28,6 +28,9 @@ npm run preview       # Preview production build
 npm test              # Run tests in watch mode
 npm run test:run      # Run tests once (CI mode)
 npm run test:coverage # Run tests with coverage report
+
+# Run a specific test file
+npx vitest run tests/services/dataforseoService.test.ts
 ```
 
 ## Environment Variables
@@ -97,7 +100,7 @@ index.tsx → AppWrapper.tsx → AuthProvider
 │   ├── AuthContext.tsx # Access code authentication state
 │   └── ToastContext.tsx # Global toast notification system
 ├── hooks/
-│   ├── useAutoSave.ts  # Debounced auto-save to Supabase (2s debounce)
+│   ├── useAutoSave.ts  # Debounced auto-save to Supabase (500ms debounce)
 │   └── useBriefLoader.ts # Load brief data from Supabase
 ├── services/
 │   ├── supabaseClient.ts    # Supabase client + isSupabaseConfigured()
@@ -199,6 +202,14 @@ Check if configured:
 ```typescript
 import { isSupabaseConfigured } from './services/supabaseClient';
 if (isSupabaseConfigured()) { /* use Supabase */ }
+```
+
+### Path Alias
+
+The `@/` alias maps to project root. Use for imports:
+```typescript
+import { Card } from '@/components/ui';
+import { geminiService } from '@/services/geminiService';
 ```
 
 ## Testing

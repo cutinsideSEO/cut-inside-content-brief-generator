@@ -50,8 +50,8 @@ const PreWizardHeader: React.FC<PreWizardHeaderProps> = ({
           {/* Left side: Logo + Title + Breadcrumb */}
           <div className="flex items-center gap-4">
             <img
-              src="https://cutinside.com/llm-perception-tool/logo.png"
-              alt="CUT INSIDE Logo"
+              src="https://cutinside.com/wp-content/uploads/2025/01/Logo.svg"
+              alt="Cut Inside Logo"
               className="h-7 w-auto"
             />
             <div className="hidden md:flex items-center gap-2 pl-4 border-l border-gray-200">

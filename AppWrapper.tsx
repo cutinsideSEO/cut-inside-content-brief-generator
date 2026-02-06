@@ -310,7 +310,7 @@ const AppWrapperInner: React.FC = () => {
             {/* Brand Panel — Left Half (hidden on mobile) */}
             <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-teal-600 to-teal-800 items-center justify-center relative overflow-hidden">
               <div className="relative z-10 text-center px-12">
-                <img src="https://cutinside.com/llm-perception-tool/logo.png" alt="CUT INSIDE" className="h-12 w-auto mx-auto mb-6 brightness-0 invert" />
+                <img src="https://cutinside.com/wp-content/uploads/2025/01/Logo.svg" alt="Cut Inside" className="h-12 w-auto mx-auto mb-6 brightness-0 invert" />
                 <h1 className="text-3xl font-heading font-bold text-white mb-3">Content Brief Generator</h1>
                 <p className="text-teal-100 text-lg max-w-md mx-auto">AI-powered SEO content strategy for data-driven briefs</p>
               </div>

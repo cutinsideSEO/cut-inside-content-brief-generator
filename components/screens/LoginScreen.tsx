@@ -37,11 +37,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       <div className="animate-fade-in">
         {/* Logo/Header */}
         <div className="text-center mb-8 lg:hidden">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-teal/10 rounded-lg mb-4">
-            <svg className="w-8 h-8 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
+          <img
+            src="https://cutinside.com/wp-content/uploads/2025/01/Logo.svg"
+            alt="Cut Inside Logo"
+            className="h-10 w-auto mx-auto mb-4"
+          />
           <h1 className="text-3xl font-heading font-bold text-gray-900 mb-2">
             Welcome to Cut Inside
           </h1>
@@ -77,11 +77,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     <div className="animate-fade-in">
       {/* Logo/Header */}
       <div className="text-center mb-8 lg:hidden">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-teal/10 rounded-lg mb-4">
-          <svg className="w-8 h-8 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
+        <img
+          src="https://cutinside.com/wp-content/uploads/2025/01/Logo.svg"
+          alt="Cut Inside Logo"
+          className="h-10 w-auto mx-auto mb-4"
+        />
         <h1 className="text-3xl font-heading font-bold text-gray-900 mb-2">
           Welcome to Cut Inside
         </h1>

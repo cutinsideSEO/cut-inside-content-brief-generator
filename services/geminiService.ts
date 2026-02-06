@@ -1,7 +1,7 @@
 import { Type } from "@google/genai";
-import { getSystemPrompt, getStructureEnrichmentPrompt, getStructureResourceAnalysisPrompt, getContentGenerationPrompt, TEMPLATE_EXTRACTION_PROMPT, ADAPT_HEADINGS_PROMPT, PARAGRAPH_REGENERATION_PROMPT, REWRITE_SELECTION_PROMPTS, THINKING_LEVEL_BY_STEP, getLengthConstraintPrompt, VALIDATION_PROMPT, EEAT_SIGNALS_PROMPT, CONTENT_VALIDATION_SYSTEM_PROMPT, CONTENT_VALIDATION_PROMPT, CONTENT_VALIDATION_FOLLOWUP_PROMPT } from '../constants';
+import { getSystemPrompt, getStructureEnrichmentPrompt, getStructureResourceAnalysisPrompt, getContentGenerationPrompt, TEMPLATE_EXTRACTION_PROMPT, ADAPT_HEADINGS_PROMPT, PARAGRAPH_REGENERATION_PROMPT, REWRITE_SELECTION_PROMPTS, THINKING_LEVEL_BY_STEP, getLengthConstraintPrompt, VALIDATION_PROMPT, EEAT_SIGNALS_PROMPT, CONTENT_VALIDATION_PROMPT, CONTENT_VALIDATION_FOLLOWUP_PROMPT, getParagraphRegenerationSystemPrompt, getRewriteSelectionSystemPrompt, getBriefValidationSystemPrompt, getEEATSignalsSystemPrompt, getContentValidationSystemPrompt, getArticleOptimizerSystemPrompt, ARTICLE_THINKING_BUDGET, ARTICLE_OPTIMIZER_THINKING_BUDGET, VALIDATION_CHUNK_THRESHOLD, WC_PROMPT_MIN, WC_PROMPT_MAX, WC_STRICT_MIN, WC_STRICT_MAX } from '../constants';
 import type { ContentBrief, ArticleStructure, OutlineItem, ModelSettings, GeminiModel, ThinkingLevel, HeadingNode, RewriteAction, LengthConstraints, BriefValidation, EEATSignals, ContentValidationResult } from "../types";
-import { stripReasoningFromBrief } from './briefContextService';
+import { stripReasoningFromBrief, countWords, checkTokenBudget, truncateCompetitorText } from './briefContextService';
 import { supabase } from './supabaseClient';
 
 // Supabase project URL for edge function calls
@@ -663,6 +663,9 @@ export const generateBriefStep = async (params: GenerationParams): Promise<Parti
     // Feature 3: Length constraints support
     const lengthContext = lengthConstraints ? getLengthConstraintPrompt(lengthConstraints.globalTarget) : '';
 
+    // Token safety: truncate competitor data if it exceeds safe limits
+    const safeCompetitorDataJson = truncateCompetitorText(competitorDataJson);
+
     const prompt = `
       ${stepSpecificContext}
       ${regenerationContext}
@@ -671,7 +674,7 @@ export const generateBriefStep = async (params: GenerationParams): Promise<Parti
       ${groundTruthText ? `**"Ground Truth" Competitor Text (Full text from top 3 competitors):**\n${groundTruthText}` : ''}
 
       **Competitor Data:**
-      ${competitorDataJson}
+      ${safeCompetitorDataJson}
 
       **User-Provided Subject Matter Context:**
       ${subjectInfo || "Not provided."}
@@ -686,6 +689,8 @@ export const generateBriefStep = async (params: GenerationParams): Promise<Parti
 
       Please generate the new JSON for step ${step}, incorporating the feedback into the original JSON if provided.
     `;
+
+    checkTokenBudget(`generateBriefStep-step${step}`, prompt);
 
     // Build generation config with Gemini 3 support
     const genConfig = buildGenerationConfig(step, schema);
@@ -763,7 +768,7 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
         ---
 
         **📏 WORD COUNT REQUIREMENT:**
-        You MUST write between **${Math.round(sectionToWrite.target_word_count * 0.85)} and ${Math.round(sectionToWrite.target_word_count * 1.15)} words** for this section (target: ${sectionToWrite.target_word_count}).
+        You MUST write between **${Math.round(sectionToWrite.target_word_count * WC_PROMPT_MIN)} and ${Math.round(sectionToWrite.target_word_count * WC_PROMPT_MAX)} words** for this section (target: ${sectionToWrite.target_word_count}).
         `;
     }
 
@@ -787,7 +792,7 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
 - Total article target: ${globalWordTarget} words
 - Words written so far: ${wordsWrittenSoFar || 0}
 - Words remaining in budget: ${wordsRemaining}
-- **YOU MUST write EXACTLY between ${Math.round(effectiveTarget * 0.9)} and ${Math.round(effectiveTarget * 1.1)} words for this section. Do NOT go outside this range.**
+- **YOU MUST write EXACTLY between ${Math.round(effectiveTarget * WC_STRICT_MIN)} and ${Math.round(effectiveTarget * WC_STRICT_MAX)} words for this section. Do NOT go outside this range.**
 - Going over budget will make the article too long. Be concise and focused.
 - If you need to cut content, prioritize the most valuable information.
 `;
@@ -798,7 +803,7 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
 **WORD COUNT REQUIREMENT:**
 - Total article target: ${globalWordTarget} words
 - Words written so far: ${wordsWrittenSoFar || 0}
-- You MUST write between **${Math.round(effectiveTarget * 0.85)} and ${Math.round(effectiveTarget * 1.15)} words** for this section (target: ${effectiveTarget}).
+- You MUST write between **${Math.round(effectiveTarget * WC_PROMPT_MIN)} and ${Math.round(effectiveTarget * WC_PROMPT_MAX)} words** for this section (target: ${effectiveTarget}).
 `;
         }
     }
@@ -876,7 +881,7 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
         ---
 
         **CONTENT WRITTEN SO FAR:**
-        ${contentSoFar.slice(-3000)}
+        ${contentSoFar.slice(-16000)}
 
         ---
 
@@ -902,6 +907,8 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
         Now, write the body content for the current section.
     `;
 
+    checkTokenBudget('generateArticleSection', prompt);
+
     try {
         // Use streaming if callback provided
         if (onStream) {
@@ -909,7 +916,10 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
             const stream = callGeminiStream(
                 modelName,
                 prompt,
-                { systemInstruction }
+                {
+                    systemInstruction,
+                    ...(currentModelSettings.model.includes('gemini-3') ? { thinkingConfig: { thinkingBudget: ARTICLE_THINKING_BUDGET } } : {}),
+                }
             );
 
             for await (const chunk of stream) {
@@ -929,7 +939,10 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
             const response = await callGemini(
                 modelName,
                 prompt,
-                { systemInstruction }
+                {
+                    systemInstruction,
+                    ...(currentModelSettings.model.includes('gemini-3') ? { thinkingConfig: { thinkingBudget: ARTICLE_THINKING_BUDGET } } : {}),
+                }
             );
             const text = response.text;
             if (!text) {
@@ -1077,7 +1090,7 @@ ${PARAGRAPH_REGENERATION_PROMPT
         .replace('{after}', after)
         .replace('{feedback}', feedback)}`;
 
-    const systemInstruction = `You are an expert content editor. Your entire response must be in **${language}**. Return only the rewritten paragraph, nothing else. Ensure the rewritten paragraph flows naturally with the content before and after it.`;
+    const systemInstruction = getParagraphRegenerationSystemPrompt(language);
 
     try {
         return await retryOperation(async () => {
@@ -1115,7 +1128,7 @@ export const rewriteSelection = async (
         prompt = prompt.replace('{instruction}', customInstruction);
     }
 
-    const systemInstruction = `You are an expert content editor. Your entire response must be in **${language}**. Return only the rewritten text, nothing else.`;
+    const systemInstruction = getRewriteSelectionSystemPrompt(language);
 
     try {
         return await retryOperation(async () => {
@@ -1143,7 +1156,7 @@ export const validateBrief = async (
 
     const prompt = VALIDATION_PROMPT.replace('{briefJson}', JSON.stringify(brief, null, 2));
 
-    const systemInstruction = `You are an expert SEO Content Strategist reviewing a content brief for quality. Your entire response must be in **${language}**. Return only valid JSON.`;
+    const systemInstruction = getBriefValidationSystemPrompt(language);
 
     try {
         return await retryOperation(async () => {
@@ -1184,7 +1197,7 @@ Primary Keywords: ${brief.keyword_strategy?.primary_keywords?.map(k => k.keyword
         .replace('{topicContext}', topicContext)
         .replace('{competitorInsights}', competitorInsights);
 
-    const systemInstruction = `You are an expert SEO Content Strategist specializing in E-E-A-T optimization. Your entire response must be in **${language}**. Return only valid JSON with 'experience', 'expertise', 'authority', 'trust' arrays and a 'reasoning' field.`;
+    const systemInstruction = getEEATSignalsSystemPrompt(language);
 
     try {
         return await retryOperation(async () => {
@@ -1303,53 +1316,121 @@ export const validateGeneratedContent = async (params: {
 }): Promise<ContentValidationResult> => {
     const { generatedContent, brief, lengthConstraints, userInstructions, previousValidation, language } = params;
     const modelName = currentModelSettings.model;
+    const wordCount = countWords(generatedContent);
 
-    // Build the prompt based on whether this is a follow-up validation
-    let prompt: string;
+    checkTokenBudget('validateGeneratedContent', generatedContent + JSON.stringify(brief));
 
-    if (previousValidation && userInstructions) {
-        // Follow-up validation with user feedback
-        prompt = CONTENT_VALIDATION_FOLLOWUP_PROMPT
-            .replace('{previousValidation}', JSON.stringify(previousValidation, null, 2))
-            .replace('{userInstructions}', userInstructions)
-            .replace('{briefJson}', JSON.stringify(brief, null, 2))
-            .replace('{generatedContent}', generatedContent);
+    const systemInstruction = getContentValidationSystemPrompt(language);
+
+    if (wordCount > VALIDATION_CHUNK_THRESHOLD) {
+        // Chunked validation for long articles
+        const sections = generatedContent.split(/(?=^## )/m).filter(s => s.trim());
+        const chunkResults: ContentValidationResult[] = [];
+
+        for (const section of sections) {
+            const headingMatch = section.match(/^##\s+(.+)/m);
+            const sectionHeading = headingMatch?.[1] || '';
+
+            const chunkPrompt = CONTENT_VALIDATION_PROMPT
+                .replace('{briefJson}', JSON.stringify(brief, null, 2))
+                .replace('{generatedContent}', section)
+                .replace('{targetWordCount}', (lengthConstraints?.globalTarget || brief.article_structure?.word_count_target || 0).toString())
+                .replace('{strictMode}', lengthConstraints?.strictMode ? 'Yes' : 'No')
+                .replace('{userInstructions}', userInstructions ? `\n**USER INSTRUCTIONS:**\n${userInstructions}\n` : '');
+
+            checkTokenBudget(`validateChunk-${sectionHeading}`, chunkPrompt);
+
+            const chunkResult = await retryOperation(async () => {
+                const response = await callGemini(
+                    modelName,
+                    chunkPrompt,
+                    {
+                        systemInstruction,
+                        responseMimeType: "application/json",
+                        responseSchema: contentValidationSchema,
+                    }
+                );
+                const text = response.text;
+                if (!text) throw new Error("Empty response from AI for chunk validation.");
+                return JSON.parse(text) as ContentValidationResult;
+            });
+
+            chunkResults.push(chunkResult);
+        }
+
+        // Merge chunked results
+        const mergedChanges = chunkResults.flatMap(r => r.proposedChanges);
+        const avgScore = Math.round(chunkResults.reduce((sum, r) => sum + r.overallScore, 0) / chunkResults.length);
+        const mergedSummary = chunkResults.map(r => r.summary).join(' ');
+
+        const avgCategoryScore = (getter: (r: ContentValidationResult) => { score: number; explanation: string }) => {
+            const scores = chunkResults.map(r => getter(r));
+            return {
+                score: Math.round(scores.reduce((sum, s) => sum + s.score, 0) / scores.length),
+                explanation: scores.map(s => s.explanation).join(' '),
+            };
+        };
+
+        return {
+            overallScore: avgScore,
+            scores: {
+                briefAlignment: avgCategoryScore(r => r.scores.briefAlignment),
+                paragraphLengths: avgCategoryScore(r => r.scores.paragraphLengths),
+                totalWordCount: {
+                    actual: countWords(generatedContent),
+                    target: lengthConstraints?.globalTarget || brief.article_structure?.word_count_target || 0,
+                    explanation: chunkResults.map(r => r.scores.totalWordCount.explanation).join(' '),
+                },
+                keywordUsage: avgCategoryScore(r => r.scores.keywordUsage),
+                structureAdherence: avgCategoryScore(r => r.scores.structureAdherence),
+            },
+            proposedChanges: mergedChanges,
+            summary: mergedSummary,
+        };
     } else {
-        // Initial validation
-        const targetWordCount = lengthConstraints?.globalTarget || brief.article_structure?.word_count_target || 0;
-        const strictMode = lengthConstraints?.strictMode ? 'Yes' : 'No';
-        const userInstructionsSection = userInstructions
-            ? `\n**USER INSTRUCTIONS:**\n${userInstructions}\n`
-            : '';
+        // Standard validation for shorter articles
+        let prompt: string;
 
-        prompt = CONTENT_VALIDATION_PROMPT
-            .replace('{briefJson}', JSON.stringify(brief, null, 2))
-            .replace('{generatedContent}', generatedContent)
-            .replace('{targetWordCount}', targetWordCount.toString())
-            .replace('{strictMode}', strictMode)
-            .replace('{userInstructions}', userInstructionsSection);
-    }
+        if (previousValidation && userInstructions) {
+            prompt = CONTENT_VALIDATION_FOLLOWUP_PROMPT
+                .replace('{previousValidation}', JSON.stringify(previousValidation, null, 2))
+                .replace('{userInstructions}', userInstructions)
+                .replace('{briefJson}', JSON.stringify(brief, null, 2))
+                .replace('{generatedContent}', generatedContent);
+        } else {
+            const targetWordCount = lengthConstraints?.globalTarget || brief.article_structure?.word_count_target || 0;
+            const strictMode = lengthConstraints?.strictMode ? 'Yes' : 'No';
+            const userInstructionsSection = userInstructions
+                ? `\n**USER INSTRUCTIONS:**\n${userInstructions}\n`
+                : '';
 
-    const systemInstruction = `${CONTENT_VALIDATION_SYSTEM_PROMPT}\n\n**IMPORTANT:** All text in your response (descriptions, explanations, proposed text changes) MUST be in **${language}**.`;
+            prompt = CONTENT_VALIDATION_PROMPT
+                .replace('{briefJson}', JSON.stringify(brief, null, 2))
+                .replace('{generatedContent}', generatedContent)
+                .replace('{targetWordCount}', targetWordCount.toString())
+                .replace('{strictMode}', strictMode)
+                .replace('{userInstructions}', userInstructionsSection);
+        }
 
-    try {
-        return await retryOperation(async () => {
-            const response = await callGemini(
-                modelName,
-                prompt,
-                {
-                    systemInstruction,
-                    responseMimeType: "application/json",
-                    responseSchema: contentValidationSchema,
-                }
-            );
-            const text = response.text;
-            if (!text) throw new Error("Empty response from AI for content validation.");
-            return JSON.parse(text);
-        });
-    } catch (error) {
-        console.error("Error validating content:", error);
-        throw new Error("Failed to validate content against brief.");
+        try {
+            return await retryOperation(async () => {
+                const response = await callGemini(
+                    modelName,
+                    prompt,
+                    {
+                        systemInstruction,
+                        responseMimeType: "application/json",
+                        responseSchema: contentValidationSchema,
+                    }
+                );
+                const text = response.text;
+                if (!text) throw new Error("Empty response from AI for content validation.");
+                return JSON.parse(text);
+            });
+        } catch (error) {
+            console.error("Error validating content:", error);
+            throw new Error("Failed to validate content against brief.");
+        }
     }
 };
 
@@ -1368,19 +1449,7 @@ export const optimizeArticleWithChat = async (params: {
 
     const targetWordCount = lengthConstraints?.globalTarget || brief.article_structure?.word_count_target || 0;
 
-    const systemInstruction = `You are an expert SEO content optimizer. You have the original content brief and the current article.
-Your job is to rewrite the ENTIRE article based on the user's instruction and the metrics analysis.
-
-RULES:
-- Return ONLY the complete rewritten article in markdown format
-- Include all headings (##, ###) and body content
-- Start with # H1 title
-- Maintain the same structure unless the instruction asks to change it
-- Write in ${language}
-${targetWordCount > 0 ? `- Target word count: ${targetWordCount} words (MUST be within +/-10%)` : ''}
-- Integrate all keywords naturally
-- Follow the content brief's guidelines for each section
-- Do NOT include any commentary, explanations, or meta-text — ONLY the article`;
+    const systemInstruction = getArticleOptimizerSystemPrompt(language, targetWordCount);
 
     const prompt = `**CONTENT BRIEF (JSON):**
 ${JSON.stringify(stripReasoningFromBrief(brief), null, 2)}
@@ -1407,7 +1476,10 @@ Now rewrite the ENTIRE article incorporating the user's instruction. Return ONLY
     try {
         if (onStream) {
             let fullText = '';
-            const stream = callGeminiStream(modelName, prompt, { systemInstruction });
+            const stream = callGeminiStream(modelName, prompt, {
+                systemInstruction,
+                ...(currentModelSettings.model.includes('gemini-3') ? { thinkingConfig: { thinkingBudget: ARTICLE_OPTIMIZER_THINKING_BUDGET } } : {}),
+            });
 
             for await (const chunk of stream) {
                 const chunkText = chunk.text || '';
@@ -1423,7 +1495,10 @@ Now rewrite the ENTIRE article incorporating the user's instruction. Return ONLY
 
         // Non-streaming fallback
         return await retryOperation(async () => {
-            const response = await callGemini(modelName, prompt, { systemInstruction });
+            const response = await callGemini(modelName, prompt, {
+                systemInstruction,
+                ...(currentModelSettings.model.includes('gemini-3') ? { thinkingConfig: { thinkingBudget: ARTICLE_OPTIMIZER_THINKING_BUDGET } } : {}),
+            });
             const text = response.text;
             if (!text) throw new Error("Empty response from AI for article optimization.");
             return text;

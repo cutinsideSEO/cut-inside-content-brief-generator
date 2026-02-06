@@ -1,5 +1,20 @@
 import type { CompetitorPage } from './types';
 
+// Word count ratio constants
+export const WC_PROMPT_MIN = 0.85;
+export const WC_PROMPT_MAX = 1.15;
+export const WC_STRICT_MIN = 0.90;
+export const WC_STRICT_MAX = 1.10;
+export const WC_EXPAND_THRESHOLD = 0.70;
+export const WC_TRIM_STRICT = 1.20;
+export const WC_TRIM_NONSTRICT = 1.50;
+export const WC_OPTIMIZER_TOLERANCE = 0.10;
+
+// Thinking budget constants
+export const ARTICLE_THINKING_BUDGET = 8192;
+export const ARTICLE_OPTIMIZER_THINKING_BUDGET = 8192;
+export const VALIDATION_CHUNK_THRESHOLD = 3000;
+
 export const getSystemPrompt = (step: number, language: string, isRegeneration?: boolean): string => {
   let basePrompt = `You are a specialized AI assistant named **"BriefStrategist"**. Your sole purpose is to function as an expert SEO Content Strategist. 
   You receive a JSON object containing competitor data. Each competitor has a 'Weighted_Score' indicating their SEO strength. 
@@ -9,8 +24,10 @@ export const getSystemPrompt = (step: number, language: string, isRegeneration?:
   Your task is to generate ONLY the specific part of the content brief for the current stage.
   Your entire response must be a single, valid JSON object which strictly conforms to the JSON schema provided. Do not output any conversational text, introductions, or explanations.
   
-  **CRITICAL LANGUAGE DIRECTIVE:** Your entire response, including all text values within the JSON object (like 'reasoning', 'value', 'notes', 'heading', etc.), MUST be in **${language}**.`;
-  
+  **CRITICAL LANGUAGE DIRECTIVE:** Your entire response, including all text values within the JSON object (like 'reasoning', 'value', 'notes', 'heading', etc.), MUST be in **${language}**.
+
+  **DATA INTEGRITY:** Base all analysis ONLY on the provided competitor data, keywords, and user context. Do not fabricate statistics, studies, or claims. When referencing competitor behavior, cite the specific URL. Flag uncertain recommendations as suggestions rather than facts.`;
+
   if (isRegeneration) {
     basePrompt += `\n\n**REGENERATION TASK:** You are being asked to regenerate the output for this stage based on user feedback. The user's previous data for this stage is provided in the prompt under "Original JSON for this step". Your task is to **modify the existing JSON** to incorporate the feedback, not create it from scratch. The changes should be specific and targeted to the user's request. Focus your changes on the user's feedback.`;
   }
@@ -200,8 +217,8 @@ export const getContentGenerationPrompt = (language: string, writerInstructions?
 
 **CRITICAL: WORD COUNT IS NON-NEGOTIABLE**
 You MUST produce output within a hard minimum and maximum word range.
-- If the target is T words, you MUST write between T*0.85 and T*1.15 words. No exceptions.
-- Example: Target 200 words → Write between 170 and 230 words. NOT 300+. NOT 120.
+- If the target is T words, you MUST write between T*${WC_PROMPT_MIN} and T*${WC_PROMPT_MAX} words. No exceptions.
+- Example: Target 200 words → Write between ${Math.round(200 * WC_PROMPT_MIN)} and ${Math.round(200 * WC_PROMPT_MAX)} words. NOT 300+. NOT 120.
 - If no per-section target is given, use the suggested budget from the WORD COUNT section below.
 - Count your output before submitting. Quality over quantity.
 - Concise and impactful beats verbose and padded.
@@ -216,7 +233,8 @@ You MUST produce output within a hard minimum and maximum word range.
 5.  Integrate keywords naturally, not forced.
 6.  When E-E-A-T signals are provided, weave them in organically.
 7.  If brief validation issues are flagged, compensate in your writing.
-8.  Return only the text paragraphs for this section — no extra formatting or titles.`;
+8.  Return only the text paragraphs for this section — no extra formatting or titles.
+9.  Base all claims and facts on the content brief guidelines. Do not invent statistics, expert quotes, or citations. If a guideline calls for data you don't have, write "[CITE: add specific source]" as a placeholder.`;
 
     if (writerInstructions && writerInstructions.trim()) {
         prompt += `
@@ -417,18 +435,6 @@ export const THINKING_LEVEL_BY_STEP: { [key: number]: 'high' | 'medium' | 'low' 
   7: 'low',     // On-Page SEO - straightforward optimization
 };
 
-// Post-Content Validation Prompts
-export const CONTENT_VALIDATION_SYSTEM_PROMPT = `You are an expert SEO Content Editor specializing in content quality assurance.
-Your task is to analyze generated content against its source brief to identify improvements.
-
-You must be thorough but fair:
-- Only flag issues that genuinely impact quality, SEO, or user experience
-- Provide specific, actionable feedback with exact text to change
-- Consider the overall context when evaluating sections
-- Prioritize changes by impact (critical > warning > suggestion)
-
-Your entire response must be valid JSON matching the provided schema.`;
-
 export const CONTENT_VALIDATION_PROMPT = `
 **TASK: Validate the generated content against the original brief.**
 
@@ -459,6 +465,7 @@ Strict Mode: {strictMode}
 3. **Total Word Count:**
    - What is the actual word count vs target?
    - Is the content appropriately comprehensive?
+   - Acceptable tolerance: ${WC_PROMPT_MIN}-${WC_PROMPT_MAX} of target (strict mode: ${WC_STRICT_MIN}-${WC_STRICT_MAX})
 
 4. **Keyword Usage (1-100):**
    - Are primary keywords used in headings and body text?
@@ -514,8 +521,34 @@ Remember:
 - Be helpful and responsive to what the user is asking for
 `;
 
-// Article Optimizer Prompts
-export const ARTICLE_OPTIMIZER_SYSTEM_PROMPT = `You are an expert SEO content optimizer. You have the original content brief and the current article.
+export const getParagraphRegenerationSystemPrompt = (language: string): string =>
+  `You are an expert content editor. Your entire response must be in **${language}**. Return only the rewritten paragraph, nothing else. Ensure the rewritten paragraph flows naturally with the content before and after it.`;
+
+export const getRewriteSelectionSystemPrompt = (language: string): string =>
+  `You are an expert content editor. Your entire response must be in **${language}**. Return only the rewritten text, nothing else.`;
+
+export const getBriefValidationSystemPrompt = (language: string): string =>
+  `You are an expert SEO Content Strategist reviewing a content brief for quality. Your entire response must be in **${language}**. Return only valid JSON.`;
+
+export const getEEATSignalsSystemPrompt = (language: string): string =>
+  `You are an expert SEO Content Strategist specializing in E-E-A-T optimization. Your entire response must be in **${language}**. Return only valid JSON with 'experience', 'expertise', 'authority', 'trust' arrays and a 'reasoning' field.`;
+
+export const getContentValidationSystemPrompt = (language: string): string =>
+  `You are an expert SEO Content Editor specializing in content quality assurance.
+Your task is to analyze generated content against its source brief to identify improvements.
+
+You must be thorough but fair:
+- Only flag issues that genuinely impact quality, SEO, or user experience
+- Provide specific, actionable feedback with exact text to change
+- Consider the overall context when evaluating sections
+- Prioritize changes by impact (critical > warning > suggestion)
+
+**IMPORTANT:** All text in your response (descriptions, explanations, proposed text changes) MUST be in **${language}**.
+
+Your entire response must be valid JSON matching the provided schema.`;
+
+export const getArticleOptimizerSystemPrompt = (language: string, targetWordCount: number): string =>
+  `You are an expert SEO content optimizer. You have the original content brief and the current article.
 Your job is to rewrite the ENTIRE article based on the user's instruction and the metrics analysis.
 
 RULES:
@@ -523,22 +556,10 @@ RULES:
 - Include all headings (##, ###) and body content
 - Start with # H1 title
 - Maintain the same structure unless the instruction asks to change it
-- Do NOT include any commentary, explanations, or meta-text before or after the article
-- Do NOT wrap the article in code blocks`;
+- Write in **${language}**
+${targetWordCount > 0 ? `- Target word count: ${targetWordCount} words (MUST be within +/-${WC_OPTIMIZER_TOLERANCE * 100}%)` : ''}
+- Integrate all keywords naturally
+- Follow the content brief's guidelines for each section
+- Do not fabricate statistics, quotes, or citations not in the brief or current article
+- Do NOT include any commentary, explanations, or meta-text — ONLY the article`;
 
-export const ARTICLE_OPTIMIZER_PROMPT = `**CONTENT BRIEF (source of truth):**
-{briefJson}
-
-**CURRENT ARTICLE:**
-{currentArticle}
-
-**METRICS ANALYSIS:**
-{metricsContext}
-
-**USER INSTRUCTION:**
-{userInstruction}
-
-**LANGUAGE:** Write the entire article in {language}.
-**TARGET WORD COUNT:** {targetWordCount} words (MUST be within +/-10% of this target).
-
-Rewrite the ENTIRE article incorporating the user's instruction. Return ONLY the full article in markdown.`;

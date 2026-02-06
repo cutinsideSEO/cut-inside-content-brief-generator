@@ -5,7 +5,8 @@ import * as dataforseoService from './services/dataforseoService';
 import { parseMarkdownBrief } from './services/markdownParserService';
 import { extractTemplateFromUrl } from './services/templateExtractionService';
 import type { CompetitorPage, ContentBrief, CompetitorRanking, OutlineItem, ModelSettings, LengthConstraints, ExtractedTemplate, HeadingNode } from './types';
-import { UI_TO_LOGICAL_STEP_MAP, SOUND_EFFECTS } from './constants';
+import { UI_TO_LOGICAL_STEP_MAP, SOUND_EFFECTS, WC_EXPAND_THRESHOLD, WC_TRIM_STRICT, WC_TRIM_NONSTRICT } from './constants';
+import { stripCompetitorFullText } from './services/briefContextService';
 import { BrainCircuitIcon } from './components/Icon';
 
 // Import the new screen components
@@ -170,6 +171,7 @@ const App: React.FC<AppProps> = ({
   
   // Data state
   const [subjectInfo, setSubjectInfo] = useState('');
+  const [combinedSubjectInfo, setCombinedSubjectInfo] = useState('');
   const [brandInfo, setBrandInfo] = useState('');
   const [keywordVolumeMap, setKeywordVolumeMap] = useState<Map<string, number>>(new Map());
   const [competitorData, setCompetitorData] = useState<CompetitorPage[]>([]);
@@ -760,16 +762,19 @@ const App: React.FC<AppProps> = ({
     try {
       const keywordsWithVolume = Array.from(keywordVolumeMap.entries()).map(([keyword, volume]) => ({ keyword, volume }));
       const logicalNextStep = UI_TO_LOGICAL_STEP_MAP[nextUiStep];
+      const needsFullText = [3, 4, 5].includes(logicalNextStep);
+      const competitorDataForStep = needsFullText ? competitorData : stripCompetitorFullText(competitorData);
+      const needsGroundTruth = [1, 3, 4, 5].includes(logicalNextStep);
       const groundTruthCompetitors = getGroundTruthCompetitors(competitorData);
       const groundTruthText = groundTruthCompetitors.map(c => `URL: ${c.URL}\nTEXT: ${c.Full_Text}`).join('\n\n---\n\n');
 
       const result = await generateBriefStep({
         step: logicalNextStep,
-        competitorDataJson: JSON.stringify(competitorData),
-        subjectInfo,
+        competitorDataJson: JSON.stringify(competitorDataForStep),
+        subjectInfo: combinedSubjectInfo || subjectInfo,
         brandInfo,
         previousStepsData: briefData,
-        groundTruthText,
+        groundTruthText: needsGroundTruth ? groundTruthText : undefined,
         userFeedback,
         availableKeywords: nextUiStep === 3 ? keywordsWithVolume : undefined,
         language: outputLanguage,
@@ -792,7 +797,7 @@ const App: React.FC<AppProps> = ({
       setIsLoading(false);
       setLoadingStep(null);
     }
-  }, [briefingStep, competitorData, subjectInfo, brandInfo, briefData, keywordVolumeMap, outputLanguage, extractedTemplate, lengthConstraints, paaQuestions, briefId, onGenerationComplete, isFeelingLuckyFlow]);
+  }, [briefingStep, competitorData, subjectInfo, combinedSubjectInfo, brandInfo, briefData, keywordVolumeMap, outputLanguage, extractedTemplate, lengthConstraints, paaQuestions, briefId, onGenerationComplete, isFeelingLuckyFlow]);
 
   // Navigate to a previous step without regenerating (just show existing data)
   const handlePrevStep = useCallback(() => {
@@ -824,18 +829,20 @@ const App: React.FC<AppProps> = ({
         .filter(([, u]) => u.status === 'done' && u.content)
         .map(([url, u]) => `SOURCE URL: ${url}\n\n${u.content as string}`);
 
-      let combinedSubjectInfo = subjectInfo;
+      let combinedSubjectInfoLocal = subjectInfo;
       if (fileContexts.length > 0) {
-        combinedSubjectInfo += `\n\n### Additional Context from Files:\n\n` + fileContexts.join('\n\n---\n\n');
+        combinedSubjectInfoLocal += `\n\n### Additional Context from Files:\n\n` + fileContexts.join('\n\n---\n\n');
       }
       if (urlContexts.length > 0) {
-        combinedSubjectInfo += `\n\n### Additional Context from Scraped URLs:\n\n` + urlContexts.join('\n\n---\n\n');
+        combinedSubjectInfoLocal += `\n\n### Additional Context from Scraped URLs:\n\n` + urlContexts.join('\n\n---\n\n');
       }
+
+      setCombinedSubjectInfo(combinedSubjectInfoLocal.trim());
 
       const result = await generateBriefStep({
         step: 1,
-        competitorDataJson: JSON.stringify(competitorData),
-        subjectInfo: combinedSubjectInfo.trim(),
+        competitorDataJson: JSON.stringify(stripCompetitorFullText(competitorData)),
+        subjectInfo: combinedSubjectInfoLocal.trim(),
         brandInfo,
         previousStepsData: {},
         groundTruthText,
@@ -894,16 +901,19 @@ const App: React.FC<AppProps> = ({
     try {
       const userFeedback = feedback || userFeedbacks[logicalStepToRegen] || '';
       const keywordsWithVolume = Array.from(keywordVolumeMap.entries()).map(([keyword, volume]) => ({ keyword, volume }));
+      const needsFullText = [3, 4, 5].includes(logicalStepToRegen);
+      const competitorDataForStep = needsFullText ? competitorData : stripCompetitorFullText(competitorData);
+      const needsGroundTruth = [1, 3, 4, 5].includes(logicalStepToRegen);
       const groundTruthCompetitors = getGroundTruthCompetitors(competitorData);
       const groundTruthText = groundTruthCompetitors.map(c => `URL: ${c.URL}\nTEXT: ${c.Full_Text}`).join('\n\n---\n\n');
 
       const result = await generateBriefStep({
         step: logicalStepToRegen,
-        competitorDataJson: JSON.stringify(competitorData),
-        subjectInfo,
+        competitorDataJson: JSON.stringify(competitorDataForStep),
+        subjectInfo: combinedSubjectInfo || subjectInfo,
         brandInfo,
         previousStepsData: briefData,
-        groundTruthText,
+        groundTruthText: needsGroundTruth ? groundTruthText : undefined,
         userFeedback: userFeedback,
         availableKeywords: logicalStepToRegen === 2 ? keywordsWithVolume : undefined,
         isRegeneration: true,
@@ -940,7 +950,7 @@ const App: React.FC<AppProps> = ({
       setIsLoading(false);
       setLoadingStep(null);
     }
-  }, [currentView, competitorData, subjectInfo, brandInfo, briefData, keywordVolumeMap, userFeedbacks, outputLanguage, paaQuestions]);
+  }, [currentView, competitorData, subjectInfo, combinedSubjectInfo, brandInfo, briefData, keywordVolumeMap, userFeedbacks, outputLanguage, paaQuestions]);
   
   const handleUserFeedbackChange = (step: number, value: string) => {
     setUserFeedbacks(prev => ({ ...prev, [step]: value }));
@@ -1050,7 +1060,7 @@ const App: React.FC<AppProps> = ({
         const sectionTarget = section.target_word_count || 0;
         if (sectionTarget > 0) {
           const sectionWords = countWords(currentSectionBody);
-          if (sectionWords < sectionTarget * 0.7) {
+          if (sectionWords < sectionTarget * WC_EXPAND_THRESHOLD) {
             if (import.meta.env.DEV) console.log(`Expanding "${section.heading}": ${sectionWords} words < 70% of ${sectionTarget} target`);
             setGenerationProgress({
               currentSection: `Expanding: ${section.heading}`,
@@ -1090,8 +1100,8 @@ const App: React.FC<AppProps> = ({
         if (sectionTarget > 0) {
           const sectionWords = countWords(currentSectionBody);
           const shouldTrim = isStrictMode
-            ? sectionWords > sectionTarget * 1.2
-            : sectionWords > sectionTarget * 1.5;
+            ? sectionWords > sectionTarget * WC_TRIM_STRICT
+            : sectionWords > sectionTarget * WC_TRIM_NONSTRICT;
 
           if (shouldTrim) {
             if (import.meta.env.DEV) console.log(`Trimming "${section.heading}": ${sectionWords} → ~${sectionTarget} words`);
@@ -1305,6 +1315,7 @@ const App: React.FC<AppProps> = ({
     setBriefData({});
     setError(null);
     setSubjectInfo('');
+    setCombinedSubjectInfo('');
     setBrandInfo('');
     setAnalysisLogs([]);
     setKeywordVolumeMap(new Map());

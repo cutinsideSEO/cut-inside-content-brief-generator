@@ -21,6 +21,8 @@ export interface CompetitorPage {
   is_starred?: boolean;
 }
 
+export type CompetitorSummary = Omit<CompetitorPage, 'Full_Text'>;
+
 export interface KeywordSelection {
   keyword: string;
   notes: string;

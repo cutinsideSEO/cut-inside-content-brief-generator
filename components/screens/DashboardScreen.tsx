@@ -4,7 +4,7 @@ import { exportBriefToMarkdown } from '../../services/markdownService';
 import { validateBrief, generateEEATSignals } from '../../services/geminiService';
 import Button from '../Button';
 import Spinner from '../Spinner';
-import { Badge, Callout, Textarea } from '../ui';
+import { Badge, Callout, Textarea, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../ui';
 
 // Import stage components for inline rendering
 import Stage1Goal from '../stages/Stage1Goal';
@@ -206,7 +206,6 @@ const StatCard: React.FC<{ label: string; value: string | number; highlight?: bo
 const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'isUploadedBrief' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage'>> = ({
     briefData, setBriefData, staleSteps, isUploadedBrief, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', ...strengthProps
 }) => {
-    const [isExportOpen, setIsExportOpen] = useState(false);
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingEEAT, setIsGeneratingEEAT] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
@@ -303,22 +302,22 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                     </>
                 )}
                 {/* Export dropdown */}
-                <div className="relative">
-                    <Button variant="ghost" onClick={() => setIsExportOpen(!isExportOpen)} disabled={isUploadedBrief}>
-                        <ChevronDownIcon className={`h-4 w-4 mr-1 transition-transform ${isExportOpen ? 'rotate-180' : ''}`} />
-                        Export Brief
-                    </Button>
-                    {isExportOpen && (
-                        <div className="absolute top-full mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 animate-fade-in overflow-hidden">
-                            <button onClick={() => { handleExport(false); setIsExportOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-gray-900 hover:bg-gray-100 transition-colors">
-                                Full Brief
-                            </button>
-                            <button onClick={() => { handleExport(true); setIsExportOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-gray-900 hover:bg-gray-100 transition-colors">
-                                Concise Brief
-                            </button>
-                        </div>
-                    )}
-                </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" disabled={isUploadedBrief}>
+                            <ChevronDownIcon className="h-4 w-4 mr-1 transition-transform data-[state=open]:rotate-180" />
+                            Export Brief
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                        <DropdownMenuItem onClick={() => handleExport(false)}>
+                            Full Brief
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport(true)}>
+                            Concise Brief
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <Button variant="ghost" onClick={onRestart}>
                     Start New Brief
                 </Button>

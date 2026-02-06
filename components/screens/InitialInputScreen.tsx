@@ -4,7 +4,7 @@ import { AlertTriangleIcon, UploadCloudIcon, XIcon, FileCodeIcon, BrainCircuitIc
 import ModelSelector from '../ModelSelector';
 import LengthSettings from '../LengthSettings';
 import KeywordTableInput from '../KeywordTableInput';
-import { Card, Input, Textarea, Alert, Badge, Tabs } from '../ui';
+import { Card, Input, Textarea, Alert, Badge, Tabs, Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui';
 import type { ModelSettings, LengthConstraints, ExtractedTemplate } from '../../types';
 
 interface KeywordRow {
@@ -511,28 +511,29 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         />
 
         {/* Advanced Settings */}
-        <Card variant="outline" padding="none">
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-100 transition-colors rounded-lg"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-md bg-teal/10 flex items-center justify-center">
-                <SettingsIcon className="h-4 w-4 text-teal" />
+        <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced} asChild>
+          <Card variant="outline" padding="none">
+            <CollapsibleTrigger asChild>
+              <button className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-100 transition-colors rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-md bg-teal/10 flex items-center justify-center">
+                    <SettingsIcon className="h-4 w-4 text-teal" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-semibold text-gray-900">Advanced Settings</h3>
+                    <p className="text-sm text-gray-400">AI model selection & configuration</p>
+                  </div>
+                </div>
+                <ChevronDownIcon className={`h-5 w-5 text-gray-400 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="px-4 pb-4">
+                <ModelSelector settings={modelSettings} onChange={setModelSettings} />
               </div>
-              <div>
-                <h3 className="font-heading font-semibold text-gray-900">Advanced Settings</h3>
-                <p className="text-sm text-gray-400">AI model selection & configuration</p>
-              </div>
-            </div>
-            <ChevronDownIcon className={`h-5 w-5 text-gray-400 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-          </button>
-          {showAdvanced && (
-            <div className="px-4 pb-4">
-              <ModelSelector settings={modelSettings} onChange={setModelSettings} />
-            </div>
-          )}
-        </Card>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       </div>
 
       {(error || localError) && (

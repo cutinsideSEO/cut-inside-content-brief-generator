@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import type { ContentBrief, OutlineItem, ArticleStructure } from '../../types';
-import { XIcon, PuzzleIcon, ZapIcon, FileTextIcon, ChevronDownIcon } from '../Icon';
-import { Badge, Input, AIReasoningIcon, EditableText } from '../ui';
+import { XIcon, PuzzleIcon, ZapIcon, ChevronDownIcon } from '../Icon';
+import { Badge, Input, AIReasoningIcon, EditableText, Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui';
 import Button from '../Button';
 
 const SNIPPET_FORMAT_LABELS: Record<string, { label: string; icon: string }> = {
@@ -68,42 +68,43 @@ const OutlineNode: React.FC<{
 
   return (
     <div style={{ marginLeft: `${levelPadding}rem` }}>
-      <div className={`border-l-2 ${levelColors[item.level] || 'border-l-border'}`}>
+      <Collapsible open={isExpanded} onOpenChange={() => onToggleExpand(pathKey)} className={`border-l-2 ${levelColors[item.level] || 'border-l-border'}`}>
         {/* Compact header - always visible */}
-        <button
-          type="button"
-          onClick={() => onToggleExpand(pathKey)}
-          className="w-full flex items-center gap-3 py-2.5 pl-4 pr-2 hover:bg-gray-100 transition-colors text-left rounded-r-sm"
-        >
-          <ChevronDownIcon className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-          <Badge variant="teal" size="sm">{item.level}</Badge>
-          <span className="text-sm font-heading font-semibold text-gray-900 truncate flex-1">
-            {item.heading || 'Untitled section'}
-          </span>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {item.target_word_count && item.target_word_count > 0 && (
-              <span className="text-xs text-gray-400">{item.target_word_count.toLocaleString()}w</span>
-            )}
-            {hasSnippet && (
-              <ZapIcon className="h-3.5 w-3.5 text-emerald-500" />
-            )}
-            <div
-              className="relative"
-              onMouseEnter={() => setIsHovered(true)}
-              onMouseLeave={() => setIsHovered(false)}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {(item.targeted_keywords?.length || item.competitor_coverage?.length) ? (
-                <PuzzleIcon className="h-3.5 w-3.5 text-gray-400" />
-              ) : null}
-              {isHovered && <HeadingInsightsPopover keywords={item.targeted_keywords} competitors={item.competitor_coverage} />}
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="w-full flex items-center gap-3 py-2.5 pl-4 pr-2 hover:bg-gray-100 transition-colors text-left rounded-r-sm"
+          >
+            <ChevronDownIcon className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+            <Badge variant="teal" size="sm">{item.level}</Badge>
+            <span className="text-sm font-heading font-semibold text-gray-900 truncate flex-1">
+              {item.heading || 'Untitled section'}
+            </span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {item.target_word_count && item.target_word_count > 0 && (
+                <span className="text-xs text-gray-400">{item.target_word_count.toLocaleString()}w</span>
+              )}
+              {hasSnippet && (
+                <ZapIcon className="h-3.5 w-3.5 text-emerald-500" />
+              )}
+              <div
+                className="relative"
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {(item.targeted_keywords?.length || item.competitor_coverage?.length) ? (
+                  <PuzzleIcon className="h-3.5 w-3.5 text-gray-400" />
+                ) : null}
+                {isHovered && <HeadingInsightsPopover keywords={item.targeted_keywords} competitors={item.competitor_coverage} />}
+              </div>
             </div>
-          </div>
-        </button>
+          </button>
+        </CollapsibleTrigger>
 
         {/* Expanded details */}
-        {isExpanded && (
-          <div className="pl-4 pr-2 pb-3 pt-1 space-y-3 animate-fade-in">
+        <CollapsibleContent>
+          <div className="pl-4 pr-2 pb-3 pt-1 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {item.reasoning && <AIReasoningIcon reasoning={item.reasoning} />}
@@ -149,8 +150,8 @@ const OutlineNode: React.FC<{
               />
             </div>
           </div>
-        )}
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Nested children */}
       {item.children?.map((child, index) => (

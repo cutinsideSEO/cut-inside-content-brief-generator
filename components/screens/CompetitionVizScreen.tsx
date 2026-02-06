@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { CompetitorPage } from '../../types';
 import Button from '../Button';
 import { BarChartIcon, StarIcon } from '../Icon';
-import { Card, Badge } from '../ui';
+import { Card, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui';
 
 interface CompetitionVizScreenProps {
   competitorData: CompetitorPage[];
@@ -106,102 +106,100 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
 
         {/* Competitor Table */}
         <Card variant="default" padding="none" className="overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full min-w-max text-left text-sm">
-                    <thead className="bg-gray-100 border-b border-gray-200">
-                        <tr>
-                            <th className="p-4 font-heading font-semibold text-gray-600 w-12"></th>
-                            <th className="p-4 font-heading font-semibold text-gray-600 w-2/5">Competitor URL</th>
-                            <th
-                                className="p-4 font-heading font-semibold text-gray-600 cursor-pointer hover:text-teal transition-colors"
-                                onClick={() => requestSort('Weighted_Score')}
+            <Table className="min-w-max text-sm">
+                <TableHeader className="bg-gray-100">
+                    <TableRow>
+                        <TableHead className="p-4 font-heading font-semibold text-gray-600 w-12"></TableHead>
+                        <TableHead className="p-4 font-heading font-semibold text-gray-600 w-2/5">Competitor URL</TableHead>
+                        <TableHead
+                            className="p-4 font-heading font-semibold text-gray-600 cursor-pointer hover:text-teal transition-colors"
+                            onClick={() => requestSort('Weighted_Score')}
+                        >
+                            Score{getSortIndicator('Weighted_Score')}
+                        </TableHead>
+                        <TableHead
+                            className="p-4 font-heading font-semibold text-gray-600 cursor-pointer hover:text-teal transition-colors"
+                            onClick={() => requestSort('Word_Count')}
+                        >
+                            Words{getSortIndicator('Word_Count')}
+                        </TableHead>
+                        {topKeywords.map(({ kw }) => (
+                            <TableHead
+                                key={kw}
+                                className="p-4 font-heading font-semibold text-gray-600 cursor-pointer hover:text-teal transition-colors truncate max-w-xs"
+                                onClick={() => requestSort(kw)}
+                                title={kw}
                             >
-                                Score{getSortIndicator('Weighted_Score')}
-                            </th>
-                            <th
-                                className="p-4 font-heading font-semibold text-gray-600 cursor-pointer hover:text-teal transition-colors"
-                                onClick={() => requestSort('Word_Count')}
-                            >
-                                Words{getSortIndicator('Word_Count')}
-                            </th>
-                            {topKeywords.map(({ kw }) => (
-                                <th
-                                    key={kw}
-                                    className="p-4 font-heading font-semibold text-gray-600 cursor-pointer hover:text-teal transition-colors truncate max-w-xs"
-                                    onClick={() => requestSort(kw)}
-                                    title={kw}
-                                >
-                                    Rank: "{kw}"{getSortIndicator(kw)}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-subtle">
-                        {sortedCompetitors.map((competitor) => (
-                            <tr key={competitor.URL} className="hover:bg-gray-100 transition-colors">
-                                <td className="p-4 text-center">
-                                    <button
-                                        onClick={() => onToggleStar(competitor.URL)}
-                                        className="p-1 group rounded-sm hover:bg-gray-200 transition-colors"
-                                        title="Star this competitor"
-                                    >
-                                        <StarIcon className={`h-5 w-5 transition-all duration-200 ${
-                                            competitor.is_starred
-                                                ? 'text-amber-500 fill-yellow drop-shadow-[0_0_6px_rgba(250,204,21,0.5)]'
-                                                : 'text-gray-400 group-hover:text-amber-500'
-                                        }`} />
-                                    </button>
-                                </td>
-                                <td className="p-4 truncate max-w-xs" title={competitor.URL}>
-                                    <a
-                                        href={competitor.URL}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-teal hover:text-teal/80 hover:underline transition-colors"
-                                    >
-                                        {competitor.URL}
-                                    </a>
-                                </td>
-                                <td className="p-4 font-bold text-lg text-gray-900">
-                                    <div className="relative flex items-center">
-                                        <div
-                                            className="absolute inset-y-0 left-0 bg-teal/20 rounded-sm"
-                                            style={{ width: `${(competitor.Weighted_Score / maxScore) * 100}%`}}
-                                        />
-                                        <span className="relative px-2">{competitor.Weighted_Score.toLocaleString()}</span>
-                                    </div>
-                                </td>
-                                <td className="p-4 text-gray-600">
-                                    <div className="relative flex items-center">
-                                        <div
-                                            className="absolute inset-y-0 left-0 bg-gray-200 rounded-sm"
-                                            style={{ width: `${(competitor.Word_Count / maxWordCount) * 100}%`}}
-                                        />
-                                        <span className="relative px-2">{competitor.Word_Count.toLocaleString()}</span>
-                                    </div>
-                                </td>
-                                {topKeywords.map(({ kw }) => {
-                                    const ranking = competitor.rankings.find(r => r.keyword === kw);
-                                    return (
-                                        <td key={`${competitor.URL}-${kw}`} className="p-4 text-center">
-                                            {ranking ? (
-                                                <Badge
-                                                    variant={ranking.rank <= 3 ? 'success' : ranking.rank <= 10 ? 'warning' : 'default'}
-                                                    size="sm"
-                                                >
-                                                    #{ranking.rank}
-                                                </Badge>
-                                            ) : (
-                                                <span className="text-gray-400">-</span>
-                                            )}
-                                        </td>
-                                    );
-                                })}
-                            </tr>
+                                Rank: "{kw}"{getSortIndicator(kw)}
+                            </TableHead>
                         ))}
-                    </tbody>
-                </table>
-            </div>
+                    </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border-subtle">
+                    {sortedCompetitors.map((competitor) => (
+                        <TableRow key={competitor.URL}>
+                            <TableCell className="p-4 text-center">
+                                <button
+                                    onClick={() => onToggleStar(competitor.URL)}
+                                    className="p-1 group rounded-sm hover:bg-gray-200 transition-colors"
+                                    title="Star this competitor"
+                                >
+                                    <StarIcon className={`h-5 w-5 transition-all duration-200 ${
+                                        competitor.is_starred
+                                            ? 'text-amber-500 fill-yellow drop-shadow-[0_0_6px_rgba(250,204,21,0.5)]'
+                                            : 'text-gray-400 group-hover:text-amber-500'
+                                    }`} />
+                                </button>
+                            </TableCell>
+                            <TableCell className="p-4 truncate max-w-xs" title={competitor.URL}>
+                                <a
+                                    href={competitor.URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-teal hover:text-teal/80 hover:underline transition-colors"
+                                >
+                                    {competitor.URL}
+                                </a>
+                            </TableCell>
+                            <TableCell className="p-4 font-bold text-lg text-gray-900">
+                                <div className="relative flex items-center">
+                                    <div
+                                        className="absolute inset-y-0 left-0 bg-teal/20 rounded-sm"
+                                        style={{ width: `${(competitor.Weighted_Score / maxScore) * 100}%`}}
+                                    />
+                                    <span className="relative px-2">{competitor.Weighted_Score.toLocaleString()}</span>
+                                </div>
+                            </TableCell>
+                            <TableCell className="p-4 text-gray-600">
+                                <div className="relative flex items-center">
+                                    <div
+                                        className="absolute inset-y-0 left-0 bg-gray-200 rounded-sm"
+                                        style={{ width: `${(competitor.Word_Count / maxWordCount) * 100}%`}}
+                                    />
+                                    <span className="relative px-2">{competitor.Word_Count.toLocaleString()}</span>
+                                </div>
+                            </TableCell>
+                            {topKeywords.map(({ kw }) => {
+                                const ranking = competitor.rankings.find(r => r.keyword === kw);
+                                return (
+                                    <TableCell key={`${competitor.URL}-${kw}`} className="p-4 text-center">
+                                        {ranking ? (
+                                            <Badge
+                                                variant={ranking.rank <= 3 ? 'success' : ranking.rank <= 10 ? 'warning' : 'default'}
+                                                size="sm"
+                                            >
+                                                #{ranking.rank}
+                                            </Badge>
+                                        ) : (
+                                            <span className="text-gray-400">-</span>
+                                        )}
+                                    </TableCell>
+                                );
+                            })}
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
         </Card>
 
         {/* Action Buttons */}

@@ -8,12 +8,12 @@ import {
   AlertCircleIcon,
   LightbulbIcon,
   ChevronDownIcon,
-  ChevronUpIcon,
   ChevronRightIcon,
   SendIcon,
   RefreshCwIcon,
   ShieldCheckIcon,
 } from './Icon';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from './ui';
 import { validateGeneratedContent } from '../services/geminiService';
 import type { ContentBrief, LengthConstraints, ContentValidationResult, ProposedChange, ValidationMessage } from '../types';
 
@@ -58,18 +58,15 @@ const SeverityBadge: React.FC<{ severity: ProposedChange['severity'] }> = ({ sev
 
 // Score bar component
 const ScoreBar: React.FC<{ label: string; score: number; explanation?: string }> = ({ label, score, explanation }) => {
-  const [showExplanation, setShowExplanation] = useState(false);
-
   return (
-    <div className="mb-3">
+    <Collapsible className="mb-3">
       <div className="flex justify-between items-center mb-1">
-        <button
-          onClick={() => setShowExplanation(!showExplanation)}
-          className="text-sm text-gray-600/80 hover:text-white flex items-center gap-1 transition-colors"
-        >
-          {showExplanation ? <ChevronUpIcon className="h-3 w-3" /> : <ChevronDownIcon className="h-3 w-3" />}
-          {label}
-        </button>
+        <CollapsibleTrigger asChild>
+          <button className="text-sm text-gray-600/80 hover:text-white flex items-center gap-1 transition-colors">
+            <ChevronDownIcon className="h-3 w-3 transition-transform data-[state=open]:rotate-180" />
+            {label}
+          </button>
+        </CollapsibleTrigger>
         <span className={`text-sm font-bold ${getScoreTextColor(score)}`}>{score}/100</span>
       </div>
       <div className="w-full bg-gray-200/20 rounded-full h-2">
@@ -78,10 +75,12 @@ const ScoreBar: React.FC<{ label: string; score: number; explanation?: string }>
           style={{ width: `${score}%` }}
         />
       </div>
-      {showExplanation && explanation && (
-        <p className="text-xs text-gray-600/60 mt-1 pl-4 border-l border-white/10">{explanation}</p>
+      {explanation && (
+        <CollapsibleContent>
+          <p className="text-xs text-gray-600/60 mt-1 pl-4 border-l border-white/10">{explanation}</p>
+        </CollapsibleContent>
       )}
-    </div>
+    </Collapsible>
   );
 };
 
@@ -91,8 +90,6 @@ const ProposedChangeCard: React.FC<{
   isSelected: boolean;
   onToggle: () => void;
 }> = ({ change, isSelected, onToggle }) => {
-  const [expanded, setExpanded] = useState(false);
-
   return (
     <div
       className={`border rounded-lg p-3 mb-2 transition-all ${
@@ -120,34 +117,35 @@ const ProposedChangeCard: React.FC<{
           <p className="text-sm text-gray-600/90">{change.description}</p>
 
           {(change.currentText || change.proposedText) && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="text-xs text-teal hover:text-teal/80 mt-2 flex items-center gap-1"
-            >
-              {expanded ? <ChevronUpIcon className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
-              {expanded ? 'Hide diff' : 'Show diff'}
-            </button>
-          )}
-
-          {expanded && (
-            <div className="mt-2 space-y-2 animate-fade-in">
-              {change.currentText && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded p-2">
-                  <span className="text-xs text-red-400 font-medium block mb-1">Current:</span>
-                  <p className="text-xs text-gray-600/80 whitespace-pre-wrap">{change.currentText}</p>
+            <Collapsible>
+              <CollapsibleTrigger asChild>
+                <button className="text-xs text-teal hover:text-teal/80 mt-2 flex items-center gap-1 group">
+                  <ChevronRightIcon className="h-3 w-3 transition-transform group-data-[state=open]:rotate-90" />
+                  <span className="group-data-[state=open]:hidden">Show diff</span>
+                  <span className="hidden group-data-[state=open]:inline">Hide diff</span>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="mt-2 space-y-2 animate-fade-in">
+                  {change.currentText && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded p-2">
+                      <span className="text-xs text-red-400 font-medium block mb-1">Current:</span>
+                      <p className="text-xs text-gray-600/80 whitespace-pre-wrap">{change.currentText}</p>
+                    </div>
+                  )}
+                  {change.proposedText && (
+                    <div className="bg-green-500/10 border border-green-500/30 rounded p-2">
+                      <span className="text-xs text-emerald-500 font-medium block mb-1">Proposed:</span>
+                      <p className="text-xs text-gray-600/80 whitespace-pre-wrap">{change.proposedText}</p>
+                    </div>
+                  )}
+                  <div className="bg-white/5 border border-white/10 rounded p-2">
+                    <span className="text-xs text-gray-600/60 font-medium block mb-1">Reasoning:</span>
+                    <p className="text-xs text-gray-600/70">{change.reasoning}</p>
+                  </div>
                 </div>
-              )}
-              {change.proposedText && (
-                <div className="bg-green-500/10 border border-green-500/30 rounded p-2">
-                  <span className="text-xs text-emerald-500 font-medium block mb-1">Proposed:</span>
-                  <p className="text-xs text-gray-600/80 whitespace-pre-wrap">{change.proposedText}</p>
-                </div>
-              )}
-              <div className="bg-white/5 border border-white/10 rounded p-2">
-                <span className="text-xs text-gray-600/60 font-medium block mb-1">Reasoning:</span>
-                <p className="text-xs text-gray-600/70">{change.reasoning}</p>
-              </div>
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </div>
       </div>

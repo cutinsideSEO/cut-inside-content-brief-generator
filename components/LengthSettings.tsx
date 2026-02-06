@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { LengthConstraints } from '../types';
 import { ChevronDownIcon, HashIcon } from './Icon';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from './ui';
 
 interface LengthSettingsProps {
   constraints: LengthConstraints;
@@ -48,35 +49,34 @@ const LengthSettings: React.FC<LengthSettingsProps> = ({ constraints, onChange, 
   };
 
   return (
-    <div className="bg-black/30 rounded-lg border border-white/10">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition-colors rounded-lg"
-      >
-        <div className="flex items-center space-x-3">
-          <HashIcon className="h-5 w-5 text-teal" />
-          <div>
-            <h3 className="font-heading font-semibold text-gray-600">Word Count Target</h3>
-            {constraints.globalTarget ? (
-              <p className="text-sm text-gray-600/60">
-                Target: {constraints.globalTarget.toLocaleString()} words
-                {currentWordCount !== undefined && (
-                  <span className="ml-2 text-teal">
-                    (Current: ~{currentWordCount.toLocaleString()})
-                  </span>
-                )}
-              </p>
-            ) : (
-              <p className="text-sm text-gray-600/60">No target set (AI decides)</p>
-            )}
+    <Collapsible open={isExpanded} onOpenChange={setIsExpanded} className="bg-black/30 rounded-lg border border-white/10">
+      <CollapsibleTrigger asChild>
+        <button className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition-colors rounded-lg">
+          <div className="flex items-center space-x-3">
+            <HashIcon className="h-5 w-5 text-teal" />
+            <div>
+              <h3 className="font-heading font-semibold text-gray-600">Word Count Target</h3>
+              {constraints.globalTarget ? (
+                <p className="text-sm text-gray-600/60">
+                  Target: {constraints.globalTarget.toLocaleString()} words
+                  {currentWordCount !== undefined && (
+                    <span className="ml-2 text-teal">
+                      (Current: ~{currentWordCount.toLocaleString()})
+                    </span>
+                  )}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-600/60">No target set (AI decides)</p>
+              )}
+            </div>
           </div>
-        </div>
-        <ChevronDownIcon
-          className={`h-5 w-5 text-gray-600/50 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-        />
-      </button>
+          <ChevronDownIcon
+            className={`h-5 w-5 text-gray-600/50 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          />
+        </button>
+      </CollapsibleTrigger>
 
-      {isExpanded && (
+      <CollapsibleContent>
         <div className="p-4 pt-0 space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
             {presets.map((preset) => (
@@ -132,8 +132,8 @@ const LengthSettings: React.FC<LengthSettingsProps> = ({ constraints, onChange, 
               : 'Target is a guideline - AI may adjust based on topic depth.'}
           </p>
         </div>
-      )}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
 

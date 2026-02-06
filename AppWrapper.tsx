@@ -15,7 +15,7 @@ import type { SaveStatus } from './types/appState';
 import LoginScreen from './components/screens/LoginScreen';
 import ClientSelectScreen from './components/screens/ClientSelectScreen';
 import BriefListScreen from './components/screens/BriefListScreen';
-import ArticleViewScreen from './components/screens/ArticleViewScreen';
+import ArticleScreen from './components/screens/ArticleScreen';
 import PreWizardHeader from './components/PreWizardHeader';
 import Sidebar from './components/Sidebar';
 
@@ -416,7 +416,7 @@ const AppWrapperInner: React.FC = () => {
               <main className="flex-1 overflow-y-auto">
                 <div className="px-6 lg:px-8 py-8">
                   {state.selectedArticleId ? (
-                    <ArticleViewScreen
+                    <ArticleScreen
                       articleId={state.selectedArticleId}
                       onBack={handleBackFromArticle}
                     />

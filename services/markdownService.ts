@@ -301,3 +301,93 @@ export const exportArticleToMarkdown = (article: { title: string, content: strin
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
+
+
+/**
+ * Applies inline markdown formatting (bold, italic) to a text string.
+ */
+function applyInlineFormatting(text: string): string {
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  return text;
+}
+
+/**
+ * Converts article markdown to rich HTML and copies it to the clipboard.
+ * When pasted into Google Docs, headings, bold, italic, lists, and
+ * paragraph formatting are preserved.
+ */
+export async function copyArticleToClipboardRich(content: string): Promise<void> {
+  if (!content) {
+    throw new Error('No content to copy.');
+  }
+
+  const lines = content.split('\n');
+  const htmlParts: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+
+    const h3Match = line.match(/^###\s+(.*)/);
+    if (h3Match) {
+      htmlParts.push(`<h3>${applyInlineFormatting(h3Match[1].trim())}</h3>`);
+      i++;
+      continue;
+    }
+
+    const h2Match = line.match(/^##\s+(.*)/);
+    if (h2Match) {
+      htmlParts.push(`<h2>${applyInlineFormatting(h2Match[1].trim())}</h2>`);
+      i++;
+      continue;
+    }
+
+    const h1Match = line.match(/^#\s+(.*)/);
+    if (h1Match) {
+      htmlParts.push(`<h1>${applyInlineFormatting(h1Match[1].trim())}</h1>`);
+      i++;
+      continue;
+    }
+
+    if (line.match(/^[-*]\s+/)) {
+      const items: string[] = [];
+      while (i < lines.length && lines[i].match(/^[-*]\s+/)) {
+        const itemText = lines[i].replace(/^[-*]\s+/, '');
+        items.push(`<li>${applyInlineFormatting(itemText.trim())}</li>`);
+        i++;
+      }
+      htmlParts.push(`<ul>${items.join('')}</ul>`);
+      continue;
+    }
+
+    if (line.match(/^\d+\.\s+/)) {
+      const items: string[] = [];
+      while (i < lines.length && lines[i].match(/^\d+\.\s+/)) {
+        const itemText = lines[i].replace(/^\d+\.\s+/, '');
+        items.push(`<li>${applyInlineFormatting(itemText.trim())}</li>`);
+        i++;
+      }
+      htmlParts.push(`<ol>${items.join('')}</ol>`);
+      continue;
+    }
+
+    htmlParts.push(`<p>${applyInlineFormatting(line.trim())}</p>`);
+    i++;
+  }
+
+  const html = htmlParts.join('');
+
+  const htmlBlob = new Blob([html], { type: 'text/html' });
+  const textBlob = new Blob([content], { type: 'text/plain' });
+  const clipboardItem = new ClipboardItem({
+    'text/html': htmlBlob,
+    'text/plain': textBlob,
+  });
+  await navigator.clipboard.write([clipboardItem]);
+}

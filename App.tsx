@@ -15,6 +15,7 @@ import CompetitionVizScreen from './components/screens/CompetitionVizScreen';
 import BriefingScreen from './components/screens/BriefingScreen';
 import DashboardScreen from './components/screens/DashboardScreen';
 import ContentGenerationScreen from './components/screens/ContentGenerationScreen';
+import ArticleScreen from './components/screens/ArticleScreen';
 import BriefUploadScreen from './components/screens/BriefUploadScreen';
 
 // Import Supabase integration components
@@ -28,7 +29,7 @@ import { createArticle } from './services/articleService';
 import { uploadContextFile, addContextUrl as addContextUrlToDb, deleteContextFile, deleteContextUrl } from './services/contextService';
 import type { SaveStatus } from './types/appState';
 
-type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_upload';
+type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'article_view' | 'brief_upload';
 type ToastMessage = { id: number; title: string; message: string };
 
 // Props for Supabase integration
@@ -195,6 +196,7 @@ const App: React.FC<AppProps> = ({
 
   // Content generation state
   const [generatedArticle, setGeneratedArticle] = useState<{ title: string; content: string } | null>(null);
+  const [generatedArticleDbId, setGeneratedArticleDbId] = useState<string | null>(null);
   const [generationProgress, setGenerationProgress] = useState<{ currentSection: string; currentIndex: number; total: number } | null>(null);
 
   // "I'm Feeling Lucky" flow state
@@ -952,6 +954,7 @@ const App: React.FC<AppProps> = ({
     setError(null);
     setCurrentView('content_generation');
     setIsLoading(true);
+    setGeneratedArticleDbId(null);
 
     // Notify parent that content generation is starting
     if (briefId && onGenerationStart) {
@@ -1187,11 +1190,14 @@ const App: React.FC<AppProps> = ({
       // Save the generated article to the database
       if (briefId && isSupabaseMode) {
         try {
-          await createArticle(briefId, initialTitle, fullContent, {
+          const { data: savedArticle } = await createArticle(briefId, initialTitle, fullContent, {
             model_settings: modelSettings,
             length_constraints: lengthConstraints,
             writer_instructions: writerInstructions?.trim() || undefined,
           });
+          if (savedArticle) {
+            setGeneratedArticleDbId(savedArticle.id);
+          }
         } catch (saveErr) {
           console.error('Failed to save article to database:', saveErr);
         }
@@ -1316,6 +1322,7 @@ const App: React.FC<AppProps> = ({
     setApiLogin(import.meta.env.VITE_DATAFORSEO_LOGIN || '');
     setApiPassword(import.meta.env.VITE_DATAFORSEO_PASSWORD || '');
     setGeneratedArticle(null);
+    setGeneratedArticleDbId(null);
     setGenerationProgress(null);
     setIsUploadedBrief(false);
     setWriterInstructions('');
@@ -1409,6 +1416,17 @@ const App: React.FC<AppProps> = ({
                   selectedSection={dashboardSection}
                   onSelectSection={setDashboardSection}
                 />;
+      case 'article_view':
+          if (!generatedArticle) return null;
+          return <ArticleScreen
+            article={generatedArticle}
+            articleDbId={generatedArticleDbId || undefined}
+            briefData={briefData}
+            lengthConstraints={lengthConstraints}
+            language={outputLanguage}
+            onBack={() => setCurrentView('dashboard')}
+            onArticleChange={(updated) => setGeneratedArticle(updated)}
+          />;
       case 'content_generation':
           return <ContentGenerationScreen
               isLoading={isLoading}
@@ -1421,6 +1439,7 @@ const App: React.FC<AppProps> = ({
               language={outputLanguage}
               briefData={briefData}
               lengthConstraints={lengthConstraints}
+              onArticleReady={() => setCurrentView('article_view')}
           />
       default:
         return <InitialInputScreen 

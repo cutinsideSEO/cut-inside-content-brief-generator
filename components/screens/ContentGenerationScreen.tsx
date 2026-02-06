@@ -21,6 +21,7 @@ interface ContentGenerationScreenProps {
   language?: string;
   briefData?: Partial<ContentBrief>;
   lengthConstraints?: LengthConstraints;
+  onArticleReady?: () => void;
 }
 
 // Parse markdown into structured elements for paragraph-level editing
@@ -224,6 +225,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
   language = 'English',
   briefData,
   lengthConstraints,
+  onArticleReady,
 }) => {
   const [showCelebration, setShowCelebration] = useState(true);
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
@@ -287,7 +289,13 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
   useEffect(() => {
     if (!isLoading && article) {
         sound?.playSound('success');
-        const timer = setTimeout(() => setShowCelebration(false), 3000);
+        const timer = setTimeout(() => {
+          setShowCelebration(false);
+          // Transition to the unified ArticleScreen
+          if (onArticleReady) {
+            onArticleReady();
+          }
+        }, 3000);
         return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

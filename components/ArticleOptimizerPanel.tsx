@@ -14,7 +14,9 @@ import {
 } from './Icon';
 import { Badge, Progress, Collapsible, CollapsibleTrigger, CollapsibleContent } from './ui';
 import { validateGeneratedContent, optimizeArticleWithChat } from '../services/geminiService';
+import { updateArticleContent } from '../services/articleService';
 import { calculateArticleMetrics } from '../utils/articleMetrics';
+import { toast } from 'sonner';
 import type { ContentBrief, LengthConstraints, ContentValidationResult } from '../types';
 import type { ArticleMetrics } from '../utils/articleMetrics';
 
@@ -25,6 +27,8 @@ interface ArticleOptimizerPanelProps {
   language: string;
   onApplyChanges: (newContent: string) => void;
   onClose: () => void;
+  articleId?: string;
+  mode?: 'overlay' | 'inline';
 }
 
 interface ChatMessage {
@@ -152,6 +156,8 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
   language,
   onApplyChanges,
   onClose,
+  articleId,
+  mode = 'overlay',
 }) => {
   const [metrics, setMetrics] = useState<ArticleMetrics | null>(null);
   const [validationResult, setValidationResult] = useState<ContentValidationResult | null>(null);
@@ -308,12 +314,30 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
     handleSendInstruction(userInput);
   }, [userInput, handleSendInstruction]);
 
-  const handleApplyChanges = useCallback(() => {
-    if (pendingContent) {
-      onApplyChanges(pendingContent);
-      onClose();
+  const handleApplyChanges = useCallback(async () => {
+    if (!pendingContent) return;
+
+    // Save to DB if article ID is available
+    if (articleId) {
+      const title = pendingContent.match(/^# (.+)$/m)?.[1] || article.title;
+      const { error } = await updateArticleContent(articleId, title, pendingContent);
+      if (error) {
+        toast.error('Failed to save changes to database');
+        // Still apply locally even if DB save fails
+      } else {
+        toast.success('Article saved');
+      }
     }
-  }, [pendingContent, onApplyChanges, onClose]);
+
+    // Apply changes to parent state
+    onApplyChanges(pendingContent);
+
+    // Clear pending content but DON'T close — stay open for further optimization
+    setPendingContent(null);
+    setStreamedContent('');
+
+    // Recalculate metrics with new content (the article prop will update from parent)
+  }, [pendingContent, articleId, article.title, onApplyChanges]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -333,7 +357,11 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
   const overallScore = validationResult?.overallScore ?? null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full md:w-[520px] lg:w-[580px] bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col animate-slide-in-right">
+    <div className={
+      mode === 'inline'
+        ? 'flex flex-col h-full bg-white border-l border-gray-200'
+        : 'fixed inset-y-0 right-0 w-full md:w-[520px] lg:w-[580px] bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col animate-slide-in-right'
+    }>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center gap-2.5">
@@ -357,12 +385,14 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
               {overallScore}/100
             </div>
           )}
-          <button
-            onClick={onClose}
-            className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <XIcon className="h-5 w-5" />
-          </button>
+          {mode !== 'inline' && (
+            <button
+              onClick={onClose}
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <XIcon className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -559,7 +589,7 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
               <div className="flex gap-2">
                 <Button onClick={handleApplyChanges} variant="primary" size="sm" className="flex-1">
                   <CheckIcon className="h-4 w-4 mr-1" />
-                  Apply Changes
+                  {articleId ? 'Apply & Save' : 'Apply Changes'}
                 </Button>
                 <Button
                   onClick={() => setPendingContent(null)}

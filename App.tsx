@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, createContext, useContext } from 'react';
 import Header from './components/Header';
-import { generateBriefStep, generateArticleSection, setModelSettings, regenerateParagraph } from './services/geminiService';
+import { generateBriefStep, generateArticleSection, setModelSettings, regenerateParagraph, trimSectionToWordCount } from './services/geminiService';
 import * as dataforseoService from './services/dataforseoService';
 import { parseMarkdownBrief } from './services/markdownParserService';
 import { extractTemplateFromUrl } from './services/templateExtractionService';
@@ -984,7 +984,7 @@ const App: React.FC<AppProps> = ({
           sectionToWrite: section,
           upcomingHeadings,
           language: outputLanguage,
-          writerInstructions: isUploadedBrief ? writerInstructions : undefined,
+          writerInstructions: writerInstructions?.trim() || undefined,
           globalWordTarget,
           wordsWrittenSoFar: countWords(fullContent),
           totalSections: allSections.length,
@@ -1000,6 +1000,33 @@ const App: React.FC<AppProps> = ({
         // If not (fallback), we need to add it
         if (!fullContent.includes(sectionContent)) {
           fullContent += sectionContent;
+        }
+
+        // Auto-trim over-budget sections in strict mode
+        const sectionTarget = section.target_word_count || 0;
+        if (isStrictMode && sectionTarget > 0) {
+          const sectionWords = countWords(sectionContent);
+          const maxAllowed = sectionTarget * 1.2; // 20% buffer
+
+          if (sectionWords > maxAllowed) {
+            console.log(`Trimming "${section.heading}": ${sectionWords} → ~${sectionTarget} words`);
+            setGenerationProgress({
+              currentSection: `Trimming: ${section.heading}`,
+              currentIndex: i + 1,
+              total: allSections.length,
+            });
+
+            const trimmedContent = await trimSectionToWordCount(
+              sectionContent,
+              sectionTarget,
+              outputLanguage,
+              section.heading
+            );
+
+            // Replace the over-budget section content in fullContent
+            fullContent = fullContent.replace(sectionContent, trimmedContent);
+            setGeneratedArticle({ title: initialTitle, content: fullContent });
+          }
         }
 
         fullContent += '\n\n';
@@ -1039,7 +1066,7 @@ const App: React.FC<AppProps> = ({
                 },
                 upcomingHeadings: [],
                 language: outputLanguage,
-                writerInstructions: isUploadedBrief ? writerInstructions : undefined,
+                writerInstructions: writerInstructions?.trim() || undefined,
                 globalWordTarget,
                 wordsWrittenSoFar: countWords(fullContent),
                 totalSections: allSections.length + briefData.faqs.questions.length,
@@ -1068,7 +1095,7 @@ const App: React.FC<AppProps> = ({
           await createArticle(briefId, initialTitle, fullContent, {
             model_settings: modelSettings,
             length_constraints: lengthConstraints,
-            writer_instructions: isUploadedBrief ? writerInstructions : undefined,
+            writer_instructions: writerInstructions?.trim() || undefined,
           });
         } catch (saveErr) {
           console.error('Failed to save article to database:', saveErr);

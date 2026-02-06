@@ -92,7 +92,7 @@ export const getSystemPrompt = (step: number, language: string, isRegeneration?:
       2.  **Hierarchical Depth:** The outline must be nested. Use 'H2' for main sections, 'H3' for sub-sections.
       3.  **Special Sections:** Include special sections where appropriate: \`level: "Hero"\`, \`level: "Conclusion"\`. Do NOT create an FAQ section here; that will be handled in a separate step.
       4.  **Deep Reasoning:** Your 'reasoning' for EACH item must be a detailed sentence explaining *why* it is included, explicitly linking back to the Content Gap Analysis or competitor insights (e.g., "Covers the 'Table Stakes' topic of X," or "Exploits the 'Strategic Opportunity' to discuss Y in more detail than competitors.").
-      5.  **Word Count:** Recommend a competitive word count based on the average of the top and starred competitors. Optionally, allocate approximate word counts to major sections using the 'target_word_count' field.
+      5.  **Word Count:** Recommend a competitive word count based on the average of the top and starred competitors. You MUST allocate a 'target_word_count' (in words) to EVERY section in the outline. Base allocations on section depth (H2 sections need more words than H3), guideline complexity, and whether it's targeting a featured snippet. The sum of all section word counts should approximately equal the total word_count_target.
 
       **FEATURED SNIPPET TARGETING (IMPORTANT):**
       Based on the Search Intent analysis from Step 1, identify if there's a Featured Snippet opportunity.
@@ -196,29 +196,30 @@ export const getStructureResourceAnalysisPrompt = (language: string): string => 
 }
 
 export const getContentGenerationPrompt = (language: string, writerInstructions?: string): string => {
-    let prompt = `You are an expert content writer tasked with writing a single section of a larger article. You must write in a profound, engaging, and expert tone.
-    
-    **CRITICAL INSTRUCTIONS:**
-    1.  You will be given the full content brief, the article content written so far, and the specific outline item you are to write now.
-    2.  Adhere strictly to the 'guidelines' provided for the current section. This is your primary directive.
-    3.  Your task is to write **only the body content** for the current section. **DO NOT repeat the section's heading** in your response.
-    4.  Ensure your writing flows naturally from the 'Content Written So Far'.
-    5.  You will see a list of 'Upcoming Headings' to help you anticipate the article's flow and write a good transition.
-    6.  Your entire response must be only the text (one or more paragraphs) for the current section. Do not add any extra formatting, titles, or conversational text.
-    7.  Your entire response MUST be in **${language}**.
-    8.  **WORD COUNT DISCIPLINE:** When a word count target is specified, you MUST respect it. Count your output mentally as you write. It is better to be concise and impactful than to pad with filler content. If a strict limit is set, DO NOT exceed it under any circumstances.
-    9.  **E-E-A-T SIGNALS:** When E-E-A-T (Experience, Expertise, Authority, Trust) signals are provided, weave them naturally into your writing. Cite authoritative sources, demonstrate expertise through precise language, and include trust signals where appropriate. Do NOT list them artificially — integrate them so the content reads as genuinely authoritative.
-    10. **BRIEF QUALITY COMPENSATION:** When brief validation issues are flagged, actively compensate for them in your writing. If the brief missed covering a topic, fill the gap. If keyword integration was weak, ensure you use the keywords naturally. Your job is to produce the best possible content even if the brief has imperfections.`;
+    let prompt = `You are an expert content writer writing a single section of an article.
+
+**CRITICAL: WORD COUNT IS NON-NEGOTIABLE**
+When given a word count target, you MUST stay within ±15% of that target.
+- Target 200 words → Write 170-230 words. NOT 300+.
+- Count mentally as you write. Quality over quantity.
+- Concise and impactful beats verbose and padded.
+- If over budget, cut filler — keep only high-value content.
+
+**WRITING RULES:**
+1.  Write ONLY the body content. DO NOT repeat the section heading.
+2.  Follow the section 'guidelines' as your primary directive.
+3.  Flow naturally from the 'Content Written So Far'.
+4.  Write in **${language}**.
+5.  Integrate keywords naturally, not forced.
+6.  When E-E-A-T signals are provided, weave them in organically.
+7.  If brief validation issues are flagged, compensate in your writing.
+8.  Return only the text paragraphs for this section — no extra formatting or titles.`;
 
     if (writerInstructions && writerInstructions.trim()) {
         prompt += `
-    
-**ADDITIONAL WRITER INSTRUCTIONS (STYLE, TONE, ETC.):**
-You MUST follow these instructions carefully throughout your writing:
----
-${writerInstructions.trim()}
----
-        `;
+
+**STYLE/TONE REQUIREMENTS:**
+${writerInstructions.trim()}`;
     }
 
     return prompt;

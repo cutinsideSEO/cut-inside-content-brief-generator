@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { getSystemPrompt, getStructureEnrichmentPrompt, getStructureResourceAnalysisPrompt, getContentGenerationPrompt, TEMPLATE_EXTRACTION_PROMPT, ADAPT_HEADINGS_PROMPT, PARAGRAPH_REGENERATION_PROMPT, REWRITE_SELECTION_PROMPTS, THINKING_LEVEL_BY_STEP, getLengthConstraintPrompt, VALIDATION_PROMPT, EEAT_SIGNALS_PROMPT, CONTENT_VALIDATION_SYSTEM_PROMPT, CONTENT_VALIDATION_PROMPT, CONTENT_VALIDATION_FOLLOWUP_PROMPT } from '../constants';
 import type { ContentBrief, ArticleStructure, OutlineItem, ModelSettings, GeminiModel, ThinkingLevel, HeadingNode, RewriteAction, LengthConstraints, BriefValidation, EEATSignals, ContentValidationResult } from "../types";
+import { stripReasoningFromBrief } from './briefContextService';
 
 if (!process.env.API_KEY) {
   throw new Error("API_KEY environment variable is not set.");
@@ -803,8 +804,8 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
     }
 
     const prompt = `
-        **FULL CONTENT BRIEF (JSON):**
-        ${JSON.stringify(brief, null, 2)}
+        **FULL CONTENT BRIEF (JSON, reasoning fields stripped for brevity):**
+        ${JSON.stringify(stripReasoningFromBrief(brief), null, 2)}
 
         ---
 
@@ -878,6 +879,54 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
     } catch (error) {
         console.error("Error generating article section:", error);
         throw new Error("Failed to generate article section from Gemini API.");
+    }
+};
+
+/**
+ * Trims a section to target word count using AI condensation.
+ * Only called if section exceeds maxWords (target * 1.2) in strict mode.
+ */
+export const trimSectionToWordCount = async (
+    content: string,
+    targetWords: number,
+    language: string,
+    sectionHeading: string
+): Promise<string> => {
+    const modelName = currentModelSettings.model;
+
+    const prompt = `Condense the following section to approximately ${targetWords} words.
+
+RULES:
+- Preserve ALL key information and main points
+- Maintain natural flow and readability
+- Remove filler, redundancy, and overly wordy phrases
+- Do NOT add any commentary — return ONLY the condensed text
+- Write in **${language}**
+
+SECTION HEADING: ${sectionHeading}
+
+CONTENT TO CONDENSE:
+${content}
+
+Condensed version (approximately ${targetWords} words):`;
+
+    try {
+        return await retryOperation(async () => {
+            const response = await ai.models.generateContent({
+                model: modelName,
+                contents: prompt,
+                config: {
+                    thinkingConfig: { thinkingBudget: 1024 }, // Minimal thinking for faithful condensation
+                },
+            });
+            const text = response.text;
+            if (!text) throw new Error("Empty response from AI for section trimming.");
+            return text.trim();
+        });
+    } catch (error) {
+        console.error("Error trimming section:", error);
+        // Return original content if trimming fails
+        return content;
     }
 };
 

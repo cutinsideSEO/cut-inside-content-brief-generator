@@ -93,7 +93,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           <Input
             label="Access Code"
             id="accessCode"
-            type="text"
+            type="password"
             value={accessCode}
             onChange={(e) => setAccessCode(e.target.value)}
             placeholder="Enter your access code"

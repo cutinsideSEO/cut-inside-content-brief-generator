@@ -77,7 +77,7 @@ const OutlineNode: React.FC<{
           >
             <ChevronDownIcon className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
             <Badge variant="teal" size="sm">{item.level}</Badge>
-            <span className="text-sm font-heading font-semibold text-gray-900 truncate flex-1">
+            <span className="text-sm font-heading font-semibold text-foreground truncate flex-1">
               {item.heading || 'Untitled section'}
             </span>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -133,7 +133,7 @@ const OutlineNode: React.FC<{
             </div>
 
             <div>
-              <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-1">Heading</label>
+              <label className="block text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider mb-1">Heading</label>
               <Input
                 value={item.heading}
                 onChange={(e) => handleInputChange('heading', e.target.value)}
@@ -142,7 +142,7 @@ const OutlineNode: React.FC<{
             </div>
 
             <div>
-              <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-1">Guidelines</label>
+              <label className="block text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider mb-1">Guidelines</label>
               <EditableText
                 value={item.guidelines.join('\n')}
                 onChange={(val) => handleInputChange('guidelines', val.split('\n'))}
@@ -259,11 +259,11 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
   const isAllExpanded = structure.outline && structure.outline.length > 0 && expandedPaths.size >= getAllPaths(structure.outline).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Word count + reasoning */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <label htmlFor="word_count" className="text-sm font-heading font-medium text-gray-600">Word Count Target</label>
+          <label htmlFor="word_count" className="text-sm font-heading font-medium text-muted-foreground">Word Count Target</label>
           {structure.reasoning && <AIReasoningIcon reasoning={structure.reasoning} />}
         </div>
         <div className="w-40">
@@ -281,7 +281,7 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       {/* Content Outline */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider">Content Outline</h3>
+          <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider">Content Outline</h3>
           {structure.outline && structure.outline.length > 0 && (
             <button
               type="button"
@@ -305,7 +305,7 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
             />
           ))}
           {structure.outline?.length === 0 && (
-            <p className="text-sm text-gray-400 italic py-4 text-center">No outline sections yet</p>
+            <p className="text-sm text-muted-foreground italic py-4 text-center">No outline sections yet</p>
           )}
         </div>
       </div>

@@ -28,12 +28,12 @@ const Badge: React.FC<BadgeProps> = ({
         'inline-flex items-center gap-1.5 font-medium rounded transition-all duration-200',
 
         // Variant
-        variant === 'default' && 'bg-gray-100 border border-gray-200 text-gray-600',
+        variant === 'default' && 'bg-gray-100 border border-border text-gray-600',
         variant === 'success' && 'bg-emerald-50 border border-emerald-200 text-emerald-700',
         variant === 'warning' && 'bg-amber-50 border border-amber-200 text-amber-700',
         variant === 'error' && 'bg-red-50 border border-red-200 text-red-700',
         variant === 'teal' && 'bg-teal-50 border border-teal-200 text-teal-700',
-        variant === 'outline' && 'bg-transparent border border-gray-200 text-gray-500',
+        variant === 'outline' && 'bg-transparent border border-border text-gray-500',
 
         // Size
         size === 'sm' && 'px-2 py-0.5 text-xs',

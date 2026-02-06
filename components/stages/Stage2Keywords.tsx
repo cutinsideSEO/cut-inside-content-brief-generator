@@ -87,9 +87,9 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
                   {type}
                 </Badge>
               </TableCell>
-              <TableCell className="p-3 font-medium text-gray-900">{kwSelection.keyword}</TableCell>
-              <TableCell className="p-3 font-mono text-gray-600 text-sm">{getVolume(kwSelection.keyword)}</TableCell>
-              <TableCell className="p-3 text-sm text-gray-400 truncate max-w-[200px]">
+              <TableCell className="p-3 font-medium text-foreground">{kwSelection.keyword}</TableCell>
+              <TableCell className="p-3 font-mono text-muted-foreground text-sm">{getVolume(kwSelection.keyword)}</TableCell>
+              <TableCell className="p-3 text-sm text-muted-foreground truncate max-w-[200px]">
                 {notePreview || <span className="italic">No notes</span>}
               </TableCell>
               <TableCell className="p-3 text-center">
@@ -138,18 +138,18 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
       {strategy.reasoning && (
         <div className="flex items-center gap-2 mb-2">
           <AIReasoningIcon reasoning={strategy.reasoning} />
-          <span className="text-xs text-gray-400">AI has categorized your keywords with strategic notes</span>
+          <span className="text-xs text-muted-foreground">AI has categorized your keywords with strategic notes</span>
         </div>
       )}
 
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-100">
-            <TableHead className="p-3 text-xs font-heading font-semibold text-gray-600 uppercase tracking-wider w-[15%]">Type</TableHead>
-            <TableHead className="p-3 text-xs font-heading font-semibold text-gray-600 uppercase tracking-wider w-[25%]">Keyword</TableHead>
-            <TableHead className="p-3 text-xs font-heading font-semibold text-gray-600 uppercase tracking-wider w-[15%]">Volume</TableHead>
-            <TableHead className="p-3 text-xs font-heading font-semibold text-gray-600 uppercase tracking-wider w-[35%]">Notes</TableHead>
-            <TableHead className="p-3 text-xs font-heading font-semibold text-gray-600 uppercase tracking-wider w-[10%]"></TableHead>
+            <TableHead className="p-3 text-xs font-heading font-semibold text-muted-foreground uppercase tracking-wider w-[15%]">Type</TableHead>
+            <TableHead className="p-3 text-xs font-heading font-semibold text-muted-foreground uppercase tracking-wider w-[25%]">Keyword</TableHead>
+            <TableHead className="p-3 text-xs font-heading font-semibold text-muted-foreground uppercase tracking-wider w-[15%]">Volume</TableHead>
+            <TableHead className="p-3 text-xs font-heading font-semibold text-muted-foreground uppercase tracking-wider w-[35%]">Notes</TableHead>
+            <TableHead className="p-3 text-xs font-heading font-semibold text-muted-foreground uppercase tracking-wider w-[10%]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -163,7 +163,7 @@ const Stage2Keywords: React.FC<StageProps> = ({ briefData, setBriefData, keyword
       </Table>
 
       {strategy.primary_keywords?.length === 0 && strategy.secondary_keywords?.length === 0 && (
-        <div className="text-center py-8 text-gray-400">
+        <div className="text-center py-8 text-muted-foreground">
           <p>No keywords have been categorized yet.</p>
         </div>
       )}

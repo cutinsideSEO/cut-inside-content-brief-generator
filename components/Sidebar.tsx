@@ -29,6 +29,7 @@ interface SidebarProps {
   briefingStep?: number;
   selectedSection?: number | null;
   onSelectSection?: (section: number | null) => void;
+  onGoToStep?: (step: number) => void;
   staleSteps?: Set<number>;
   isUploadedBrief?: boolean;
   clientName?: string;
@@ -42,6 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   briefingStep = 1,
   selectedSection,
   onSelectSection,
+  onGoToStep,
   staleSteps = new Set(),
   isUploadedBrief = false,
   clientName,
@@ -134,9 +136,16 @@ const Sidebar: React.FC<SidebarProps> = ({
                         aria-hidden="true"
                       />
                     )}
-                    <div className={`relative flex items-center gap-3 p-2 rounded-md transition-all duration-200 ${
-                      isActive ? 'bg-teal-50' : 'hover:bg-gray-100'
-                    }`}>
+                    <div
+                      className={`relative flex items-center gap-3 p-2 rounded-md transition-all duration-200 ${
+                        isActive ? 'bg-teal-50' : 'hover:bg-gray-100'
+                      } ${isCompleted && onGoToStep ? 'cursor-pointer' : ''}`}
+                      onClick={() => {
+                        if (isCompleted && onGoToStep) {
+                          onGoToStep(step.uiStep);
+                        }
+                      }}
+                    >
                       <span className={`relative z-10 w-9 h-9 flex items-center justify-center rounded-full border-2 transition-all duration-200 ${
                         isCompleted
                           ? 'bg-teal border-teal shadow-glow-teal-sm'

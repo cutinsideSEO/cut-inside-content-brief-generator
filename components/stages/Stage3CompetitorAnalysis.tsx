@@ -48,7 +48,7 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
       {/* Differentiation Summary */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider">
+          <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider">
             Differentiation Summary
           </h3>
           {insights.differentiation_summary.reasoning && (
@@ -64,7 +64,7 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
 
       {/* Competitor Breakdowns */}
       <div className="border-t border-gray-100 pt-8">
-        <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider mb-4">
+        <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-4">
           Competitor Breakdowns
         </h3>
 
@@ -82,7 +82,7 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
                     </span>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {bestRank && (
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-muted-foreground">
                           #{bestRank.rank} for "{bestRank.keyword}"
                         </span>
                       )}
@@ -107,7 +107,7 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
 
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">Description</label>
+                          <label className="block text-xs font-heading font-medium text-muted-foreground uppercase tracking-wider mb-2">Description</label>
                           <EditableText
                             value={item.description}
                             onChange={(val) => handleBreakdownChange(index, 'description', val)}
@@ -145,7 +145,7 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
             })}
           </Accordion>
         ) : (
-          <div className="text-center py-8 text-gray-400">
+          <div className="text-center py-8 text-muted-foreground">
             <p>No competitor insights available yet.</p>
           </div>
         )}

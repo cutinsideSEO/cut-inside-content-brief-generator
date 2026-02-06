@@ -24,7 +24,7 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
   };
 
   const variantStyles = {
-    default: 'border-gray-200',
+    default: 'border-border',
     warning: 'border-amber-300',
     info: 'border-teal/50',
   };
@@ -61,7 +61,7 @@ export const FloatingPanelHeader: React.FC<FloatingPanelHeaderProps> = ({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 p-4 border-b border-gray-200 sticky top-0 glass-effect',
+        'flex items-center gap-2 p-4 border-b border-border sticky top-0 glass-effect',
         className
       )}
       {...props}
@@ -90,11 +90,11 @@ export const FloatingPanelItem: React.FC<FloatingPanelItemProps> = ({
   ...props
 }) => {
   return (
-    <div className={cn('p-4 border-b border-gray-200 last:border-b-0', className)} {...props}>
+    <div className={cn('p-4 border-b border-border last:border-b-0', className)} {...props}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
           <div className="font-medium text-foreground truncate">{title}</div>
-          {subtitle && <div className="text-sm text-gray-400 truncate">{subtitle}</div>}
+          {subtitle && <div className="text-sm text-muted-foreground truncate">{subtitle}</div>}
         </div>
         {action && <div className="flex-shrink-0">{action}</div>}
       </div>
@@ -116,7 +116,7 @@ export const FloatingPanelFooter: React.FC<FloatingPanelFooterProps> = ({
   return (
     <div
       className={cn(
-        'p-3 border-t border-gray-200 text-xs text-gray-400 text-center sticky bottom-0 glass-effect',
+        'p-3 border-t border-border text-xs text-muted-foreground text-center sticky bottom-0 glass-effect',
         className
       )}
       {...props}

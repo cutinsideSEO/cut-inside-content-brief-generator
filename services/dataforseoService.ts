@@ -2,8 +2,40 @@
 
 const API_BASE_URL = "https://api.dataforseo.com/v3";
 
+// Track active request controllers for cancellation support
+const activeControllers = new Set<AbortController>();
+
+/**
+ * Abort all in-flight DataForSEO requests (e.g., when user navigates away)
+ */
+export const abortAllRequests = () => {
+    activeControllers.forEach(c => c.abort());
+    activeControllers.clear();
+};
+
+/**
+ * Fetch with timeout and abort tracking
+ */
+const fetchWithTimeout = (url: string, options: RequestInit, timeoutMs = 30000): Promise<Response> => {
+    const controller = new AbortController();
+    activeControllers.add(controller);
+
+    // If the caller already provided a signal, listen to it
+    if (options.signal) {
+        options.signal.addEventListener('abort', () => controller.abort());
+    }
+
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    return fetch(url, { ...options, signal: controller.signal })
+        .finally(() => {
+            clearTimeout(timeoutId);
+            activeControllers.delete(controller);
+        });
+};
+
 const executePost = async (endpoint: string, payload: any[], login: string, password: string) => {
-    const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/${endpoint}`, {
         method: 'POST',
         headers: {
             'Authorization': 'Basic ' + btoa(`${login}:${password}`),
@@ -18,7 +50,7 @@ const executePost = async (endpoint: string, payload: any[], login: string, pass
     }
 
     const data = await response.json();
-    
+
     if (data.status_code !== 20000 || data.tasks_error > 0) {
         throw new Error(`DataForSEO task error: ${data.tasks[0]?.status_message}`);
     }

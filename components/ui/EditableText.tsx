@@ -123,7 +123,7 @@ const EditableText: React.FC<EditableTextProps> = ({
   // Edit mode
   if (isEditing) {
     const editStyles =
-      'w-full bg-white border border-gray-200 rounded-md text-foreground text-sm leading-relaxed py-3 px-4 focus:outline-none focus:border-teal resize-none';
+      'w-full bg-card border border-border rounded-md text-foreground text-sm leading-relaxed py-3 px-4 focus:outline-none focus:border-teal resize-none';
 
     if (multiline) {
       return (

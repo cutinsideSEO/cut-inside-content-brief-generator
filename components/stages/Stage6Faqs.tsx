@@ -29,6 +29,17 @@ const Stage6Faqs: React.FC<StageProps> = ({ briefData, setBriefData }) => {
     });
   };
 
+  const handleAddFaq = () => {
+    setBriefData(prev => {
+      const currentFaqs = prev.faqs || faqsData;
+      const newQuestions = [...currentFaqs.questions, { question: '', guidelines: [''] }];
+      return {
+        ...prev,
+        faqs: { ...currentFaqs, questions: newQuestions },
+      };
+    });
+  };
+
   const handleRemoveFaq = (indexToRemove: number) => {
     setBriefData(prev => {
       const currentFaqs = prev.faqs;
@@ -44,11 +55,11 @@ const Stage6Faqs: React.FC<StageProps> = ({ briefData, setBriefData }) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {faqsData.reasoning && (
         <div className="flex items-center gap-2 mb-2">
           <AIReasoningIcon reasoning={faqsData.reasoning} />
-          <span className="text-xs text-gray-400">AI-generated questions based on PAA data and competitor analysis</span>
+          <span className="text-xs text-muted-foreground">AI-generated questions based on PAA data and competitor analysis</span>
         </div>
       )}
 
@@ -89,10 +100,24 @@ const Stage6Faqs: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       </div>
 
       {faqsData.questions.length === 0 && (
-        <div className="text-center py-8 text-gray-400">
+        <div className="text-center py-8 text-muted-foreground">
           <p>No FAQs generated yet.</p>
         </div>
       )}
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleAddFaq}
+        className="mt-2 text-teal hover:text-teal"
+        icon={
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        }
+      >
+        Add FAQ
+      </Button>
     </div>
   );
 };

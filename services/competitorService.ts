@@ -91,12 +91,25 @@ export async function saveCompetitors(
     }
 
     // Remove competitors that are no longer in the list
-    const currentUrls = competitors.map((c) => c.URL);
-    await supabase
+    // Fetch existing competitors, compute which to delete in JS, then delete by ID
+    const currentUrls = new Set(competitors.map((c) => c.URL));
+    const { data: existing } = await supabase
       .from('brief_competitors')
-      .delete()
-      .eq('brief_id', briefId)
-      .not('url', 'in', `(${currentUrls.map((u) => `"${u.replace(/"/g, '\\"')}"`).join(',')})`);
+      .select('id, url')
+      .eq('brief_id', briefId);
+
+    if (existing && existing.length > 0) {
+      const idsToDelete = existing
+        .filter((row: { id: string; url: string }) => !currentUrls.has(row.url))
+        .map((row: { id: string; url: string }) => row.id);
+
+      if (idsToDelete.length > 0) {
+        await supabase
+          .from('brief_competitors')
+          .delete()
+          .in('id', idsToDelete);
+      }
+    }
 
     return { data: data as BriefCompetitor[], error: null };
   } catch (err) {

@@ -208,23 +208,24 @@ export async function setCurrentArticle(
   articleId: string
 ): Promise<ApiResponse<BriefArticle>> {
   try {
-    // First, mark all articles for this brief as not current
-    await supabase
-      .from('brief_articles')
-      .update({ is_current: false })
-      .eq('brief_id', briefId);
-
-    // Then mark the specified article as current
-    const { data, error } = await supabase
+    // Set the target article as current first (safe: if this fails, nothing changes)
+    const { data, error: setError } = await supabase
       .from('brief_articles')
       .update({ is_current: true })
       .eq('id', articleId)
       .select()
       .single();
 
-    if (error) {
-      return { data: null, error: error.message };
+    if (setError) {
+      return { data: null, error: setError.message };
     }
+
+    // Then clear all other articles for this brief (safe: target is already set)
+    await supabase
+      .from('brief_articles')
+      .update({ is_current: false })
+      .eq('brief_id', briefId)
+      .neq('id', articleId);
 
     return { data: data as BriefArticle, error: null };
   } catch (err) {

@@ -1,13 +1,79 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import { getSystemPrompt, getStructureEnrichmentPrompt, getStructureResourceAnalysisPrompt, getContentGenerationPrompt, TEMPLATE_EXTRACTION_PROMPT, ADAPT_HEADINGS_PROMPT, PARAGRAPH_REGENERATION_PROMPT, REWRITE_SELECTION_PROMPTS, THINKING_LEVEL_BY_STEP, getLengthConstraintPrompt, VALIDATION_PROMPT, EEAT_SIGNALS_PROMPT, CONTENT_VALIDATION_SYSTEM_PROMPT, CONTENT_VALIDATION_PROMPT, CONTENT_VALIDATION_FOLLOWUP_PROMPT } from '../constants';
 import type { ContentBrief, ArticleStructure, OutlineItem, ModelSettings, GeminiModel, ThinkingLevel, HeadingNode, RewriteAction, LengthConstraints, BriefValidation, EEATSignals, ContentValidationResult } from "../types";
 import { stripReasoningFromBrief } from './briefContextService';
+import { supabase } from './supabaseClient';
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable is not set.");
-}
+// Supabase project URL for edge function calls
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+/**
+ * Call the Gemini proxy edge function (non-streaming).
+ */
+const callGemini = async (model: string, contents: string, config: any): Promise<{ text: string }> => {
+  const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+    body: { model, contents, config },
+  });
+
+  if (error) {
+    throw new Error(`Gemini proxy error: ${error.message}`);
+  }
+
+  if (data?.error) {
+    throw new Error(`Gemini API error: ${data.error}`);
+  }
+
+  return data;
+};
+
+/**
+ * Call the Gemini proxy edge function with streaming (SSE).
+ */
+const callGeminiStream = async function* (model: string, contents: string, config: any): AsyncGenerator<{ text: string }> {
+  const url = `${supabaseUrl}/functions/v1/gemini-proxy`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseAnonKey}`,
+    },
+    body: JSON.stringify({ model, contents, config, stream: true }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Gemini proxy stream error: ${response.status} ${errorBody}`);
+  }
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') return;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.error) throw new Error(parsed.error);
+          yield parsed;
+        } catch (e) {
+          if (e instanceof SyntaxError) continue;
+          throw e;
+        }
+      }
+    }
+  }
+};
 
 // Default model settings - can be overridden by user
 let currentModelSettings: ModelSettings = {
@@ -448,15 +514,15 @@ const generateHierarchicalArticleStructure = async (params: GenerationParams): P
 
     // RETRY 1: Structure Skeleton
     const initialStructure = await retryOperation(async () => {
-        const response = await ai.models.generateContent({
-            model: modelName,
-            contents: `${basePrompt}\nPlease generate the JSON for step 5, part 1 (the core structure only).`,
-            config: {
+        const response = await callGemini(
+            modelName,
+            `${basePrompt}\nPlease generate the JSON for step 5, part 1 (the core structure only).`,
+            {
                 systemInstruction: structureSystemInstruction,
                 responseMimeType: "application/json",
                 responseSchema: schema,
-            },
-        });
+            }
+        );
         const text = response.text;
         if (!text) throw new Error("Received an empty response from the AI for structure generation (Part 1).");
         return JSON.parse(text);
@@ -483,15 +549,15 @@ const generateHierarchicalArticleStructure = async (params: GenerationParams): P
 
     // RETRY 2: Enrichment
     const enrichedStructure = await retryOperation(async () => {
-        const response = await ai.models.generateContent({
-            model: modelName,
-            contents: enrichmentPrompt,
-            config: {
+        const response = await callGemini(
+            modelName,
+            enrichmentPrompt,
+            {
                 systemInstruction: enrichmentSystemInstruction,
                 responseMimeType: "application/json",
                 responseSchema: schema,
-            },
-        });
+            }
+        );
         const text = response.text;
         if (!text) throw new Error("Received an empty response from the AI for structure enrichment (Part 2).");
         return JSON.parse(text);
@@ -509,15 +575,15 @@ const generateHierarchicalArticleStructure = async (params: GenerationParams): P
     // RETRY 3: Resource Analysis (with fallback)
     try {
         const finalStructure = await retryOperation(async () => {
-             const response = await ai.models.generateContent({
-                model: modelName,
-                contents: resourceAnalysisPrompt,
-                config: {
+             const response = await callGemini(
+                modelName,
+                resourceAnalysisPrompt,
+                {
                     systemInstruction: resourceAnalysisSystemInstruction,
                     responseMimeType: "application/json",
                     responseSchema: schema,
-                },
-            });
+                }
+            );
             const text = response.text;
             if (!text) throw new Error("Received empty response for resource analysis.");
             return JSON.parse(text);
@@ -626,14 +692,14 @@ export const generateBriefStep = async (params: GenerationParams): Promise<Parti
 
     // RETRY Wrapper for general steps
     return await retryOperation(async () => {
-        const response = await ai.models.generateContent({
-            model: modelName,
-            contents: prompt,
-            config: {
+        const response = await callGemini(
+            modelName,
+            prompt,
+            {
                 systemInstruction: systemInstruction,
                 ...genConfig,
-            },
-        });
+            }
+        );
 
         const text = response.text;
         if (!text) {
@@ -840,13 +906,11 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
         // Use streaming if callback provided
         if (onStream) {
             let fullText = '';
-            const stream = await ai.models.generateContentStream({
-                model: modelName,
-                contents: prompt,
-                config: {
-                    systemInstruction,
-                },
-            });
+            const stream = callGeminiStream(
+                modelName,
+                prompt,
+                { systemInstruction }
+            );
 
             for await (const chunk of stream) {
                 const chunkText = chunk.text || '';
@@ -862,13 +926,11 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
 
         // Non-streaming fallback with retry
         return await retryOperation(async () => {
-             const response = await ai.models.generateContent({
-                model: modelName,
-                contents: prompt,
-                config: {
-                    systemInstruction,
-                },
-            });
+            const response = await callGemini(
+                modelName,
+                prompt,
+                { systemInstruction }
+            );
             const text = response.text;
             if (!text) {
                 throw new Error("Received an empty response from the AI for article section generation.");
@@ -912,13 +974,11 @@ Condensed version (approximately ${targetWords} words):`;
 
     try {
         return await retryOperation(async () => {
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: prompt,
-                config: {
-                    thinkingConfig: { thinkingBudget: 1024 }, // Minimal thinking for faithful condensation
-                },
-            });
+            const response = await callGemini(
+                modelName,
+                prompt,
+                { thinkingConfig: { thinkingBudget: 1024 } }
+            );
             const text = response.text;
             if (!text) throw new Error("Empty response from AI for section trimming.");
             return text.trim();
@@ -943,13 +1003,11 @@ Your response must be a valid JSON array.`;
 
     try {
         return await retryOperation(async () => {
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                },
-            });
+            const response = await callGemini(
+                modelName,
+                prompt,
+                { responseMimeType: "application/json" }
+            );
             const text = response.text;
             if (!text) throw new Error("Empty response from AI for template extraction.");
             return JSON.parse(text);
@@ -971,13 +1029,11 @@ export const adaptHeadingsToTopic = async (headings: HeadingNode[], originalUrl:
 
     try {
         return await retryOperation(async () => {
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                },
-            });
+            const response = await callGemini(
+                modelName,
+                prompt,
+                { responseMimeType: "application/json" }
+            );
             const text = response.text;
             if (!text) throw new Error("Empty response from AI for heading adaptation.");
             return JSON.parse(text);
@@ -1025,13 +1081,11 @@ ${PARAGRAPH_REGENERATION_PROMPT
 
     try {
         return await retryOperation(async () => {
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: prompt,
-                config: {
-                    systemInstruction,
-                },
-            });
+            const response = await callGemini(
+                modelName,
+                prompt,
+                { systemInstruction }
+            );
             const text = response.text;
             if (!text) throw new Error("Empty response from AI for paragraph regeneration.");
             return text.trim();
@@ -1065,13 +1119,11 @@ export const rewriteSelection = async (
 
     try {
         return await retryOperation(async () => {
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: prompt,
-                config: {
-                    systemInstruction,
-                },
-            });
+            const response = await callGemini(
+                modelName,
+                prompt,
+                { systemInstruction }
+            );
             const text = response.text;
             if (!text) throw new Error("Empty response from AI for text rewrite.");
             return text.trim();
@@ -1095,14 +1147,11 @@ export const validateBrief = async (
 
     try {
         return await retryOperation(async () => {
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: prompt,
-                config: {
-                    systemInstruction,
-                    responseMimeType: "application/json",
-                },
-            });
+            const response = await callGemini(
+                modelName,
+                prompt,
+                { systemInstruction, responseMimeType: "application/json" }
+            );
             const text = response.text;
             if (!text) throw new Error("Empty response from AI for brief validation.");
             return JSON.parse(text);
@@ -1139,14 +1188,11 @@ Primary Keywords: ${brief.keyword_strategy?.primary_keywords?.map(k => k.keyword
 
     try {
         return await retryOperation(async () => {
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: prompt,
-                config: {
-                    systemInstruction,
-                    responseMimeType: "application/json",
-                },
-            });
+            const response = await callGemini(
+                modelName,
+                prompt,
+                { systemInstruction, responseMimeType: "application/json" }
+            );
             const text = response.text;
             if (!text) throw new Error("Empty response from AI for E-E-A-T signals.");
             return JSON.parse(text);
@@ -1288,15 +1334,15 @@ export const validateGeneratedContent = async (params: {
 
     try {
         return await retryOperation(async () => {
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: prompt,
-                config: {
+            const response = await callGemini(
+                modelName,
+                prompt,
+                {
                     systemInstruction,
                     responseMimeType: "application/json",
                     responseSchema: contentValidationSchema,
-                },
-            });
+                }
+            );
             const text = response.text;
             if (!text) throw new Error("Empty response from AI for content validation.");
             return JSON.parse(text);

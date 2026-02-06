@@ -15,6 +15,7 @@ interface BriefListCardProps {
   onUseAsTemplate: (briefId: string) => void;
   onArchive: (briefId: string) => void;
   isSelected?: boolean;
+  onToggleSelect?: (briefId: string) => void;
   // Background generation
   isGenerating?: boolean;
   generationStatus?: GenerationStatus;
@@ -30,6 +31,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   onUseAsTemplate,
   onArchive,
   isSelected = false,
+  onToggleSelect,
   isGenerating = false,
   generationStatus = 'idle',
   generationStep = null,
@@ -114,6 +116,26 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
         ${isGenerating ? 'border-amber-400/50 ring-1 ring-status-generating/30' : ''}
       `}
     >
+      {/* Selection checkbox */}
+      {onToggleSelect && (
+        <div className="absolute top-3 left-3 z-10">
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleSelect(brief.id); }}
+            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+              isSelected
+                ? 'bg-teal border-teal text-white'
+                : 'border-gray-300 hover:border-teal bg-white'
+            }`}
+          >
+            {isSelected && (
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Generation indicator */}
       {isGenerating && (
         <div className="absolute top-3 right-3 flex items-center gap-2">

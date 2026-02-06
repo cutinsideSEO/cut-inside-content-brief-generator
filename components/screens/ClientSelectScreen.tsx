@@ -1,7 +1,8 @@
 // Client Select Screen - Choose a client folder
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getAccessibleClients, createClient } from '../../services/clientService';
+import { getAccessibleClients, createClient, updateClient, deleteClient } from '../../services/clientService';
+import { toast } from 'sonner';
 import type { ClientWithBriefCount } from '../../types/database';
 import ClientCard from '../clients/ClientCard';
 import Button from '../Button';
@@ -55,6 +56,23 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  // Edit client modal state
+  const [editingClient, setEditingClient] = useState<ClientWithBriefCount | null>(null);
+  const [editClientName, setEditClientName] = useState('');
+  const [editClientDescription, setEditClientDescription] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Delete client modal state
+  const [deletingClient, setDeletingClient] = useState<ClientWithBriefCount | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Sort state
+  const [sortBy, setSortBy] = useState<'name' | 'updated' | 'created' | 'briefs'>('name');
+
+  // Load-more pagination
+  const [visibleCount, setVisibleCount] = useState(12);
+  const CLIENT_PAGE_SIZE = 12;
+
   // Get list of generating brief IDs
   const generatingBriefIds = Object.keys(generatingBriefs);
   const hasGeneratingBriefs = generatingBriefIds.length > 0;
@@ -87,14 +105,37 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   };
 
   // Filter clients by search
-  const filteredClients = clients.filter((client) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      client.name.toLowerCase().includes(query) ||
-      client.description?.toLowerCase().includes(query)
-    );
-  });
+  const filteredClients = useMemo(() => {
+    let result = clients.filter((client) => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        client.name.toLowerCase().includes(query) ||
+        client.description?.toLowerCase().includes(query)
+      );
+    });
+
+    // Sort
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case 'updated':
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+        case 'created':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'briefs':
+          return b.brief_count - a.brief_count;
+        case 'name':
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+
+    return result;
+  }, [clients, searchQuery, sortBy]);
+
+  // Paginated clients
+  const paginatedClients = filteredClients.slice(0, visibleCount);
+  const hasMoreClients = filteredClients.length > visibleCount;
 
   // Fetch clients on mount
   useEffect(() => {
@@ -155,6 +196,59 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
     setCreateError(null);
   };
 
+  // Edit client
+  const handleEditClient = (client: ClientWithBriefCount) => {
+    setEditingClient(client);
+    setEditClientName(client.name);
+    setEditClientDescription(client.description || '');
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingClient || !editClientName.trim()) return;
+    setIsEditing(true);
+
+    const { data, error: editError } = await updateClient(editingClient.id, {
+      name: editClientName.trim(),
+      description: editClientDescription.trim() || null,
+    });
+
+    if (editError) {
+      toast.error(`Failed to update client: ${editError}`);
+    } else if (data) {
+      setClients(prev => prev.map(c =>
+        c.id === editingClient.id
+          ? { ...c, name: data.name, description: data.description }
+          : c
+      ));
+      toast.success('Client updated');
+    }
+
+    setIsEditing(false);
+    setEditingClient(null);
+  };
+
+  // Delete client
+  const handleDeleteClient = (client: ClientWithBriefCount) => {
+    setDeletingClient(client);
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!deletingClient) return;
+    setIsDeleting(true);
+
+    const { error: deleteError } = await deleteClient(deletingClient.id);
+
+    if (deleteError) {
+      toast.error(`Failed to delete client: ${deleteError}`);
+    } else {
+      setClients(prev => prev.filter(c => c.id !== deletingClient.id));
+      toast.success('Client deleted');
+    }
+
+    setIsDeleting(false);
+    setDeletingClient(null);
+  };
+
   return (
     <div>
       {/* Header */}
@@ -180,24 +274,36 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search and Sort */}
       {clients.length > 0 && (
-        <div className="mb-6">
-          <Input
-            placeholder="Search clients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            icon={
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            }
-          />
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div className="flex-1">
+            <Input
+              placeholder="Search clients..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              icon={
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              }
+            />
+          </div>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="px-3 py-2 bg-white border border-gray-200 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-teal focus:border-teal"
+          >
+            <option value="name">Name A-Z</option>
+            <option value="updated">Last Updated</option>
+            <option value="created">Newest First</option>
+            <option value="briefs">Most Briefs</option>
+          </select>
         </div>
       )}
 
@@ -266,18 +372,53 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
 
       {/* Client grid */}
       {!isLoading && !error && filteredClients.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredClients.map((client, index) => (
-            <ClientCard
-              key={client.id}
-              client={client}
-              onClick={() => onSelectClient(client.id, client.name)}
-              isGenerating={getGeneratingBriefsForClient(client.id).length > 0}
-              generatingCount={getGeneratingBriefsForClient(client.id).length}
-              colorIndex={clients.indexOf(client)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {paginatedClients.map((client) => (
+              <div key={client.id} className="relative group">
+                <ClientCard
+                  client={client}
+                  onClick={() => onSelectClient(client.id, client.name)}
+                  isGenerating={getGeneratingBriefsForClient(client.id).length > 0}
+                  generatingCount={getGeneratingBriefsForClient(client.id).length}
+                  colorIndex={clients.indexOf(client)}
+                />
+                {/* Edit/Delete overlay buttons */}
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEditClient(client); }}
+                    className="p-1.5 bg-white rounded-md shadow-sm border border-gray-200 text-gray-500 hover:text-teal hover:border-teal transition-colors"
+                    title="Edit client"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteClient(client); }}
+                    className="p-1.5 bg-white rounded-md shadow-sm border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors"
+                    title="Delete client"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Load More */}
+          {hasMoreClients && (
+            <div className="text-center mt-6">
+              <Button
+                variant="secondary"
+                onClick={() => setVisibleCount(prev => prev + CLIENT_PAGE_SIZE)}
+              >
+                Load More ({filteredClients.length - visibleCount} remaining)
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {/* No search results */}
@@ -385,6 +526,71 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
             <Alert variant="error">{createError}</Alert>
           )}
         </div>
+      </Modal>
+
+      {/* Edit Client Modal */}
+      <Modal
+        isOpen={!!editingClient}
+        onClose={() => setEditingClient(null)}
+        title="Edit Client"
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditingClient(null)} disabled={isEditing}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleEditSubmit}
+              loading={isEditing}
+              disabled={!editClientName.trim()}
+            >
+              Save Changes
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Client Name"
+            value={editClientName}
+            onChange={(e) => setEditClientName(e.target.value)}
+            placeholder="e.g., Acme Corp"
+            disabled={isEditing}
+          />
+          <Textarea
+            label="Description"
+            hint="Optional"
+            value={editClientDescription}
+            onChange={(e) => setEditClientDescription(e.target.value)}
+            placeholder="Brief description of the client"
+            rows={3}
+            disabled={isEditing}
+          />
+        </div>
+      </Modal>
+
+      {/* Delete Client Confirmation Modal */}
+      <Modal
+        isOpen={!!deletingClient}
+        onClose={() => setDeletingClient(null)}
+        title="Delete Client"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setDeletingClient(null)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" onClick={handleDeleteConfirmed} loading={isDeleting}>
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-600">
+          Are you sure you want to delete <strong>{deletingClient?.name}</strong>?
+          This will permanently delete all briefs and articles under this client.
+        </p>
       </Modal>
     </div>
   );

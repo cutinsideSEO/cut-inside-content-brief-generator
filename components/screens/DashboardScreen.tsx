@@ -4,7 +4,7 @@ import { exportBriefToMarkdown } from '../../services/markdownService';
 import { validateBrief, generateEEATSignals } from '../../services/geminiService';
 import Button from '../Button';
 import Spinner from '../Spinner';
-import { Badge, Callout, Textarea, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../ui';
+import { Badge, Callout, Textarea, Modal, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../ui';
 
 // Import stage components for inline rendering
 import Stage1Goal from '../stages/Stage1Goal';
@@ -61,9 +61,9 @@ const BriefValidationDisplay: React.FC<{ validation: BriefValidation }> = ({ val
   return (
     <div className="space-y-4">
       {/* Overall Score */}
-      <div className="flex items-center justify-between p-4 bg-gray-100 rounded-lg">
+      <div className="flex items-center justify-between p-4 bg-secondary rounded-lg">
         <div>
-          <p className="text-sm font-heading text-gray-400">Overall Score</p>
+          <p className="text-sm font-heading text-muted-foreground">Overall Score</p>
           <p className={`text-3xl font-bold ${getScoreColor(validation.overall_score)}`}>
             {validation.overall_score}/50
           </p>
@@ -80,7 +80,7 @@ const BriefValidationDisplay: React.FC<{ validation: BriefValidation }> = ({ val
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {(Object.entries(validation.scores) as [string, { score: number; explanation: string }][]).map(([key, scoreData]) => (
           <div key={key} className={`p-3 rounded-md ${getScoreBgColor(scoreData.score)}`}>
-            <p className="text-xs font-heading text-gray-400 capitalize">{key.replace(/_/g, ' ')}</p>
+            <p className="text-xs font-heading text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</p>
             <p className={`text-xl font-bold ${getScoreColor(scoreData.score)}`}>{scoreData.score}/10</p>
           </div>
         ))}
@@ -103,8 +103,8 @@ const BriefValidationDisplay: React.FC<{ validation: BriefValidation }> = ({ val
           <div className="space-y-3">
             {validation.improvements.map((improvement, i) => (
               <div key={i} className="text-sm">
-                <p className="text-gray-900 font-medium">{improvement.section}: {improvement.issue}</p>
-                <p className="text-gray-400 mt-1">→ {improvement.suggestion}</p>
+                <p className="text-foreground font-medium">{improvement.section}: {improvement.issue}</p>
+                <p className="text-muted-foreground mt-1">→ {improvement.suggestion}</p>
               </div>
             ))}
           </div>
@@ -187,7 +187,7 @@ const BriefStrengthMeter: React.FC<Pick<DashboardScreenProps, 'briefData' | 'com
                         style={{ transform: 'rotate(-90deg)', transformOrigin: '40px 40px' }}
                     />
                 </svg>
-                <span className="absolute text-xl font-bold font-heading text-gray-900">{`${score}%`}</span>
+                <span className="absolute text-xl font-bold font-heading text-foreground">{`${score}%`}</span>
             </div>
             <p className="font-heading font-semibold text-gray-600 mt-2">Brief Strength</p>
         </div>
@@ -196,9 +196,9 @@ const BriefStrengthMeter: React.FC<Pick<DashboardScreenProps, 'briefData' | 'com
 
 // Stat Card for dashboard overview
 const StatCard: React.FC<{ label: string; value: string | number; highlight?: boolean }> = ({ label, value, highlight }) => (
-    <div className="bg-gray-100 p-4 rounded-lg">
-        <p className="text-sm font-heading text-gray-400">{label}</p>
-        <p className={`text-lg font-bold truncate ${highlight ? 'text-teal' : 'text-gray-900'}`} title={String(value)}>{value}</p>
+    <div className="bg-secondary p-4 rounded-lg">
+        <p className="text-sm font-heading text-muted-foreground">{label}</p>
+        <p className={`text-lg font-bold truncate ${highlight ? 'text-teal' : 'text-foreground'}`} title={String(value)}>{value}</p>
     </div>
 );
 
@@ -210,6 +210,8 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
     const [isGeneratingEEAT, setIsGeneratingEEAT] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     const [eeatError, setEeatError] = useState<string | null>(null);
+    const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
+    const [showNewBriefConfirm, setShowNewBriefConfirm] = useState(false);
 
     const handleExport = (isConcise: boolean) => {
         exportBriefToMarkdown(briefData, competitorData, keywordVolumeMap, isConcise);
@@ -259,8 +261,8 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                     <BriefStrengthMeter {...strengthProps} briefData={briefData} competitorData={competitorData} />
                 )}
                 <div>
-                    <p className="text-sm text-gray-400">Primary Keyword</p>
-                    <p className="text-gray-900 font-heading font-semibold">{primaryKeyword}</p>
+                    <p className="text-sm text-muted-foreground">Primary Keyword</p>
+                    <p className="text-foreground font-heading font-semibold">{primaryKeyword}</p>
                 </div>
                 <div className="flex items-center gap-4 text-sm text-gray-600">
                     <span>{wordCount} words</span>
@@ -279,7 +281,7 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
 
             {/* Action buttons — horizontal row */}
             <div className="flex items-center gap-3 flex-wrap">
-                <Button variant="primary" onClick={onStartContentGeneration} glow>
+                <Button variant="primary" onClick={() => setShowGenerateConfirm(true)} glow>
                     <BrainCircuitIcon className="h-4 w-4 mr-2" />
                     Generate Full Article
                 </Button>
@@ -318,7 +320,7 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="ghost" onClick={onRestart}>
+                <Button variant="ghost" onClick={() => setShowNewBriefConfirm(true)}>
                     Start New Brief
                 </Button>
             </div>
@@ -326,7 +328,7 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
             {/* Writer Instructions for uploaded briefs */}
             {isUploadedBrief && (
                 <div>
-                    <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider mb-2">Writer Instructions</h3>
+                    <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-2">Writer Instructions</h3>
                     <Textarea
                         value={writerInstructions}
                         onChange={(e) => setWriterInstructions(e.target.value)}
@@ -351,6 +353,46 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                 </Callout>
             )}
             {briefData.eeat_signals && <EEATSignalsDisplay signals={briefData.eeat_signals} />}
+
+            {/* Generate Article Confirmation Modal */}
+            <Modal
+                isOpen={showGenerateConfirm}
+                onClose={() => setShowGenerateConfirm(false)}
+                title="Generate Full Article"
+                size="sm"
+                footer={
+                    <>
+                        <Button variant="secondary" size="sm" onClick={() => setShowGenerateConfirm(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="primary" size="sm" onClick={() => { setShowGenerateConfirm(false); onStartContentGeneration(); }}>
+                            Generate Article
+                        </Button>
+                    </>
+                }
+            >
+                <p className="text-gray-600">This will generate a full article based on your brief. The process may take several minutes. Continue?</p>
+            </Modal>
+
+            {/* Start New Brief Confirmation Modal */}
+            <Modal
+                isOpen={showNewBriefConfirm}
+                onClose={() => setShowNewBriefConfirm(false)}
+                title="Start New Brief"
+                size="sm"
+                footer={
+                    <>
+                        <Button variant="secondary" size="sm" onClick={() => setShowNewBriefConfirm(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="primary" size="sm" onClick={() => { setShowNewBriefConfirm(false); onRestart(); }}>
+                            Start New Brief
+                        </Button>
+                    </>
+                }
+            >
+                <p className="text-gray-600">Starting a new brief will clear your current work. Make sure you have exported or saved your brief before continuing.</p>
+            </Modal>
         </div>
     )
 }
@@ -387,7 +429,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
                 {/* Section header — simple, no Card */}
                 <div className="flex items-center gap-3 mb-6">
                     <div className="text-teal">{section.icon}</div>
-                    <h2 className="text-xl font-heading font-semibold text-gray-900">{section.title}</h2>
+                    <h2 className="text-xl font-heading font-semibold text-foreground">{section.title}</h2>
                 </div>
 
                 {/* Stage content — directly rendered, no Card wrap */}
@@ -396,7 +438,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
                 {/* Feedback — simple bottom section */}
                 {!isUploadedBrief && (
                     <div className="mt-8 pt-6 border-t border-gray-100">
-                        <h3 className="text-sm font-heading font-semibold text-gray-600 mb-2">Feedback / Notes for Regeneration</h3>
+                        <h3 className="text-sm font-heading font-semibold text-muted-foreground mb-2">Feedback / Notes for Regeneration</h3>
                         <Textarea
                             value={userFeedbacks[section.logicalStep] || ''}
                             onChange={(e) => onFeedbackChange(section.logicalStep, e.target.value)}
@@ -433,7 +475,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
         <div className="animate-fade-in">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-2xl font-heading font-bold text-gray-900">Content Brief Dashboard</h1>
+                <h1 className="text-2xl font-heading font-bold text-foreground">Content Brief Dashboard</h1>
                 <p className="text-gray-600 mt-1">
                     {isUploadedBrief ? "Your imported brief is ready." : "Your brief is ready."} Review, refine, and generate the article.
                 </p>

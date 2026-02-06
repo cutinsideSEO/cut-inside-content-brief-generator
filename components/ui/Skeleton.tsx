@@ -53,7 +53,7 @@ const Skeleton: React.FC<SkeletonProps> = ({
   const sizeStyle = getSize();
 
   const classes = cn(
-    'bg-gray-200 rounded',
+    'bg-muted rounded',
     animationStyles[animation],
     variantStyles[variant],
     className

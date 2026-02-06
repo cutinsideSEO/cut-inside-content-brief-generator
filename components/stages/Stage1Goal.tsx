@@ -34,7 +34,7 @@ const Stage1Goal: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       {searchIntent && (
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider">
+            <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider">
               Search Intent Classification
             </h3>
             {searchIntent.reasoning && (
@@ -57,7 +57,7 @@ const Stage1Goal: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       {/* Page Goal */}
       <div className="border-t border-gray-100 pt-8">
         <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider">Page Goal</h3>
+          <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider">Page Goal</h3>
           {briefData.page_goal?.reasoning && <AIReasoningIcon reasoning={briefData.page_goal.reasoning} />}
         </div>
         <EditableText
@@ -70,7 +70,7 @@ const Stage1Goal: React.FC<StageProps> = ({ briefData, setBriefData }) => {
       {/* Target Audience */}
       <div className="border-t border-gray-100 pt-8">
         <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider">Target Audience</h3>
+          <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider">Target Audience</h3>
           {briefData.target_audience?.reasoning && <AIReasoningIcon reasoning={briefData.target_audience.reasoning} />}
         </div>
         <EditableText

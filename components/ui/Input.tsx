@@ -17,7 +17,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor={inputId} className="block text-sm font-medium text-foreground mb-2">
             {label}
           </label>
         )}
@@ -31,7 +31,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={cn(
-              'w-full bg-white border rounded-md text-foreground placeholder:text-gray-400 transition-all duration-200 focus:outline-none focus-ring',
+              'w-full bg-card border rounded-md text-foreground placeholder:text-gray-400 transition-all duration-200 focus:outline-none focus-ring',
 
               // Size
               size === 'sm' && 'py-2 px-3 text-sm',
@@ -41,7 +41,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               // State
               error
                 ? 'border-red-400 focus:border-red-400'
-                : 'border-gray-200 hover:border-gray-300 focus:border-teal',
+                : 'border-border hover:border-gray-300 focus:border-teal',
 
               // Icon/suffix padding
               icon && 'pl-10',
@@ -55,7 +55,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{suffix}</div>
           )}
         </div>
-        {hint && !error && <p className="mt-1.5 text-sm text-gray-400">{hint}</p>}
+        {hint && !error && <p className="mt-1.5 text-sm text-muted-foreground">{hint}</p>}
         {error && <p className="mt-1.5 text-sm text-red-500">{error}</p>}
       </div>
     );

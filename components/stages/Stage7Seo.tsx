@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ContentBrief } from '../../types';
 import { Badge, Textarea, Input, AIReasoningIcon } from '../ui';
 
@@ -43,6 +43,39 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
     });
   };
 
+  const [slugError, setSlugError] = useState<string | null>(null);
+
+  const validateSlug = (slug: string): string | null => {
+    if (!slug) return null;
+    if (/[A-Z]/.test(slug)) return 'Slug should only contain lowercase letters, numbers, and hyphens';
+    if (/\s/.test(slug)) return 'Slug should only contain lowercase letters, numbers, and hyphens';
+    if (/[^a-z0-9-]/.test(slug)) return 'Slug should only contain lowercase letters, numbers, and hyphens';
+    return null;
+  };
+
+  const autoFixSlug = (slug: string): string => {
+    return slug
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  };
+
+  const handleSlugChange = (value: string) => {
+    handleChange('url_slug', value);
+    setSlugError(validateSlug(value));
+  };
+
+  const handleSlugBlur = () => {
+    const currentSlug = seoData.url_slug.value;
+    if (currentSlug && validateSlug(currentSlug)) {
+      const fixed = autoFixSlug(currentSlug);
+      handleChange('url_slug', fixed);
+      setSlugError(null);
+    }
+  };
+
   const getCharCountStatus = (count: number, max: number): { variant: 'success' | 'warning' | 'error'; label: string } => {
     if (count > max) return { variant: 'error', label: `${count}/${max}` };
     if (count > max * 0.9) return { variant: 'warning', label: `${count}/${max}` };
@@ -64,7 +97,7 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <label htmlFor={id} className="text-sm font-heading font-semibold text-gray-900">
+          <label htmlFor={id} className="text-sm font-heading font-semibold text-foreground">
             {label}
           </label>
           {charStatus && (
@@ -98,10 +131,10 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Core SEO */}
       <div>
-        <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider mb-4">Core SEO</h3>
+        <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-4">Core SEO</h3>
         <div className="space-y-5">
           <SeoField
             id="title_tag"
@@ -133,20 +166,31 @@ const Stage7Seo: React.FC<StageProps> = ({ briefData, setBriefData }) => {
             placeholder="Enter H1 heading..."
           />
 
-          <SeoField
-            id="url_slug"
-            label="URL Slug"
-            value={seoData.url_slug.value}
-            reasoning={seoData.url_slug.reasoning}
-            onChange={(value) => handleChange('url_slug', value)}
-            placeholder="enter-url-slug"
-          />
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <label htmlFor="url_slug" className="text-sm font-heading font-semibold text-foreground">
+                URL Slug
+              </label>
+              {seoData.url_slug.reasoning && <AIReasoningIcon reasoning={seoData.url_slug.reasoning} />}
+            </div>
+            <Input
+              id="url_slug"
+              value={seoData.url_slug.value}
+              onChange={(e) => handleSlugChange(e.target.value)}
+              onBlur={handleSlugBlur}
+              placeholder="enter-url-slug"
+              error={slugError || undefined}
+            />
+            {slugError && (
+              <p className="text-xs text-red-500">{slugError}</p>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Social Media */}
-      <div className="border-t border-gray-100 pt-6">
-        <h3 className="text-sm font-heading font-semibold text-gray-600 uppercase tracking-wider mb-4">Social Media (Open Graph)</h3>
+      <div className="border-t border-border pt-8">
+        <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-4">Social Media (Open Graph)</h3>
         <div className="space-y-5">
           <SeoField
             id="og_title"

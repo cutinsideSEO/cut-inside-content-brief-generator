@@ -58,6 +58,10 @@ export type { AIReasoningIconProps } from './AIReasoningIcon';
 export { default as EditableText } from './EditableText';
 export type { EditableTextProps } from './EditableText';
 
+// Select
+export { default as Select } from './Select';
+export type { SelectProps } from './Select';
+
 // --- New shadcn primitives (direct re-exports) ---
 
 // Label
@@ -92,6 +96,18 @@ export { Popover, PopoverTrigger, PopoverContent } from './primitives/popover';
 
 // Collapsible
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from './primitives/collapsible';
+
+// SectionHeader
+export { default as SectionHeader } from './SectionHeader';
+export type { SectionHeaderProps } from './SectionHeader';
+
+// EmptyState
+export { default as EmptyState } from './EmptyState';
+export type { EmptyStateProps } from './EmptyState';
+
+// StatCard
+export { default as StatCard } from './StatCard';
+export type { StatCardProps } from './StatCard';
 
 // Sonner (Toaster)
 export { Toaster } from './primitives/sonner';

@@ -40,7 +40,7 @@ const Modal: React.FC<ModalProps> = ({
             'fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%]',
             'w-full',
             sizeStyles[size],
-            'bg-card border border-gray-200',
+            'bg-card border border-border',
             'rounded-xl shadow-card-elevated',
             'animate-scale-in',
             'focus:outline-none'
@@ -50,7 +50,7 @@ const Modal: React.FC<ModalProps> = ({
         >
           {/* Header */}
           {title && (
-            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+            <div className="flex items-center justify-between p-5 border-b border-border">
               <DialogPrimitive.Title className="font-heading font-semibold text-lg text-foreground">
                 {title}
               </DialogPrimitive.Title>
@@ -73,7 +73,7 @@ const Modal: React.FC<ModalProps> = ({
 
           {/* Footer */}
           {footer && (
-            <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-200">{footer}</div>
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-border">{footer}</div>
           )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

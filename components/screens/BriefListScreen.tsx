@@ -1,12 +1,13 @@
 // Brief List Screen - View and manage briefs for a client
-import React, { useState, useEffect } from 'react';
-import { getBriefsForClient, archiveBrief, createBrief } from '../../services/briefService';
+import React, { useState, useEffect, useMemo } from 'react';
+import { getBriefsForClient, archiveBrief, deleteBrief } from '../../services/briefService';
 import { getArticlesForClient, deleteArticle } from '../../services/articleService';
+import { toast } from 'sonner';
 import type { BriefWithClient, ArticleWithBrief } from '../../types/database';
 import BriefListCard from '../briefs/BriefListCard';
 import ArticleListCard from '../articles/ArticleListCard';
 import Button from '../Button';
-import { Card, Input, Alert, Tabs, Skeleton } from '../ui';
+import { Card, Input, Alert, Tabs, Skeleton, Modal } from '../ui';
 
 // Generation status type (matches AppWrapper)
 type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
@@ -54,6 +55,18 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const [activeTab, setActiveTab] = useState<'briefs' | 'articles'>('briefs');
   const [articles, setArticles] = useState<ArticleWithBrief[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
+  const [archiveConfirm, setArchiveConfirm] = useState<string | null>(null);
+
+  // Sort state
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'modified' | 'name'>('newest');
+
+  // Bulk selection state
+  const [selectedBriefs, setSelectedBriefs] = useState<Set<string>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+  // Load-more pagination
+  const [visibleCount, setVisibleCount] = useState(20);
+  const BRIEF_PAGE_SIZE = 20;
 
   // Fetch briefs on mount and when clientId changes
   useEffect(() => {
@@ -75,9 +88,14 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     setIsLoading(false);
   };
 
-  const handleArchive = async (briefId: string) => {
-    const confirmed = window.confirm('Are you sure you want to archive this brief?');
-    if (!confirmed) return;
+  const handleArchiveClick = (briefId: string) => {
+    setArchiveConfirm(briefId);
+  };
+
+  const handleArchiveConfirmed = async () => {
+    if (!archiveConfirm) return;
+    const briefId = archiveConfirm;
+    setArchiveConfirm(null);
 
     const { error: archiveError } = await archiveBrief(briefId);
 
@@ -88,6 +106,48 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
     // Remove from local list
     setBriefs((prev) => prev.filter((b) => b.id !== briefId));
+  };
+
+  // Bulk selection helpers
+  const toggleBriefSelection = (briefId: string) => {
+    setSelectedBriefs(prev => {
+      const next = new Set(prev);
+      if (next.has(briefId)) {
+        next.delete(briefId);
+      } else {
+        next.add(briefId);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedBriefs(new Set());
+
+  const handleBulkArchive = async () => {
+    const ids: string[] = [...selectedBriefs];
+    let failed = 0;
+    for (const id of ids) {
+      const { error: archiveError } = await archiveBrief(id);
+      if (archiveError) failed++;
+    }
+    setBriefs(prev => prev.filter(b => !selectedBriefs.has(b.id) || failed > 0));
+    toast.success(`Archived ${ids.length - failed} brief${ids.length - failed !== 1 ? 's' : ''}`);
+    if (failed > 0) toast.error(`Failed to archive ${failed} brief${failed !== 1 ? 's' : ''}`);
+    clearSelection();
+  };
+
+  const handleBulkDelete = async () => {
+    const ids: string[] = [...selectedBriefs];
+    let failed = 0;
+    for (const id of ids) {
+      const { error: deleteError } = await deleteBrief(id);
+      if (deleteError) failed++;
+    }
+    setBriefs(prev => prev.filter(b => !selectedBriefs.has(b.id)));
+    toast.success(`Deleted ${ids.length - failed} brief${ids.length - failed !== 1 ? 's' : ''}`);
+    if (failed > 0) toast.error(`Failed to delete ${failed} brief${failed !== 1 ? 's' : ''}`);
+    clearSelection();
+    setShowBulkDeleteConfirm(false);
   };
 
   // Load articles when articles tab is active
@@ -113,25 +173,40 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     }
   };
 
-  // Filter and search briefs
-  const filteredBriefs = briefs.filter((brief) => {
-    // Filter by status
-    if (filterStatus !== 'all' && brief.status !== filterStatus) {
-      return false;
-    }
+  // Filter, search, and sort briefs
+  const filteredBriefs = useMemo(() => {
+    let result = briefs.filter((brief) => {
+      if (filterStatus !== 'all' && brief.status !== filterStatus) {
+        return false;
+      }
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesName = brief.name.toLowerCase().includes(query);
+        const matchesKeywords = brief.keywords?.some((k) =>
+          k.kw.toLowerCase().includes(query)
+        );
+        return matchesName || matchesKeywords;
+      }
+      return true;
+    });
 
-    // Search by name
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchesName = brief.name.toLowerCase().includes(query);
-      const matchesKeywords = brief.keywords?.some((k) =>
-        k.kw.toLowerCase().includes(query)
-      );
-      return matchesName || matchesKeywords;
-    }
+    // Sort
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'modified':
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'newest':
+        default:
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+    });
 
-    return true;
-  });
+    return result;
+  }, [briefs, filterStatus, searchQuery, sortBy]);
 
   // Count briefs by status
   const counts = {
@@ -141,10 +216,14 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     complete: briefs.filter((b) => b.status === 'complete').length,
   };
 
-  // Group briefs by status for better organization
-  const draftBriefs = filteredBriefs.filter((b) => b.status === 'draft');
-  const inProgressBriefs = filteredBriefs.filter((b) => b.status === 'in_progress');
-  const completeBriefs = filteredBriefs.filter((b) => b.status === 'complete');
+  // Paginated briefs
+  const paginatedBriefs = filteredBriefs.slice(0, visibleCount);
+  const hasMoreBriefs = filteredBriefs.length > visibleCount;
+
+  // Group paginated briefs by status for better organization
+  const draftBriefs = paginatedBriefs.filter((b) => b.status === 'draft');
+  const inProgressBriefs = paginatedBriefs.filter((b) => b.status === 'in_progress');
+  const completeBriefs = paginatedBriefs.filter((b) => b.status === 'complete');
 
   // Tab items with counts
   const tabItems = [
@@ -221,7 +300,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
       {/* Briefs tab content */}
       {activeTab === 'briefs' && (<>
-      {/* Search and Filter */}
+      {/* Search, Sort, and Filter */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="flex-1">
           <Input
@@ -240,6 +319,16 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
             }
           />
         </div>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          className="px-3 py-2 bg-white border border-gray-200 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-teal focus:border-teal"
+        >
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="modified">Last Modified</option>
+          <option value="name">Name A-Z</option>
+        </select>
         <Tabs
           items={tabItems}
           activeId={filterStatus}
@@ -248,6 +337,25 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           size="sm"
         />
       </div>
+
+      {/* Bulk Action Bar */}
+      {selectedBriefs.size > 0 && (
+        <div className="flex items-center gap-3 mb-4 p-3 bg-teal/5 border border-teal/20 rounded-lg">
+          <span className="text-sm font-medium text-gray-900">
+            {selectedBriefs.size} selected
+          </span>
+          <div className="flex-1" />
+          <Button variant="secondary" size="sm" onClick={handleBulkArchive}>
+            Archive All
+          </Button>
+          <Button variant="danger" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
+            Delete All
+          </Button>
+          <Button variant="ghost" size="sm" onClick={clearSelection}>
+            Cancel
+          </Button>
+        </div>
+      )}
 
       {/* Error state */}
       {error && (
@@ -337,6 +445,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
       {/* Brief list */}
       {!isLoading && !error && filteredBriefs.length > 0 && (
+        <>
         <div className="space-y-8">
           {/* In Progress Section */}
           {inProgressBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'in_progress') && (
@@ -355,7 +464,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       onContinue={onContinueBrief}
                       onEdit={onEditBrief}
                       onUseAsTemplate={onUseAsTemplate}
-                      onArchive={handleArchive}
+                      onArchive={handleArchiveClick}
+                      isSelected={selectedBriefs.has(brief.id)}
+                      onToggleSelect={toggleBriefSelection}
                       isGenerating={!!generating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
@@ -383,7 +494,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       onContinue={onContinueBrief}
                       onEdit={onEditBrief}
                       onUseAsTemplate={onUseAsTemplate}
-                      onArchive={handleArchive}
+                      onArchive={handleArchiveClick}
+                      isSelected={selectedBriefs.has(brief.id)}
+                      onToggleSelect={toggleBriefSelection}
                       isGenerating={!!generating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
@@ -411,7 +524,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       onContinue={onContinueBrief}
                       onEdit={onEditBrief}
                       onUseAsTemplate={onUseAsTemplate}
-                      onArchive={handleArchive}
+                      onArchive={handleArchiveClick}
+                      isSelected={selectedBriefs.has(brief.id)}
+                      onToggleSelect={toggleBriefSelection}
                       isGenerating={!!generating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
@@ -422,8 +537,63 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
             </section>
           )}
         </div>
+
+        {/* Load More */}
+        {hasMoreBriefs && (
+          <div className="text-center mt-6">
+            <Button
+              variant="secondary"
+              onClick={() => setVisibleCount(prev => prev + BRIEF_PAGE_SIZE)}
+            >
+              Load More ({filteredBriefs.length - visibleCount} remaining)
+            </Button>
+          </div>
+        )}
+        </>
       )}
       </>)}
+
+      {/* Archive confirmation modal */}
+      <Modal
+        isOpen={!!archiveConfirm}
+        onClose={() => setArchiveConfirm(null)}
+        title="Archive Brief"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setArchiveConfirm(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleArchiveConfirmed}>
+              Archive
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-600">Are you sure you want to archive this brief? You can restore it later.</p>
+      </Modal>
+
+      {/* Bulk Delete Confirmation Modal */}
+      <Modal
+        isOpen={showBulkDeleteConfirm}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+        title="Delete Selected Briefs"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setShowBulkDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" onClick={handleBulkDelete}>
+              Delete {selectedBriefs.size} Brief{selectedBriefs.size !== 1 ? 's' : ''}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-600">
+          Are you sure you want to permanently delete {selectedBriefs.size} selected brief{selectedBriefs.size !== 1 ? 's' : ''}? This action cannot be undone.
+        </p>
+      </Modal>
     </div>
   );
 };

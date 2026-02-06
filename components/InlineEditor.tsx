@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import Button from './Button';
 import { RefreshCwIcon, ZapIcon, EditIcon, XIcon } from './Icon';
 import type { RewriteAction } from '../types';
@@ -171,7 +172,7 @@ const InlineEditor: React.FC<InlineEditorProps> = ({
             onChange(e.currentTarget.textContent || '');
           }
         }}
-        dangerouslySetInnerHTML={{ __html: content.replace(/\n/g, '<br>') }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content.replace(/\n/g, '<br>')) }}
       />
 
       {/* Floating toolbar */}

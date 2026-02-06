@@ -4,7 +4,7 @@ import { AlertTriangleIcon, UploadCloudIcon, XIcon, FileCodeIcon, BrainCircuitIc
 import ModelSelector from '../ModelSelector';
 import LengthSettings from '../LengthSettings';
 import KeywordTableInput from '../KeywordTableInput';
-import { Card, Input, Textarea, Alert, Badge, Tabs, Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui';
+import { Card, Input, Textarea, Alert, Badge, Tabs, Select, Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui';
 import type { ModelSettings, LengthConstraints, ExtractedTemplate } from '../../types';
 
 interface KeywordRow {
@@ -54,6 +54,31 @@ const findDefaultColumn = (headers: string[], keywords: string[]): string => {
 const dfsEnvLogin = import.meta.env.VITE_DATAFORSEO_LOGIN || '';
 const dfsEnvPassword = import.meta.env.VITE_DATAFORSEO_PASSWORD || '';
 const hasDfsEnvCredentials = Boolean(dfsEnvLogin && dfsEnvPassword);
+
+// Proper CSV line parser that handles quoted values with commas and escaped quotes
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
 
 const StepDots = ({ current, total }: { current: number; total: number }) => (
   <div className="flex items-center justify-center gap-2 mb-8">
@@ -116,7 +141,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
       reader.onload = (e) => {
         const text = e.target?.result as string;
         const firstLine = text.split('\n')[0];
-        const headers = firstLine.split(',').map(h => h.trim());
+        const headers = parseCSVLine(firstLine);
         setCsvHeaders(headers);
         setCsvFile(file);
       };
@@ -165,7 +190,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
                             reject(new Error("CSV must have a header row and at least one data row."));
                             return;
                         }
-                        const headers = lines[0].split(',').map(h => h.trim());
+                        const headers = parseCSVLine(lines[0]);
                         const keywordIndex = headers.indexOf(keywordColumn);
                         const volumeIndex = headers.indexOf(volumeColumn);
                         if (keywordIndex === -1 || volumeIndex === -1) {
@@ -173,7 +198,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
                             return;
                         }
                         const parsed = lines.slice(1).map(line => {
-                            const columns = line.split(',');
+                            const columns = parseCSVLine(line);
                             const kw = columns[keywordIndex]?.trim();
                             const volume = parseInt(columns[volumeIndex]?.trim(), 10);
                             return { kw, volume };
@@ -281,7 +306,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   const renderSetupStep1 = () => (
     <div className="max-w-3xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-heading font-bold text-gray-900">What keywords should we target?</h2>
+        <h2 className="text-2xl font-heading font-bold text-foreground">What keywords should we target?</h2>
         <p className="text-gray-600 mt-2">Upload a CSV or enter keywords manually to get started.</p>
       </div>
 
@@ -303,7 +328,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         {inputMethod === 'csv' && (
           <>
             {!csvFile ? (
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-200 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-lg cursor-pointer bg-background hover:bg-secondary transition-colors">
                 <div className="flex flex-col items-center justify-center py-6">
                   <UploadCloudIcon className="w-10 h-10 mb-2 text-gray-400" />
                   <p className="text-sm text-gray-600">
@@ -320,7 +345,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
                       <FileCodeIcon className="h-5 w-5 text-teal"/>
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-900">{csvFile.name}</p>
+                      <p className="font-semibold text-foreground">{csvFile.name}</p>
                       <p className="text-xs text-gray-400">{formatBytes(csvFile.size)}</p>
                     </div>
                   </div>
@@ -329,28 +354,20 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
                   </Button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
-                  <div>
-                    <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">Keyword Column</label>
-                    <select
-                      value={keywordColumn}
-                      onChange={(e) => setKeywordColumn(e.target.value)}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-md text-gray-900 focus:ring-2 focus:ring-teal focus:border-teal transition-all"
-                    >
-                      <option value="" disabled>Select column...</option>
-                      {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">Volume Column</label>
-                    <select
-                      value={volumeColumn}
-                      onChange={(e) => setVolumeColumn(e.target.value)}
-                      className="w-full p-3 bg-white border border-gray-200 rounded-md text-gray-900 focus:ring-2 focus:ring-teal focus:border-teal transition-all"
-                    >
-                      <option value="" disabled>Select column...</option>
-                      {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
+                  <Select
+                    label="Keyword Column"
+                    value={keywordColumn}
+                    onChange={(e) => setKeywordColumn(e.target.value)}
+                    placeholder="Select column..."
+                    options={csvHeaders.map(h => ({ value: h, label: h }))}
+                  />
+                  <Select
+                    label="Volume Column"
+                    value={volumeColumn}
+                    onChange={(e) => setVolumeColumn(e.target.value)}
+                    placeholder="Select column..."
+                    options={csvHeaders.map(h => ({ value: h, label: h }))}
+                  />
                 </div>
               </Card>
             )}
@@ -373,10 +390,18 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         </div>
       )}
 
-      <div className="mt-6">
-        <Button onClick={handleNextFromStep1} fullWidth size="lg">
-          Next
-        </Button>
+      <div className="mt-6 flex items-center gap-4">
+        <button
+          onClick={() => { setLocalError(''); setFlow(null); setSetupStep(1); }}
+          className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          Back
+        </button>
+        <div className="flex-1">
+          <Button onClick={handleNextFromStep1} fullWidth size="lg">
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -384,7 +409,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   const renderSetupStep2 = () => (
     <div className="max-w-2xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-heading font-bold text-gray-900">Where are your readers?</h2>
+        <h2 className="text-2xl font-heading font-bold text-foreground">Where are your readers?</h2>
         <p className="text-gray-600 mt-2">Set the target market and language for your analysis.</p>
       </div>
 
@@ -393,44 +418,32 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
       <div className="space-y-6">
         <Card variant="default" padding="lg">
           <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">SERP Country</label>
-              <select
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full p-3 bg-white border border-gray-200 rounded-md text-gray-900 focus:ring-2 focus:ring-teal focus:border-teal transition-all"
-              >
-                {countries.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">SERP Language</label>
-              <select
-                value={serpLanguage}
-                onChange={(e) => setSerpLanguage(e.target.value)}
-                className="w-full p-3 bg-white border border-gray-200 rounded-md text-gray-900 focus:ring-2 focus:ring-teal focus:border-teal transition-all"
-              >
-                {languages.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-heading font-medium text-gray-400 uppercase tracking-wider mb-2">Brief Output Language</label>
-              <select
-                value={outputLanguage}
-                onChange={(e) => setOutputLanguage(e.target.value)}
-                className="w-full p-3 bg-white border border-gray-200 rounded-md text-gray-900 focus:ring-2 focus:ring-teal focus:border-teal transition-all"
-              >
-                {languages.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-            </div>
+            <Select
+              label="SERP Country"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              options={countries.map(c => ({ value: c, label: c }))}
+            />
+            <Select
+              label="SERP Language"
+              value={serpLanguage}
+              onChange={(e) => setSerpLanguage(e.target.value)}
+              options={languages.map(l => ({ value: l, label: l }))}
+            />
+            <Select
+              label="Brief Output Language"
+              value={outputLanguage}
+              onChange={(e) => setOutputLanguage(e.target.value)}
+              options={languages.map(l => ({ value: l, label: l }))}
+            />
           </div>
         </Card>
 
         {!hasDfsEnvCredentials && (
           <Card variant="default" padding="lg">
             <div className="mb-4">
-              <h3 className="font-heading font-semibold text-gray-900">DataForSEO Credentials</h3>
-              <p className="text-sm text-gray-400 mt-1">Required to fetch SERP data for your keywords.</p>
+              <h3 className="font-heading font-semibold text-foreground">DataForSEO Credentials</h3>
+              <p className="text-sm text-muted-foreground mt-1">Required to fetch SERP data for your keywords.</p>
             </div>
             <div className="space-y-4">
               <Input
@@ -478,7 +491,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   const renderSetupStep3 = () => (
     <div className="max-w-3xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-heading font-bold text-gray-900">Fine-tune your brief</h2>
+        <h2 className="text-2xl font-heading font-bold text-foreground">Fine-tune your brief</h2>
         <p className="text-gray-600 mt-2">Optional settings to customize the output. You can skip straight to analysis.</p>
       </div>
 
@@ -492,8 +505,8 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
               <LinkIcon className="h-4 w-4 text-teal" />
             </div>
             <div>
-              <h3 className="font-heading font-semibold text-gray-900">Use Content as Template</h3>
-              <p className="text-xs text-gray-400">Extract heading structure from existing content</p>
+              <h3 className="font-heading font-semibold text-foreground">Use Content as Template</h3>
+              <p className="text-xs text-muted-foreground">Extract heading structure from existing content</p>
             </div>
           </div>
           <Input
@@ -520,8 +533,8 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
                     <SettingsIcon className="h-4 w-4 text-teal" />
                   </div>
                   <div>
-                    <h3 className="font-heading font-semibold text-gray-900">Advanced Settings</h3>
-                    <p className="text-sm text-gray-400">AI model selection & configuration</p>
+                    <h3 className="font-heading font-semibold text-foreground">Advanced Settings</h3>
+                    <p className="text-sm text-muted-foreground">AI model selection & configuration</p>
                   </div>
                 </div>
                 <ChevronDownIcon className={`h-5 w-5 text-gray-400 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
@@ -575,7 +588,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
     <div className="animate-fade-in">
       {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-heading font-bold text-gray-900">Start Your Content Project</h1>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Start Your Content Project</h1>
         <p className="text-lg text-gray-600 mt-2">Choose your starting point.</p>
       </div>
 
@@ -593,8 +606,8 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
             <div className="w-14 h-14 mx-auto mb-4 rounded-lg bg-teal/10 flex items-center justify-center">
               <FileCodeIcon className="h-7 w-7 text-teal" />
             </div>
-            <h2 className="text-lg font-heading font-semibold text-gray-900">Create New Brief</h2>
-            <p className="text-sm text-gray-400 mt-2">Start with keywords to generate a data-driven brief from scratch.</p>
+            <h2 className="text-lg font-heading font-semibold text-foreground">Create New Brief</h2>
+            <p className="text-sm text-muted-foreground mt-2">Start with keywords to generate a data-driven brief from scratch.</p>
           </Card>
           <Card
             variant="interactive"
@@ -607,8 +620,8 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
             <div className="w-14 h-14 mx-auto mb-4 rounded-lg bg-teal/10 flex items-center justify-center">
               <BrainCircuitIcon className="h-7 w-7 text-teal" />
             </div>
-            <h2 className="text-lg font-heading font-semibold text-gray-900">Use Existing Brief</h2>
-            <p className="text-sm text-gray-400 mt-2">Upload a pre-made brief in Markdown to generate the article content.</p>
+            <h2 className="text-lg font-heading font-semibold text-foreground">Use Existing Brief</h2>
+            <p className="text-sm text-muted-foreground mt-2">Upload a pre-made brief in Markdown to generate the article content.</p>
           </Card>
         </div>
       )}

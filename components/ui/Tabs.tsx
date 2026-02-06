@@ -28,15 +28,15 @@ const Tabs: React.FC<TabsProps> = ({
   className = '',
 }) => {
   const baseContainerStyles = {
-    pills: 'flex gap-2 p-1 bg-gray-100 rounded-lg border border-gray-200',
-    underline: 'flex gap-6 border-b border-gray-200',
-    boxed: 'inline-flex rounded-lg border border-gray-200 overflow-hidden',
+    pills: 'flex gap-2 p-1 bg-gray-100 rounded-lg border border-border',
+    underline: 'flex gap-6 border-b border-border',
+    boxed: 'inline-flex rounded-lg border border-border overflow-hidden',
   };
 
   const baseTabStyles = {
     pills: 'rounded-md transition-all duration-200',
     underline: 'pb-3 border-b-2 -mb-px transition-all duration-200',
-    boxed: 'border-r border-gray-200 last:border-r-0 transition-all duration-200',
+    boxed: 'border-r border-border last:border-r-0 transition-all duration-200',
   };
 
   const activeTabStyles = {

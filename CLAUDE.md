@@ -228,14 +228,14 @@ Push to `master` triggers auto-deploy.
 
 ## UI Component Library
 
-Reusable components in `components/ui/` follow a dark theme design system:
+Reusable components in `components/ui/` follow a light theme design system:
 
 **Design Tokens (Tailwind classes):**
-- Surfaces: `bg-surface`, `bg-surface-hover`, `bg-surface-active`
-- Text: `text-text-primary`, `text-text-secondary`, `text-text-muted`
-- Borders: `border-border`, `border-border-subtle`, `border-border-emphasis`
-- Status: `text-status-complete`, `text-status-error`, `text-status-warning`
-- Brand: `text-teal`, `bg-teal`, `text-yellow`
+- Surfaces: `bg-background` (#F9FAFB), `bg-card` (#FFFFFF), `bg-secondary` (#F3F4F6)
+- Text: `text-foreground` (#111827), `text-muted-foreground` (#6B7280)
+- Borders: `border-border` (#E5E7EB), `border-input` (#E5E7EB)
+- Brand: `text-primary`/`bg-primary` (#0D9488), `text-teal`/`bg-teal` (#0D9488)
+- Status: `text-status-complete`, `text-status-error`, `text-status-generating`, `text-status-draft`
 
 **Available Components:**
 - `Card` - Container with variants (default, elevated, outlined)

@@ -23,6 +23,7 @@ interface BriefingScreenProps {
   briefData: Partial<ContentBrief>;
   setBriefData: React.Dispatch<React.SetStateAction<Partial<ContentBrief>>>;
   onNextStep: (feedback?: string) => void;
+  onPrevStep?: () => void;
   onRegenerate: (step: number, feedback?: string) => void;
   onRestart: () => void;
   keywordVolumeMap: Map<string, number>;
@@ -68,6 +69,7 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
   briefData,
   setBriefData,
   onNextStep,
+  onPrevStep,
   onRegenerate,
   onRestart,
   keywordVolumeMap,
@@ -146,7 +148,7 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
                     key={step}
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300 ${
                       step < currentStep
-                        ? 'bg-teal text-surface-primary'
+                        ? 'bg-teal text-white'
                         : step === currentStep
                           ? 'bg-teal/20 text-teal border-2 border-teal animate-pulse'
                           : 'bg-gray-100 text-gray-400'
@@ -246,6 +248,18 @@ const BriefingScreen: React.FC<BriefingScreenProps> = ({
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                        {onPrevStep && currentStep > 1 && (
+                            <Button
+                                variant="ghost"
+                                onClick={onPrevStep}
+                                disabled={isLoading}
+                            >
+                                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                                Previous
+                            </Button>
+                        )}
                         <Button
                             variant="primary"
                             onClick={() => onNextStep(userFeedback)}

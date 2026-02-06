@@ -1,5 +1,5 @@
 // useAutoSave Hook - Debounced auto-save to Supabase
-import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { saveBriefState } from '../services/briefService';
 import { saveCompetitors } from '../services/competitorService';
 import type { AppState, SaveStatus } from '../types/appState';
@@ -38,6 +38,8 @@ interface UseAutoSaveReturn {
   triggerSave: () => void;
   saveNow: () => Promise<void>;
   isSaving: boolean;
+  pauseAutoSave: () => void;
+  resumeAutoSave: () => void;
 }
 
 /**
@@ -79,6 +81,9 @@ export function useAutoSave(
   } = options;
 
   const isSavingRef = useRef(false);
+  const [isSavingState, setIsSavingState] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedDataRef = useRef<string | null>(null);
 
@@ -128,7 +133,7 @@ export function useAutoSave(
 
   // Perform the save
   const performSave = useCallback(async () => {
-    if (!briefId || !enabled || isSavingRef.current) {
+    if (!briefId || !enabled || isSavingRef.current || isPausedRef.current) {
       return;
     }
 
@@ -138,6 +143,7 @@ export function useAutoSave(
     }
 
     isSavingRef.current = true;
+    setIsSavingState(true);
     onSaveStart?.();
 
     try {
@@ -165,6 +171,7 @@ export function useAutoSave(
       onSaveError?.(message);
     } finally {
       isSavingRef.current = false;
+      setIsSavingState(false);
     }
   }, [
     briefId,
@@ -255,10 +262,27 @@ export function useAutoSave(
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [state.saveStatus, briefId, enabled]);
 
+  const pauseAutoSave = useCallback(() => {
+    isPausedRef.current = true;
+    setIsPaused(true);
+    // Clear any pending debounced save
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  const resumeAutoSave = useCallback(() => {
+    isPausedRef.current = false;
+    setIsPaused(false);
+  }, []);
+
   return {
     triggerSave,
     saveNow,
-    isSaving: isSavingRef.current,
+    isSaving: isSavingState,
+    pauseAutoSave,
+    resumeAutoSave,
   };
 }
 

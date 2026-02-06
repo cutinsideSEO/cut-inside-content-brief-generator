@@ -2,9 +2,10 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { isSupabaseConfigured } from './services/supabaseClient';
-import { createBrief, getBrief, updateBriefProgress, updateBriefStatus } from './services/briefService';
+import { createBrief, getBrief, getBriefsForClient, updateBriefProgress, updateBriefStatus } from './services/briefService';
 import { saveCompetitors, getCompetitorsForBrief, toCompetitorPages } from './services/competitorService';
 import { createArticle, getArticleCountForClient } from './services/articleService';
+import { toast } from 'sonner';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
 import type { Brief, AppView as DatabaseAppView } from './types/database';
@@ -24,6 +25,7 @@ import OriginalApp from './App';
 // Import TooltipProvider for Radix tooltips
 import { TooltipProvider } from './components/ui/primitives/tooltip';
 import { ToastProvider } from './contexts/ToastContext';
+import { Tooltip, TooltipTrigger, TooltipContent } from './components/ui/primitives/tooltip';
 
 // Generation status type
 type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
@@ -82,10 +84,22 @@ const AppWrapperInner: React.FC = () => {
   // Article count for sidebar
   const [articleCount, setArticleCount] = useState(0);
 
-  // Fetch article count when in brief_list mode
+  // Brief counts for sidebar
+  const [briefCounts, setBriefCounts] = useState<{ draft: number; in_progress: number; complete: number }>({ draft: 0, in_progress: 0, complete: 0 });
+
+  // Fetch article count and brief counts when in brief_list mode
   useEffect(() => {
     if (state.mode === 'brief_list' && state.selectedClientId) {
       getArticleCountForClient(state.selectedClientId).then(setArticleCount);
+      getBriefsForClient(state.selectedClientId).then(({ data }) => {
+        if (data) {
+          setBriefCounts({
+            draft: data.filter(b => b.status === 'draft').length,
+            in_progress: data.filter(b => b.status === 'in_progress').length,
+            complete: data.filter(b => b.status === 'complete').length,
+          });
+        }
+      });
     }
   }, [state.mode, state.selectedClientId]);
 
@@ -222,7 +236,7 @@ const AppWrapperInner: React.FC = () => {
 
     if (error || !data) {
       console.error('Failed to create brief:', error);
-      alert('Failed to create brief. Please try again.');
+      toast.error('Failed to create brief. Please try again.');
       return;
     }
 
@@ -254,10 +268,9 @@ const AppWrapperInner: React.FC = () => {
     }));
   }, []);
 
-  // Handle using a brief as template
-  const handleUseAsTemplate = useCallback(async (briefId: string) => {
-    // For now, just show an alert - this can be expanded later
-    alert('Template feature coming soon! For now, you can manually copy the brief structure.');
+  // Handle using a brief as template (feature not yet implemented)
+  const handleUseAsTemplate = useCallback(async (_briefId: string) => {
+    toast.info('Template feature coming soon!');
   }, []);
 
   // Handle viewing an article
@@ -397,7 +410,7 @@ const AppWrapperInner: React.FC = () => {
                 currentView="brief_list"
                 clientName={state.selectedClientName || undefined}
                 onBackToClients={handleBackToClients}
-                briefCounts={{ draft: 0, in_progress: 0, complete: 0 }}
+                briefCounts={briefCounts}
                 articleCount={articleCount}
               />
               <main className="flex-1 overflow-y-auto">

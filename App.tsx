@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, createContext, useContext } from 'react';
+import React, { useState, useCallback, useEffect, useRef, createContext, useContext } from 'react';
 import Header from './components/Header';
 import { generateBriefStep, generateArticleSection, setModelSettings, regenerateParagraph, trimSectionToWordCount } from './services/geminiService';
 import * as dataforseoService from './services/dataforseoService';
@@ -229,7 +229,7 @@ const App: React.FC<AppProps> = ({
     : Array.from(keywordVolumeMap.entries()).map(([kw, volume]) => ({ kw, volume }));
 
   // Auto-save hook (only active in Supabase mode)
-  const { triggerSave, saveNow } = useAutoSave(
+  const { triggerSave, saveNow, pauseAutoSave } = useAutoSave(
     {
       currentView,
       briefingStep,
@@ -431,7 +431,7 @@ const App: React.FC<AppProps> = ({
 
     // Update brief name to primary keyword (makes it meaningful in the dashboard)
     if (briefId && isSupabaseMode && keywords.length > 0) {
-      const primaryKeyword = keywords.sort((a, b) => b.volume - a.volume)[0].kw;
+      const primaryKeyword = [...keywords].sort((a, b) => b.volume - a.volume)[0].kw;
       updateBrief(briefId, { name: primaryKeyword }).catch(err => {
         console.error('Failed to update brief name:', err);
       });
@@ -462,7 +462,7 @@ const App: React.FC<AppProps> = ({
       const newVolumeMap = new Map<string, number>();
       keywords.forEach(k => newVolumeMap.set(k.kw.toLowerCase(), k.volume));
       setKeywordVolumeMap(newVolumeMap);
-      setTopKeywordsForViz(keywords.sort((a, b) => b.volume - a.volume).slice(0, 5));
+      setTopKeywordsForViz([...keywords].sort((a, b) => b.volume - a.volume).slice(0, 5));
       addLog(`Found ${keywords.length} keywords. Starting SERP analysis for ${country} in ${serpLanguage}.`);
 
       const urlDataMap = new Map<string, { rankings: CompetitorRanking[], score: number }>();
@@ -620,7 +620,7 @@ const App: React.FC<AppProps> = ({
     });
   }, []);
   
-  const addContextFiles = useCallback((files: File[]) => {
+  const addContextFiles = useCallback(async (files: File[]) => {
     const newFilesMap = new Map(contextFiles);
     const newContentsMap = new Map(fileContents);
     const filesToParse: File[] = [];
@@ -648,20 +648,25 @@ const App: React.FC<AppProps> = ({
     setContextFiles(newFilesMap);
     if(newContentsMap.size > fileContents.size) setFileContents(newContentsMap);
 
-    filesToParse.forEach(async (file) => {
-        setFileContents(prev => new Map(prev).set(file.name, { content: null, error: null, status: 'parsing' }));
-        const result = await parseFile(file);
-        setFileContents(prev => new Map(prev).set(file.name, { ...result, status: 'done' }));
+    await Promise.all(filesToParse.map(async (file) => {
+        try {
+            setFileContents(prev => new Map(prev).set(file.name, { content: null, error: null, status: 'parsing' }));
+            const result = await parseFile(file);
+            setFileContents(prev => new Map(prev).set(file.name, { ...result, status: 'done' }));
 
-        // Save to database if in Supabase mode
-        if (briefId && isSupabaseMode) {
-            try {
-                await uploadContextFile(briefId, file, result.content || undefined);
-            } catch (err) {
-                console.error('Failed to save context file to database:', err);
+            // Save to database if in Supabase mode
+            if (briefId && isSupabaseMode) {
+                try {
+                    await uploadContextFile(briefId, file, result.content || undefined);
+                } catch (err) {
+                    console.error('Failed to save context file to database:', err);
+                }
             }
+        } catch (err) {
+            console.error(`Error processing file ${file.name}:`, err);
+            setFileContents(prev => new Map(prev).set(file.name, { content: null, error: String(err), status: 'done' }));
         }
-    });
+    }));
   }, [contextFiles, fileContents, parseFile, addToast, hasAchievedDataMaven, briefId, isSupabaseMode]);
 
   const removeContextFile = useCallback((fileName: string) => {
@@ -787,6 +792,20 @@ const App: React.FC<AppProps> = ({
     }
   }, [briefingStep, competitorData, subjectInfo, brandInfo, briefData, keywordVolumeMap, outputLanguage, extractedTemplate, lengthConstraints, paaQuestions, briefId, onGenerationComplete, isFeelingLuckyFlow]);
 
+  // Navigate to a previous step without regenerating (just show existing data)
+  const handlePrevStep = useCallback(() => {
+    if (briefingStep > 1) {
+      setBriefingStep(prev => prev - 1);
+    }
+  }, [briefingStep]);
+
+  // Jump to a specific completed step
+  const handleGoToStep = useCallback((step: number) => {
+    if (step >= 1 && step <= briefingStep) {
+      setBriefingStep(step);
+    }
+  }, [briefingStep]);
+
   const handleProceedToBriefing = useCallback(async () => {
     setCurrentView('briefing');
     setIsLoading(true);
@@ -841,21 +860,27 @@ const App: React.FC<AppProps> = ({
     handleProceedToBriefing();
   }, [handleProceedToBriefing, briefId, onGenerationStart]);
 
+  // Use refs to avoid re-firing the Feeling Lucky effect when callbacks change
+  const handleNextStepRef = useRef(handleNextStep);
+  const onGenerationProgressRef = useRef(onGenerationProgress);
+  useEffect(() => { handleNextStepRef.current = handleNextStep; }, [handleNextStep]);
+  useEffect(() => { onGenerationProgressRef.current = onGenerationProgress; }, [onGenerationProgress]);
+
   useEffect(() => {
     // This effect drives the "I'm Feeling Lucky" flow forward.
     if (isFeelingLuckyFlow && currentView === 'briefing' && !isLoading && !error) {
         // Report progress to parent
-        if (onGenerationProgress) {
-          onGenerationProgress(briefingStep);
+        if (onGenerationProgressRef.current) {
+          onGenerationProgressRef.current(briefingStep);
         }
         // When a step completes, isLoading becomes false, and this effect triggers.
         // We call handleNextStep, which will either generate the next step
         // or, if all steps are complete (briefingStep will be 7), it will transition to the dashboard.
         if (briefingStep <= 7) {
-            handleNextStep();
+            handleNextStepRef.current();
         }
     }
-  }, [isFeelingLuckyFlow, currentView, isLoading, error, briefingStep, briefData, handleNextStep, onGenerationProgress]);
+  }, [isFeelingLuckyFlow, currentView, isLoading, error, briefingStep]);
   
   const handleRegenerateStep = useCallback(async (logicalStepToRegen: number, feedback?: string) => {
     setError(null);
@@ -948,6 +973,8 @@ const App: React.FC<AppProps> = ({
     const countWords = (text: string): number => text.trim().split(/\s+/).filter(Boolean).length;
 
     const allSections = flattenOutline(briefData.article_structure.outline);
+    // Use a sections array to avoid ambiguous string matching when trimming
+    const contentParts: string[] = [];
     let fullContent = '';
 
     // Extract word count constraints
@@ -956,7 +983,8 @@ const App: React.FC<AppProps> = ({
 
     // Initialize with H1
     const initialTitle = briefData.on_page_seo?.h1?.value || briefData.keyword_strategy?.primary_keywords?.[0]?.keyword || "Untitled Article";
-    fullContent += `# ${initialTitle}\n\n`;
+    contentParts.push(`# ${initialTitle}\n\n`);
+    fullContent = contentParts.join('');
     setGeneratedArticle({ title: initialTitle, content: fullContent });
 
     try {
@@ -977,7 +1005,13 @@ const App: React.FC<AppProps> = ({
         fullContent += heading;
         setGeneratedArticle({ title: initialTitle, content: fullContent });
 
+        // Track the section content start index in contentParts
+        const sectionPartIndex = contentParts.length;
+        // Temporarily push heading + empty content
+        contentParts.push(heading);
+
         // Use streaming to show real-time content generation
+        let streamedContent = '';
         const sectionContent = await generateArticleSection({
           brief: briefData,
           contentSoFar: fullContent,
@@ -991,25 +1025,31 @@ const App: React.FC<AppProps> = ({
           currentSectionIndex: i,
           strictMode: isStrictMode,
           onStream: (chunk) => {
+            streamedContent += chunk;
             fullContent += chunk;
             setGeneratedArticle({ title: initialTitle, content: fullContent });
           },
         });
 
-        // If streaming worked, content is already added via onStream
-        // If not (fallback), we need to add it
-        if (!fullContent.includes(sectionContent)) {
+        // Determine the final section body text
+        const finalSectionBody = streamedContent || sectionContent;
+
+        // If streaming didn't add content, add the fallback
+        if (!streamedContent) {
           fullContent += sectionContent;
         }
+
+        // Update the contentParts entry for this section (heading + body)
+        contentParts[sectionPartIndex] = heading + finalSectionBody;
 
         // Auto-trim over-budget sections in strict mode
         const sectionTarget = section.target_word_count || 0;
         if (isStrictMode && sectionTarget > 0) {
-          const sectionWords = countWords(sectionContent);
+          const sectionWords = countWords(finalSectionBody);
           const maxAllowed = sectionTarget * 1.2; // 20% buffer
 
           if (sectionWords > maxAllowed) {
-            console.log(`Trimming "${section.heading}": ${sectionWords} → ~${sectionTarget} words`);
+            if (import.meta.env.DEV) console.log(`Trimming "${section.heading}": ${sectionWords} → ~${sectionTarget} words`);
             setGenerationProgress({
               currentSection: `Trimming: ${section.heading}`,
               currentIndex: i + 1,
@@ -1017,19 +1057,21 @@ const App: React.FC<AppProps> = ({
             });
 
             const trimmedContent = await trimSectionToWordCount(
-              sectionContent,
+              finalSectionBody,
               sectionTarget,
               outputLanguage,
               section.heading
             );
 
-            // Replace the over-budget section content in fullContent
-            fullContent = fullContent.replace(sectionContent, trimmedContent);
+            // Replace the section at its known index instead of ambiguous string matching
+            contentParts[sectionPartIndex] = heading + trimmedContent;
+            fullContent = contentParts.join('\n\n');
             setGeneratedArticle({ title: initialTitle, content: fullContent });
           }
         }
 
-        fullContent += '\n\n';
+        contentParts.push('\n\n');
+        fullContent = contentParts.join('');
         setGeneratedArticle({ title: initialTitle, content: fullContent });
       }
 
@@ -1197,6 +1239,9 @@ const App: React.FC<AppProps> = ({
       await saveNow();
     }
 
+    // Pause auto-save to prevent saving empty state after clearing
+    pauseAutoSave();
+
     setCurrentView('initial_input');
     setBriefData({});
     setError(null);
@@ -1278,6 +1323,7 @@ const App: React.FC<AppProps> = ({
                   briefData={briefData}
                   setBriefData={setBriefData}
                   onNextStep={handleNextStep}
+                  onPrevStep={handlePrevStep}
                   onRegenerate={handleRegenerateStep}
                   onRestart={handleRestart}
                   keywordVolumeMap={keywordVolumeMap}
@@ -1349,6 +1395,7 @@ const App: React.FC<AppProps> = ({
               briefingStep={briefingStep}
               selectedSection={dashboardSection}
               onSelectSection={setDashboardSection}
+              onGoToStep={handleGoToStep}
               staleSteps={staleSteps}
               isUploadedBrief={isUploadedBrief}
             />

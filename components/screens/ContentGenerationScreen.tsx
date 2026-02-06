@@ -6,6 +6,7 @@ import ContentValidationPanel from '../ContentValidationPanel';
 import { BrainCircuitIcon, AlertTriangleIcon, CheckIcon, RefreshCwIcon, EditIcon, XIcon, ZapIcon, FileTextIcon, ShieldCheckIcon } from '../Icon';
 import { exportArticleToMarkdown } from '../../services/markdownService';
 import { useSound } from '../../App';
+import { toast } from 'sonner';
 import type { ContentBrief, LengthConstraints } from '../../types';
 import { Card, Progress, Input, Textarea } from '../ui';
 
@@ -229,6 +230,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [editMode, setEditMode] = useState<EditMode>('paragraph');
   const [showValidationPanel, setShowValidationPanel] = useState(false);
+  const [mobileView, setMobileView] = useState<'editor' | 'preview'>('editor');
   const sound = useSound();
 
   // Handle content change from InlineEditor
@@ -290,6 +292,17 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, article]);
+
+  const handleCopyToClipboard = async () => {
+    if (article) {
+      try {
+        await navigator.clipboard.writeText(article.content);
+        toast.success('Copied to clipboard');
+      } catch {
+        toast.error('Failed to copy to clipboard');
+      }
+    }
+  };
 
   const handleDownload = () => {
     if (article) {
@@ -371,7 +384,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
       return (
           <div className="flex flex-col items-center justify-center min-h-[70vh] text-center celebration-container animate-fade-in">
               <div className="celebration-icon w-24 h-24 rounded-full bg-teal flex items-center justify-center shadow-glow-teal-lg mb-4">
-                  <CheckIcon className="h-16 w-16 text-surface-primary"/>
+                  <CheckIcon className="h-16 w-16 text-white"/>
               </div>
               <h1 className="text-3xl font-heading font-bold text-gray-900">Strategy Deployed.</h1>
               <p className="text-xl text-gray-600">Content Ready.</p>
@@ -404,6 +417,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
                     Validate Against Brief
                   </Button>
                 )}
+                <Button onClick={handleCopyToClipboard} variant="outline" size="sm">Copy</Button>
                 <Button onClick={handleDownload} variant="primary" size="sm" glow>Download .md</Button>
             </div>
         </div>
@@ -428,7 +442,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
               onClick={() => setEditMode('paragraph')}
               className={`px-3 py-1.5 text-xs rounded-md transition-colors flex items-center gap-1 ${
                 editMode === 'paragraph'
-                  ? 'bg-teal text-surface-primary font-semibold'
+                  ? 'bg-teal text-white font-semibold'
                   : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
               }`}
               title="Click paragraphs to regenerate with AI feedback"
@@ -440,7 +454,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
               onClick={() => setEditMode('selection')}
               className={`px-3 py-1.5 text-xs rounded-md transition-colors flex items-center gap-1 ${
                 editMode === 'selection'
-                  ? 'bg-teal text-surface-primary font-semibold'
+                  ? 'bg-teal text-white font-semibold'
                   : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
               }`}
               title="Select any text to rewrite, expand, or shorten"
@@ -452,7 +466,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
               onClick={() => setEditMode('raw')}
               className={`px-3 py-1.5 text-xs rounded-md transition-colors flex items-center gap-1 ${
                 editMode === 'raw'
-                  ? 'bg-teal text-surface-primary font-semibold'
+                  ? 'bg-teal text-white font-semibold'
                   : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
               }`}
               title="Direct markdown editing"
@@ -468,9 +482,29 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
           </span>
         </div>
 
+        {/* Mobile view toggle */}
+        <div className="flex md:hidden mb-4 border border-gray-200 rounded-lg overflow-hidden">
+          <button
+            onClick={() => setMobileView('editor')}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              mobileView === 'editor' ? 'bg-teal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Editor
+          </button>
+          <button
+            onClick={() => setMobileView('preview')}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              mobileView === 'preview' ? 'bg-teal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Preview
+          </button>
+        </div>
+
         {/* Editor Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[65vh]">
-            <Card variant="default" padding="none" className="flex flex-col overflow-hidden">
+            <Card variant="default" padding="none" className={`flex flex-col overflow-hidden ${mobileView !== 'editor' ? 'hidden md:flex' : ''}`}>
                 <div className="p-3 border-b border-gray-200 bg-gray-100">
                     <label className="text-sm font-heading font-medium text-gray-600">Editor (Markdown)</label>
                 </div>
@@ -482,7 +516,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
                 />
             </Card>
 
-            <Card variant="default" padding="none" className="flex flex-col overflow-hidden">
+            <Card variant="default" padding="none" className={`flex flex-col overflow-hidden ${mobileView !== 'preview' ? 'hidden md:flex' : ''}`}>
                 <div className="p-3 border-b border-gray-200 bg-gray-100">
                     <label className="text-sm font-heading font-medium text-gray-600">
                       {editMode === 'paragraph' && 'Interactive Preview (Click paragraphs to edit)'}

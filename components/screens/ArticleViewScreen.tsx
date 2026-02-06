@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { getArticle } from '../../services/articleService';
+import { toast } from 'sonner';
 import type { BriefArticle } from '../../types/database';
 import Button from '../Button';
 import { Card, Alert, Skeleton, Badge } from '../ui';
@@ -32,9 +34,14 @@ const ArticleViewScreen: React.FC<ArticleViewScreenProps> = ({ articleId, onBack
 
     const handleCopy = async () => {
         if (!article) return;
-        await navigator.clipboard.writeText(article.content);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        try {
+            await navigator.clipboard.writeText(article.content);
+            toast.success('Copied to clipboard');
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            toast.error('Failed to copy to clipboard');
+        }
     };
 
     const wordCount = article?.content.trim().split(/\s+/).filter(Boolean).length || 0;
@@ -107,7 +114,7 @@ const ArticleViewScreen: React.FC<ArticleViewScreenProps> = ({ articleId, onBack
             <Card variant="default" padding="lg">
                 <div
                     className="prose prose-invert max-w-none"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content) }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(article.content)) }}
                 />
             </Card>
         </div>

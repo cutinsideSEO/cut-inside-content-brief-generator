@@ -18,6 +18,7 @@ import { updateArticleContent } from '../services/articleService';
 import { calculateArticleMetrics } from '../utils/articleMetrics';
 import { toast } from 'sonner';
 import type { ContentBrief, LengthConstraints, ContentValidationResult } from '../types';
+import type { SaveStatus } from '../types/appState';
 import type { ArticleMetrics } from '../utils/articleMetrics';
 
 interface ArticleOptimizerPanelProps {
@@ -29,6 +30,7 @@ interface ArticleOptimizerPanelProps {
   onClose: () => void;
   articleId?: string;
   mode?: 'overlay' | 'inline';
+  onSaveStatusChange?: (status: SaveStatus, savedAt?: Date) => void;
 }
 
 interface ChatMessage {
@@ -158,6 +160,7 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
   onClose,
   articleId,
   mode = 'overlay',
+  onSaveStatusChange,
 }) => {
   const [metrics, setMetrics] = useState<ArticleMetrics | null>(null);
   const [validationResult, setValidationResult] = useState<ContentValidationResult | null>(null);
@@ -319,13 +322,16 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
 
     // Save to DB if article ID is available
     if (articleId) {
+      onSaveStatusChange?.('saving');
       const title = pendingContent.match(/^# (.+)$/m)?.[1] || article.title;
       const { error } = await updateArticleContent(articleId, title, pendingContent);
       if (error) {
         toast.error('Failed to save changes to database');
+        onSaveStatusChange?.('error');
         // Still apply locally even if DB save fails
       } else {
         toast.success('Article saved');
+        onSaveStatusChange?.('saved', new Date());
       }
     }
 
@@ -337,7 +343,7 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
     setStreamedContent('');
 
     // Recalculate metrics with new content (the article prop will update from parent)
-  }, [pendingContent, articleId, article.title, onApplyChanges]);
+  }, [pendingContent, articleId, article.title, onApplyChanges, onSaveStatusChange]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -397,7 +403,7 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
       </div>
 
       {/* Content area */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {/* Metrics Dashboard */}
         {metrics && (
           <div className="px-4 py-3 border-b border-gray-200">

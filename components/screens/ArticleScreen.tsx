@@ -6,8 +6,10 @@ import { exportArticleToMarkdown, copyArticleToClipboardRich } from '../../servi
 import { toast } from 'sonner';
 import type { BriefArticle } from '../../types/database';
 import type { ContentBrief, LengthConstraints } from '../../types';
+import type { SaveStatus } from '../../types/appState';
 import Button from '../Button';
-import { Badge, Skeleton, Alert, Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui';
+import SaveStatusIndicator from '../SaveStatusIndicator';
+import { Badge, Skeleton, Alert, Collapsible, CollapsibleTrigger, CollapsibleContent, Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui';
 import { ChevronDownIcon, ChevronUpIcon, CopyIcon, ZapIcon } from '../Icon';
 import ArticleOptimizerPanel from '../ArticleOptimizerPanel';
 
@@ -25,6 +27,13 @@ const DownloadIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="7 10 12 15 17 10" />
     <line x1="12" x2="12" y1="15" y2="3" />
+  </svg>
+);
+
+const SearchIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.3-4.3" />
   </svg>
 );
 
@@ -183,6 +192,9 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
   const [showOptimizer, setShowOptimizer] = useState(true);
   const [copyLabel, setCopyLabel] = useState<'idle' | 'copied'>('idle');
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [seoMetadataOpen, setSeoMetadataOpen] = useState(true);
 
   // -- Loading logic --
 
@@ -298,7 +310,25 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
     [currentContent, onArticleChange]
   );
 
+  const handleSaveStatusChange = useCallback((status: SaveStatus, savedAt?: Date) => {
+    setSaveStatus(status);
+    if (savedAt) setLastSavedAt(savedAt);
+  }, []);
+
   const resolvedBriefData = briefContext || briefDataProp || null;
+
+  const seoMetadata = useMemo(() => {
+    const seo = resolvedBriefData?.on_page_seo;
+    if (!seo) return null;
+    const rows: { element: string; recommendation: string }[] = [];
+    if (seo.title_tag?.value) rows.push({ element: 'Meta Title', recommendation: seo.title_tag.value });
+    if (seo.meta_description?.value) rows.push({ element: 'Meta Description', recommendation: seo.meta_description.value });
+    if (seo.url_slug?.value) rows.push({ element: 'URL Slug', recommendation: seo.url_slug.value });
+    if (seo.h1?.value) rows.push({ element: 'H1', recommendation: seo.h1.value });
+    if (seo.og_title?.value) rows.push({ element: 'OG Title', recommendation: seo.og_title.value });
+    if (seo.og_description?.value) rows.push({ element: 'OG Description', recommendation: seo.og_description.value });
+    return rows.length > 0 ? rows : null;
+  }, [resolvedBriefData]);
 
   // -- Loading state --
 
@@ -384,6 +414,9 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
                   })}
                 </span>
               )}
+              {(articleData?.id || articleDbId) && (
+                <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+              )}
             </div>
           </div>
 
@@ -420,10 +453,10 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
       </header>
 
       {/* Body: split layout */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
         {/* Left pane: collapsible article reader */}
         <div
-          className={`flex-1 overflow-y-auto p-6 ${
+          className={`flex-1 overflow-y-auto p-6 min-h-0 ${
             showOptimizer && resolvedBriefData ? 'md:w-[60%] md:flex-none' : ''
           }`}
         >
@@ -434,6 +467,46 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
           )}
 
           <div className="max-w-3xl space-y-1">
+            {seoMetadata && (
+              <Collapsible open={seoMetadataOpen} onOpenChange={() => setSeoMetadataOpen(!seoMetadataOpen)}>
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center gap-2 w-full text-left py-3 mb-2 group">
+                    <SearchIcon className="h-4 w-4 text-teal flex-shrink-0" />
+                    <span className="text-sm font-heading font-semibold text-foreground group-hover:text-teal transition-colors">
+                      On-Page SEO Recommendations
+                    </span>
+                    <span className="flex-shrink-0 text-muted-foreground ml-auto">
+                      {seoMetadataOpen ? (
+                        <ChevronUpIcon className="h-4 w-4" />
+                      ) : (
+                        <ChevronDownIcon className="h-4 w-4" />
+                      )}
+                    </span>
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mb-6 border border-border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[140px]">Element</TableHead>
+                          <TableHead>Recommendation</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {seoMetadata.map((row) => (
+                          <TableRow key={row.element}>
+                            <TableCell className="font-medium text-foreground whitespace-nowrap">{row.element}</TableCell>
+                            <TableCell className="text-muted-foreground">{row.recommendation}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
             {sections.map((section) => {
               const isCollapsed = collapsedSections.has(section.index);
 
@@ -491,7 +564,7 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
 
         {/* Right pane: optimizer chat */}
         {showOptimizer && resolvedBriefData && currentContent && (
-          <div className="border-t md:border-t-0 md:border-l border-border md:w-[40%] flex-shrink-0 flex flex-col bg-card overflow-hidden">
+          <div className="border-t md:border-t-0 md:border-l border-border md:w-[40%] flex-shrink-0 flex flex-col bg-card overflow-hidden h-full min-h-0">
             <ArticleOptimizerPanel
               article={currentContent}
               brief={resolvedBriefData}
@@ -501,6 +574,7 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
               onClose={() => setShowOptimizer(false)}
               articleId={articleData?.id || articleDbId}
               mode="inline"
+              onSaveStatusChange={handleSaveStatusChange}
             />
           </div>
         )}

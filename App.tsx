@@ -1437,6 +1437,7 @@ const App: React.FC<AppProps> = ({
             language={outputLanguage}
             onBack={() => setCurrentView('dashboard')}
             onArticleChange={(updated) => setGeneratedArticle(updated)}
+            onBriefDataChange={(updates) => setBriefData(prev => ({ ...prev, ...updates }))}
           />;
       case 'content_generation':
           return <ContentGenerationScreen

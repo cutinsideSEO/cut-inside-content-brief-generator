@@ -1,4 +1,4 @@
-import type { ContentBrief, CompetitorPage, OutlineItem } from '../types';
+import type { ContentBrief, CompetitorPage, OutlineItem, OnPageSeo } from '../types';
 
 // Helper to generate slug for anchor links
 const createSlug = (text: string) => {
@@ -285,13 +285,44 @@ export const exportBriefToMarkdown = (
 };
 
 
-export const exportArticleToMarkdown = (article: { title: string, content: string }) => {
+// Generate SEO metadata as a markdown table
+function generateSeoMarkdown(seo: OnPageSeo): string {
+    const rows: string[] = [];
+    if (seo.title_tag?.value) rows.push(`| Meta Title | ${seo.title_tag.value} |`);
+    if (seo.meta_description?.value) rows.push(`| Meta Description | ${seo.meta_description.value} |`);
+    if (seo.url_slug?.value) rows.push(`| URL Slug | ${seo.url_slug.value} |`);
+    if (seo.h1?.value) rows.push(`| H1 | ${seo.h1.value} |`);
+    if (seo.og_title?.value) rows.push(`| OG Title | ${seo.og_title.value} |`);
+    if (seo.og_description?.value) rows.push(`| OG Description | ${seo.og_description.value} |`);
+    if (rows.length === 0) return '';
+
+    return `## On-Page SEO Recommendations\n\n| Element | Recommendation |\n|---------|---------------|\n${rows.join('\n')}\n\n---\n\n`;
+}
+
+// Generate SEO metadata as an HTML table
+function generateSeoHtml(seo: OnPageSeo): string {
+    const rows: string[] = [];
+    if (seo.title_tag?.value) rows.push(`<tr><td><strong>Meta Title</strong></td><td>${seo.title_tag.value}</td></tr>`);
+    if (seo.meta_description?.value) rows.push(`<tr><td><strong>Meta Description</strong></td><td>${seo.meta_description.value}</td></tr>`);
+    if (seo.url_slug?.value) rows.push(`<tr><td><strong>URL Slug</strong></td><td>${seo.url_slug.value}</td></tr>`);
+    if (seo.h1?.value) rows.push(`<tr><td><strong>H1</strong></td><td>${seo.h1.value}</td></tr>`);
+    if (seo.og_title?.value) rows.push(`<tr><td><strong>OG Title</strong></td><td>${seo.og_title.value}</td></tr>`);
+    if (seo.og_description?.value) rows.push(`<tr><td><strong>OG Description</strong></td><td>${seo.og_description.value}</td></tr>`);
+    if (rows.length === 0) return '';
+
+    return `<h2>On-Page SEO Recommendations</h2><table><thead><tr><th>Element</th><th>Recommendation</th></tr></thead><tbody>${rows.join('')}</tbody></table><hr>`;
+}
+
+export const exportArticleToMarkdown = (article: { title: string, content: string }, seoMetadata?: OnPageSeo) => {
     if (!article || !article.content) {
         console.error("Article data is empty. Cannot export.");
         return;
     }
 
-    const blob = new Blob([article.content], { type: 'text/markdown' });
+    const seoSection = seoMetadata ? generateSeoMarkdown(seoMetadata) : '';
+    const fullContent = seoSection + article.content;
+
+    const blob = new Blob([fullContent], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -317,13 +348,20 @@ function applyInlineFormatting(text: string): string {
  * When pasted into Google Docs, headings, bold, italic, lists, and
  * paragraph formatting are preserved.
  */
-export async function copyArticleToClipboardRich(content: string): Promise<void> {
+export async function copyArticleToClipboardRich(content: string, seoMetadata?: OnPageSeo): Promise<void> {
   if (!content) {
     throw new Error('No content to copy.');
   }
 
   const lines = content.split('\n');
   const htmlParts: string[] = [];
+
+  // Prepend SEO metadata table if available
+  if (seoMetadata) {
+    const seoHtml = generateSeoHtml(seoMetadata);
+    if (seoHtml) htmlParts.push(seoHtml);
+  }
+
   let i = 0;
 
   while (i < lines.length) {
@@ -383,8 +421,12 @@ export async function copyArticleToClipboardRich(content: string): Promise<void>
 
   const html = htmlParts.join('');
 
+  // Build plain text with SEO prefix
+  const seoPlainText = seoMetadata ? generateSeoMarkdown(seoMetadata) : '';
+  const fullPlainText = seoPlainText + content;
+
   const htmlBlob = new Blob([html], { type: 'text/html' });
-  const textBlob = new Blob([content], { type: 'text/plain' });
+  const textBlob = new Blob([fullPlainText], { type: 'text/plain' });
   const clipboardItem = new ClipboardItem({
     'text/html': htmlBlob,
     'text/plain': textBlob,

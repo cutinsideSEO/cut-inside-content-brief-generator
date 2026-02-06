@@ -5,7 +5,7 @@ import { getBrief } from '../../services/briefService';
 import { exportArticleToMarkdown, copyArticleToClipboardRich } from '../../services/markdownService';
 import { toast } from 'sonner';
 import type { BriefArticle } from '../../types/database';
-import type { ContentBrief, LengthConstraints } from '../../types';
+import type { ContentBrief, LengthConstraints, OnPageSeo } from '../../types';
 import type { SaveStatus } from '../../types/appState';
 import Button from '../Button';
 import SaveStatusIndicator from '../SaveStatusIndicator';
@@ -56,6 +56,8 @@ interface ArticleScreenProps {
   onBack: () => void;
   /** Notify parent when article content changes (e.g., after optimizer applies) */
   onArticleChange?: (article: { title: string; content: string }) => void;
+  /** Notify parent when brief data changes (e.g., SEO edits from optimizer chat) */
+  onBriefDataChange?: (updates: Partial<ContentBrief>) => void;
 }
 
 // --- Types ---
@@ -180,6 +182,7 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
   language = 'English',
   onBack,
   onArticleChange,
+  onBriefDataChange,
 }) => {
   const [articleData, setArticleData] = useState<BriefArticle | null>(null);
   const [currentContent, setCurrentContent] = useState<{
@@ -283,20 +286,20 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
   const handleCopyForDocs = useCallback(async () => {
     if (!currentContent?.content) return;
     try {
-      await copyArticleToClipboardRich(currentContent.content);
+      await copyArticleToClipboardRich(currentContent.content, resolvedBriefData?.on_page_seo);
       setCopyLabel('copied');
       toast.success('Copied to clipboard (rich text for Google Docs)');
       setTimeout(() => setCopyLabel('idle'), 2500);
     } catch {
       toast.error('Failed to copy to clipboard');
     }
-  }, [currentContent]);
+  }, [currentContent, resolvedBriefData]);
 
   const handleDownloadMd = useCallback(() => {
     if (!currentContent) return;
-    exportArticleToMarkdown(currentContent);
+    exportArticleToMarkdown(currentContent, resolvedBriefData?.on_page_seo);
     toast.success('Markdown file downloaded');
-  }, [currentContent]);
+  }, [currentContent, resolvedBriefData]);
 
   const handleApplyChanges = useCallback(
     (newContent: string) => {
@@ -314,6 +317,16 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
     setSaveStatus(status);
     if (savedAt) setLastSavedAt(savedAt);
   }, []);
+
+  const handleBriefDataChange = useCallback(
+    (updates: Partial<ContentBrief>) => {
+      // Update local brief context so the SEO table reactively updates
+      setBriefContext((prev) => (prev ? { ...prev, ...updates } : updates));
+      // Propagate to parent for auto-save
+      onBriefDataChange?.(updates);
+    },
+    [onBriefDataChange]
+  );
 
   const resolvedBriefData = briefContext || briefDataProp || null;
 
@@ -575,6 +588,7 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
               articleId={articleData?.id || articleDbId}
               mode="inline"
               onSaveStatusChange={handleSaveStatusChange}
+              onBriefDataChange={handleBriefDataChange}
             />
           </div>
         )}

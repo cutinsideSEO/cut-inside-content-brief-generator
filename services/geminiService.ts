@@ -1,6 +1,6 @@
 import { Type } from "@google/genai";
-import { getSystemPrompt, getStructureEnrichmentPrompt, getStructureResourceAnalysisPrompt, getContentGenerationPrompt, TEMPLATE_EXTRACTION_PROMPT, ADAPT_HEADINGS_PROMPT, PARAGRAPH_REGENERATION_PROMPT, REWRITE_SELECTION_PROMPTS, THINKING_LEVEL_BY_STEP, getLengthConstraintPrompt, VALIDATION_PROMPT, EEAT_SIGNALS_PROMPT, CONTENT_VALIDATION_PROMPT, CONTENT_VALIDATION_FOLLOWUP_PROMPT, getParagraphRegenerationSystemPrompt, getRewriteSelectionSystemPrompt, getBriefValidationSystemPrompt, getEEATSignalsSystemPrompt, getContentValidationSystemPrompt, getArticleOptimizerSystemPrompt, ARTICLE_THINKING_BUDGET, ARTICLE_OPTIMIZER_THINKING_BUDGET, VALIDATION_CHUNK_THRESHOLD, WC_PROMPT_MIN, WC_PROMPT_MAX, WC_STRICT_MIN, WC_STRICT_MAX } from '../constants';
-import type { ContentBrief, ArticleStructure, OutlineItem, ModelSettings, GeminiModel, ThinkingLevel, HeadingNode, RewriteAction, LengthConstraints, BriefValidation, EEATSignals, ContentValidationResult } from "../types";
+import { getSystemPrompt, getStructureEnrichmentPrompt, getStructureResourceAnalysisPrompt, getContentGenerationPrompt, TEMPLATE_EXTRACTION_PROMPT, ADAPT_HEADINGS_PROMPT, PARAGRAPH_REGENERATION_PROMPT, REWRITE_SELECTION_PROMPTS, THINKING_LEVEL_BY_STEP, getLengthConstraintPrompt, VALIDATION_PROMPT, EEAT_SIGNALS_PROMPT, CONTENT_VALIDATION_PROMPT, CONTENT_VALIDATION_FOLLOWUP_PROMPT, getParagraphRegenerationSystemPrompt, getRewriteSelectionSystemPrompt, getBriefValidationSystemPrompt, getEEATSignalsSystemPrompt, getContentValidationSystemPrompt, getArticleOptimizerSystemPrompt, getOptimizerRouterSystemPrompt, ARTICLE_THINKING_BUDGET, ARTICLE_OPTIMIZER_THINKING_BUDGET, VALIDATION_CHUNK_THRESHOLD, WC_PROMPT_MIN, WC_PROMPT_MAX, WC_STRICT_MIN, WC_STRICT_MAX } from '../constants';
+import type { ContentBrief, ArticleStructure, OutlineItem, ModelSettings, GeminiModel, ThinkingLevel, HeadingNode, RewriteAction, LengthConstraints, BriefValidation, EEATSignals, ContentValidationResult, OptimizerRouterResponse } from "../types";
 import { stripReasoningFromBrief, countWords, checkTokenBudget, truncateCompetitorText } from './briefContextService';
 import { supabase } from './supabaseClient';
 
@@ -1434,6 +1434,77 @@ export const validateGeneratedContent = async (params: {
     }
 };
 
+// Optimizer Router: Classify user intent (chat vs rewrite vs SEO edit)
+export const routeOptimizerMessage = async (params: {
+    userMessage: string;
+    conversationHistory: { role: 'user' | 'assistant'; content: string }[];
+    currentArticleSummary: string;
+    seoMetadata: string;
+    metricsContext: string;
+    briefContext: string;
+    language: string;
+}): Promise<OptimizerRouterResponse> => {
+    const { userMessage, conversationHistory, currentArticleSummary, seoMetadata, metricsContext, briefContext, language } = params;
+    const modelName = currentModelSettings.model;
+
+    const systemInstruction = getOptimizerRouterSystemPrompt(language);
+
+    // Build conversation context (last 10 messages)
+    const recentHistory = conversationHistory.slice(-10);
+    const historyText = recentHistory.length > 0
+        ? recentHistory.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n\n')
+        : 'No previous conversation.';
+
+    const prompt = `**CONVERSATION HISTORY:**
+${historyText}
+
+---
+
+**CONTENT BRIEF SUMMARY:**
+${briefContext}
+
+---
+
+**CURRENT ARTICLE SUMMARY (first 500 chars):**
+${currentArticleSummary}
+
+---
+
+**CURRENT ON-PAGE SEO METADATA:**
+${seoMetadata}
+
+---
+
+**ARTICLE METRICS:**
+${metricsContext}
+
+---
+
+**USER'S NEW MESSAGE:**
+${userMessage}
+
+---
+
+Classify the user's intent and respond with valid JSON.`;
+
+    try {
+        return await retryOperation(async () => {
+            const response = await callGemini(modelName, prompt, {
+                systemInstruction,
+                responseMimeType: "application/json",
+                ...(currentModelSettings.model.includes('gemini-3') ? { thinkingConfig: { thinkingBudget: 2048 } } : {}),
+            });
+            const text = response.text;
+            if (!text) throw new Error("Empty response from AI for optimizer routing.");
+            return JSON.parse(text) as OptimizerRouterResponse;
+        }, 2, 1000);
+    } catch (error) {
+        console.error("Error routing optimizer message:", error);
+        // Fallback: treat as rewrite request
+        return { action: 'rewrite_article', message: 'Processing your request...' };
+    }
+};
+
 // Article Optimizer: Chat-based full article rewrite with streaming
 export const optimizeArticleWithChat = async (params: {
     currentArticle: string;
@@ -1442,14 +1513,21 @@ export const optimizeArticleWithChat = async (params: {
     userInstruction: string;
     metricsContext: string;
     language: string;
+    conversationHistory?: { role: 'user' | 'assistant'; content: string }[];
     onStream?: (chunk: string) => void;
 }): Promise<string> => {
-    const { currentArticle, brief, lengthConstraints, userInstruction, metricsContext, language, onStream } = params;
+    const { currentArticle, brief, lengthConstraints, userInstruction, metricsContext, language, conversationHistory, onStream } = params;
     const modelName = currentModelSettings.model;
 
     const targetWordCount = lengthConstraints?.globalTarget || brief.article_structure?.word_count_target || 0;
 
     const systemInstruction = getArticleOptimizerSystemPrompt(language, targetWordCount);
+
+    // Build conversation context for the rewrite
+    const recentHistory = conversationHistory?.slice(-8) || [];
+    const historySection = recentHistory.length > 0
+        ? `**RECENT CONVERSATION CONTEXT:**\n${recentHistory.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n\n')}\n\n---\n\n`
+        : '';
 
     const prompt = `**CONTENT BRIEF (JSON):**
 ${JSON.stringify(stripReasoningFromBrief(brief), null, 2)}
@@ -1466,7 +1544,7 @@ ${metricsContext}
 
 ---
 
-**USER INSTRUCTION:**
+${historySection}**USER INSTRUCTION:**
 ${userInstruction}
 
 ---

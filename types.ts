@@ -236,3 +236,10 @@ export interface ValidationState {
   selectedChanges: Set<string>;
   showPanel: boolean;
 }
+
+// Optimizer Router Response — classifies user intent in the chat
+export interface OptimizerRouterResponse {
+  action: 'chat' | 'rewrite_article' | 'edit_seo' | 'rewrite_and_seo';
+  message: string;
+  seo_changes?: Partial<Record<'title_tag' | 'meta_description' | 'h1' | 'url_slug' | 'og_title' | 'og_description', string>>;
+}

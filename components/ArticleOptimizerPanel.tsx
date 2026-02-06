@@ -13,11 +13,11 @@ import {
   BarChartIcon,
 } from './Icon';
 import { Badge, Progress, Collapsible, CollapsibleTrigger, CollapsibleContent } from './ui';
-import { validateGeneratedContent, optimizeArticleWithChat } from '../services/geminiService';
+import { validateGeneratedContent, optimizeArticleWithChat, routeOptimizerMessage } from '../services/geminiService';
 import { updateArticleContent } from '../services/articleService';
 import { calculateArticleMetrics } from '../utils/articleMetrics';
 import { toast } from 'sonner';
-import type { ContentBrief, LengthConstraints, ContentValidationResult } from '../types';
+import type { ContentBrief, LengthConstraints, ContentValidationResult, OnPageSeo } from '../types';
 import type { SaveStatus } from '../types/appState';
 import type { ArticleMetrics } from '../utils/articleMetrics';
 
@@ -31,6 +31,7 @@ interface ArticleOptimizerPanelProps {
   articleId?: string;
   mode?: 'overlay' | 'inline';
   onSaveStatusChange?: (status: SaveStatus, savedAt?: Date) => void;
+  onBriefDataChange?: (updates: Partial<ContentBrief>) => void;
 }
 
 interface ChatMessage {
@@ -151,6 +152,64 @@ function formatMetricsContext(metrics: ArticleMetrics): string {
   return context;
 }
 
+// Merge SEO changes into the existing OnPageSeo structure, preserving .reasoning
+function mergeSeoChanges(
+  currentSeo: OnPageSeo | undefined,
+  changes: Partial<Record<'title_tag' | 'meta_description' | 'h1' | 'url_slug' | 'og_title' | 'og_description', string>>
+): OnPageSeo {
+  const base: OnPageSeo = currentSeo || {
+    title_tag: { value: '', reasoning: '' },
+    meta_description: { value: '', reasoning: '' },
+    h1: { value: '', reasoning: '' },
+    url_slug: { value: '', reasoning: '' },
+    og_title: { value: '', reasoning: '' },
+    og_description: { value: '', reasoning: '' },
+  };
+
+  const result = { ...base };
+  for (const [key, newValue] of Object.entries(changes)) {
+    if (newValue && key in result) {
+      const seoKey = key as keyof OnPageSeo;
+      result[seoKey] = { ...result[seoKey], value: newValue };
+    }
+  }
+  return result;
+}
+
+// Build a compact brief summary for the router (keeps it fast)
+function formatBriefContext(brief: Partial<ContentBrief>): string {
+  const parts: string[] = [];
+  if (brief.page_goal?.value) parts.push(`Page Goal: ${brief.page_goal.value}`);
+  if (brief.target_audience?.value) parts.push(`Target Audience: ${brief.target_audience.value}`);
+  if (brief.search_intent?.type) parts.push(`Search Intent: ${brief.search_intent.type} (${brief.search_intent.preferred_format})`);
+  if (brief.keyword_strategy) {
+    const primary = brief.keyword_strategy.primary_keywords?.map(k => k.keyword).join(', ');
+    const secondary = brief.keyword_strategy.secondary_keywords?.slice(0, 5).map(k => k.keyword).join(', ');
+    if (primary) parts.push(`Primary Keywords: ${primary}`);
+    if (secondary) parts.push(`Secondary Keywords: ${secondary}${(brief.keyword_strategy.secondary_keywords?.length || 0) > 5 ? '...' : ''}`);
+  }
+  if (brief.article_structure?.word_count_target) parts.push(`Target Word Count: ${brief.article_structure.word_count_target}`);
+  if (brief.content_gap_analysis) {
+    const stakes = brief.content_gap_analysis.table_stakes?.slice(0, 3).map(t => t.value).join(', ');
+    if (stakes) parts.push(`Key Table Stakes: ${stakes}`);
+  }
+  return parts.length > 0 ? parts.join('\n') : 'No brief data available.';
+}
+
+// Build SEO metadata string for the router prompt
+function formatSeoMetadata(brief: Partial<ContentBrief>): string {
+  const seo = brief.on_page_seo;
+  if (!seo) return 'No SEO metadata available.';
+  const lines: string[] = [];
+  if (seo.title_tag?.value) lines.push(`Meta Title: ${seo.title_tag.value}`);
+  if (seo.meta_description?.value) lines.push(`Meta Description: ${seo.meta_description.value}`);
+  if (seo.h1?.value) lines.push(`H1: ${seo.h1.value}`);
+  if (seo.url_slug?.value) lines.push(`URL Slug: ${seo.url_slug.value}`);
+  if (seo.og_title?.value) lines.push(`OG Title: ${seo.og_title.value}`);
+  if (seo.og_description?.value) lines.push(`OG Description: ${seo.og_description.value}`);
+  return lines.join('\n');
+}
+
 const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
   article,
   brief,
@@ -161,6 +220,7 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
   articleId,
   mode = 'overlay',
   onSaveStatusChange,
+  onBriefDataChange,
 }) => {
   const [metrics, setMetrics] = useState<ArticleMetrics | null>(null);
   const [validationResult, setValidationResult] = useState<ContentValidationResult | null>(null);
@@ -226,6 +286,13 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
     return generateSuggestions(metrics, validationResult);
   }, [metrics, validationResult]);
 
+  // Build conversation history from messages state for AI context
+  const buildConversationHistory = useCallback((): { role: 'user' | 'assistant'; content: string }[] => {
+    return messages
+      .filter((m) => !m.isStreaming && m.content)
+      .map((m) => ({ role: m.role, content: m.content }));
+  }, [messages]);
+
   const handleSendInstruction = useCallback(
     async (instruction: string) => {
       if (!instruction.trim() || isOptimizing || !metrics) return;
@@ -244,23 +311,86 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
       setPendingContent(null);
       setError(null);
 
-      // Add streaming AI message placeholder
-      const aiMsgId = `ai-stream-${Date.now()}`;
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: aiMsgId,
-          role: 'assistant',
-          content: '',
-          timestamp: new Date(),
-          isStreaming: true,
-        },
-      ]);
+      const metricsContext = formatMetricsContext(metrics);
+      const conversationHistory = buildConversationHistory();
 
       try {
-        const metricsContext = formatMetricsContext(metrics);
-        let accumulated = '';
+        // Step 1: Route the message (fast, non-streaming)
+        const routerResult = await routeOptimizerMessage({
+          userMessage: instruction.trim(),
+          conversationHistory,
+          currentArticleSummary: article.content.slice(0, 500),
+          seoMetadata: formatSeoMetadata(brief),
+          metricsContext,
+          briefContext: formatBriefContext(brief),
+          language,
+        });
 
+        const { action, message: aiMessage, seo_changes } = routerResult;
+
+        // Handle SEO changes for edit_seo and rewrite_and_seo
+        if ((action === 'edit_seo' || action === 'rewrite_and_seo') && seo_changes && onBriefDataChange) {
+          const updatedSeo = mergeSeoChanges(brief.on_page_seo, seo_changes);
+          onBriefDataChange({ on_page_seo: updatedSeo });
+        }
+
+        // Action: chat — just show the message, done
+        if (action === 'chat') {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `ai-chat-${Date.now()}`,
+              role: 'assistant',
+              content: aiMessage,
+              timestamp: new Date(),
+            },
+          ]);
+          setIsOptimizing(false);
+          return;
+        }
+
+        // Action: edit_seo — show message, no rewrite needed
+        if (action === 'edit_seo') {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `ai-seo-${Date.now()}`,
+              role: 'assistant',
+              content: aiMessage,
+              timestamp: new Date(),
+            },
+          ]);
+          setIsOptimizing(false);
+          return;
+        }
+
+        // Action: rewrite_article or rewrite_and_seo — show acknowledgment, then stream rewrite
+        // Add the AI acknowledgment message
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `ai-ack-${Date.now()}`,
+            role: 'assistant',
+            content: aiMessage,
+            timestamp: new Date(),
+          },
+        ]);
+
+        // Add streaming placeholder
+        const aiStreamId = `ai-stream-${Date.now()}`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: aiStreamId,
+            role: 'assistant',
+            content: '',
+            timestamp: new Date(),
+            isStreaming: true,
+          },
+        ]);
+
+        // Step 2: Stream the article rewrite
+        let accumulated = '';
         const result = await optimizeArticleWithChat({
           currentArticle: article.content,
           brief,
@@ -268,16 +398,17 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
           userInstruction: instruction.trim(),
           metricsContext,
           language,
+          conversationHistory,
           onStream: (chunk) => {
             accumulated += chunk;
             setStreamedContent(accumulated);
           },
         });
 
-        // Replace streaming message with final message
+        // Replace streaming message with completion message
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === aiMsgId
+            m.id === aiStreamId
               ? {
                   ...m,
                   content: 'Article rewrite complete. Review the changes and click "Apply Changes" to update your article.',
@@ -291,19 +422,26 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
         setStreamedContent('');
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Optimization failed';
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === aiMsgId
-              ? { ...m, content: `Error: ${errorMessage}`, isStreaming: false }
-              : m
-          )
-        );
+        // Add error as a message instead of modifying a streaming placeholder
+        setMessages((prev) => {
+          // Remove any streaming placeholder
+          const filtered = prev.filter((m) => !m.isStreaming);
+          return [
+            ...filtered,
+            {
+              id: `ai-error-${Date.now()}`,
+              role: 'assistant',
+              content: `Error: ${errorMessage}`,
+              timestamp: new Date(),
+            },
+          ];
+        });
         setError(errorMessage);
       } finally {
         setIsOptimizing(false);
       }
     },
-    [isOptimizing, metrics, article.content, brief, lengthConstraints, language]
+    [isOptimizing, metrics, article.content, brief, lengthConstraints, language, buildConversationHistory, onBriefDataChange]
   );
 
   const handleSuggestionClick = useCallback(

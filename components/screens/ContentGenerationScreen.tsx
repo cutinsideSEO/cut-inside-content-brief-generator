@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Spinner from '../Spinner';
 import Button from '../Button';
 import InlineEditor from '../InlineEditor';
-import ContentValidationPanel from '../ContentValidationPanel';
-import { BrainCircuitIcon, AlertTriangleIcon, CheckIcon, RefreshCwIcon, EditIcon, XIcon, ZapIcon, FileTextIcon, ShieldCheckIcon } from '../Icon';
+import ArticleOptimizerPanel from '../ArticleOptimizerPanel';
+import { BrainCircuitIcon, AlertTriangleIcon, CheckIcon, RefreshCwIcon, EditIcon, XIcon, ZapIcon, FileTextIcon } from '../Icon';
 import { exportArticleToMarkdown } from '../../services/markdownService';
 import { useSound } from '../../App';
 import { toast } from 'sonner';
@@ -413,8 +413,8 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
                     variant="outline"
                     size="sm"
                   >
-                    <ShieldCheckIcon className="h-4 w-4 mr-2" />
-                    Validate Against Brief
+                    <ZapIcon className="h-4 w-4 mr-2" />
+                    Optimize Article
                   </Button>
                 )}
                 <Button onClick={handleCopyToClipboard} variant="outline" size="sm">Copy</Button>
@@ -548,7 +548,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
 
         {/* Validation Panel */}
         {showValidationPanel && article && briefData && (
-          <ContentValidationPanel
+          <ArticleOptimizerPanel
             article={article}
             brief={briefData}
             lengthConstraints={lengthConstraints}

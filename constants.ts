@@ -92,7 +92,7 @@ export const getSystemPrompt = (step: number, language: string, isRegeneration?:
       2.  **Hierarchical Depth:** The outline must be nested. Use 'H2' for main sections, 'H3' for sub-sections.
       3.  **Special Sections:** Include special sections where appropriate: \`level: "Hero"\`, \`level: "Conclusion"\`. Do NOT create an FAQ section here; that will be handled in a separate step.
       4.  **Deep Reasoning:** Your 'reasoning' for EACH item must be a detailed sentence explaining *why* it is included, explicitly linking back to the Content Gap Analysis or competitor insights (e.g., "Covers the 'Table Stakes' topic of X," or "Exploits the 'Strategic Opportunity' to discuss Y in more detail than competitors.").
-      5.  **Word Count:** Recommend a competitive word count based on the average of the top and starred competitors. You MUST allocate a 'target_word_count' (in words) to EVERY section in the outline. Base allocations on section depth (H2 sections need more words than H3), guideline complexity, and whether it's targeting a featured snippet. The sum of all section word counts should approximately equal the total word_count_target.
+      5.  **Word Count:** Recommend a competitive word count based on the average of the top and starred competitors. You MUST allocate a 'target_word_count' (in words) to EVERY section in the outline. This is MANDATORY. Every single outline item must have a non-zero target_word_count. If the brief includes length_constraints with a globalTarget, use that as the total. Otherwise, base it on the average competitor word count. The sum of all section target_word_counts MUST equal the global word_count_target. Base allocations on section depth (H2 sections need more words than H3), guideline complexity, and whether it's targeting a featured snippet.
 
       **FEATURED SNIPPET TARGETING (IMPORTANT):**
       Based on the Search Intent analysis from Step 1, identify if there's a Featured Snippet opportunity.
@@ -199,11 +199,14 @@ export const getContentGenerationPrompt = (language: string, writerInstructions?
     let prompt = `You are an expert content writer writing a single section of an article.
 
 **CRITICAL: WORD COUNT IS NON-NEGOTIABLE**
-When given a word count target, you MUST stay within ±15% of that target.
-- Target 200 words → Write 170-230 words. NOT 300+.
-- Count mentally as you write. Quality over quantity.
+You MUST produce output within a hard minimum and maximum word range.
+- If the target is T words, you MUST write between T*0.85 and T*1.15 words. No exceptions.
+- Example: Target 200 words → Write between 170 and 230 words. NOT 300+. NOT 120.
+- If no per-section target is given, use the suggested budget from the WORD COUNT section below.
+- Count your output before submitting. Quality over quantity.
 - Concise and impactful beats verbose and padded.
 - If over budget, cut filler — keep only high-value content.
+- BEFORE finishing, mentally count your paragraphs and estimate total words. If under target, add more substantive content. If over, cut filler.
 
 **WRITING RULES:**
 1.  Write ONLY the body content. DO NOT repeat the section heading.
@@ -510,3 +513,32 @@ Remember:
 - Update scores if the user's feedback reveals issues you missed
 - Be helpful and responsive to what the user is asking for
 `;
+
+// Article Optimizer Prompts
+export const ARTICLE_OPTIMIZER_SYSTEM_PROMPT = `You are an expert SEO content optimizer. You have the original content brief and the current article.
+Your job is to rewrite the ENTIRE article based on the user's instruction and the metrics analysis.
+
+RULES:
+- Return ONLY the complete rewritten article in markdown format
+- Include all headings (##, ###) and body content
+- Start with # H1 title
+- Maintain the same structure unless the instruction asks to change it
+- Do NOT include any commentary, explanations, or meta-text before or after the article
+- Do NOT wrap the article in code blocks`;
+
+export const ARTICLE_OPTIMIZER_PROMPT = `**CONTENT BRIEF (source of truth):**
+{briefJson}
+
+**CURRENT ARTICLE:**
+{currentArticle}
+
+**METRICS ANALYSIS:**
+{metricsContext}
+
+**USER INSTRUCTION:**
+{userInstruction}
+
+**LANGUAGE:** Write the entire article in {language}.
+**TARGET WORD COUNT:** {targetWordCount} words (MUST be within +/-10% of this target).
+
+Rewrite the ENTIRE article incorporating the user's instruction. Return ONLY the full article in markdown.`;

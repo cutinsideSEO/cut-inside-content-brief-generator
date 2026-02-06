@@ -762,8 +762,8 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
         wordCountInstruction = `
         ---
 
-        **📏 WORD COUNT TARGET:**
-        Write approximately **${sectionToWrite.target_word_count} words** for this section.
+        **📏 WORD COUNT REQUIREMENT:**
+        You MUST write between **${Math.round(sectionToWrite.target_word_count * 0.85)} and ${Math.round(sectionToWrite.target_word_count * 1.15)} words** for this section (target: ${sectionToWrite.target_word_count}).
         `;
     }
 
@@ -787,7 +787,7 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
 - Total article target: ${globalWordTarget} words
 - Words written so far: ${wordsWrittenSoFar || 0}
 - Words remaining in budget: ${wordsRemaining}
-- **YOU MUST write approximately ${effectiveTarget} words for this section. Do NOT exceed this.**
+- **YOU MUST write EXACTLY between ${Math.round(effectiveTarget * 0.9)} and ${Math.round(effectiveTarget * 1.1)} words for this section. Do NOT go outside this range.**
 - Going over budget will make the article too long. Be concise and focused.
 - If you need to cut content, prioritize the most valuable information.
 `;
@@ -795,10 +795,10 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
             wordBudgetInstruction = `
 ---
 
-**WORD COUNT GUIDANCE:**
+**WORD COUNT REQUIREMENT:**
 - Total article target: ${globalWordTarget} words
 - Words written so far: ${wordsWrittenSoFar || 0}
-- Aim for approximately **${effectiveTarget} words** for this section.
+- You MUST write between **${Math.round(effectiveTarget * 0.85)} and ${Math.round(effectiveTarget * 1.15)} words** for this section (target: ${effectiveTarget}).
 `;
         }
     }
@@ -1350,5 +1350,86 @@ export const validateGeneratedContent = async (params: {
     } catch (error) {
         console.error("Error validating content:", error);
         throw new Error("Failed to validate content against brief.");
+    }
+};
+
+// Article Optimizer: Chat-based full article rewrite with streaming
+export const optimizeArticleWithChat = async (params: {
+    currentArticle: string;
+    brief: Partial<ContentBrief>;
+    lengthConstraints?: LengthConstraints;
+    userInstruction: string;
+    metricsContext: string;
+    language: string;
+    onStream?: (chunk: string) => void;
+}): Promise<string> => {
+    const { currentArticle, brief, lengthConstraints, userInstruction, metricsContext, language, onStream } = params;
+    const modelName = currentModelSettings.model;
+
+    const targetWordCount = lengthConstraints?.globalTarget || brief.article_structure?.word_count_target || 0;
+
+    const systemInstruction = `You are an expert SEO content optimizer. You have the original content brief and the current article.
+Your job is to rewrite the ENTIRE article based on the user's instruction and the metrics analysis.
+
+RULES:
+- Return ONLY the complete rewritten article in markdown format
+- Include all headings (##, ###) and body content
+- Start with # H1 title
+- Maintain the same structure unless the instruction asks to change it
+- Write in ${language}
+${targetWordCount > 0 ? `- Target word count: ${targetWordCount} words (MUST be within +/-10%)` : ''}
+- Integrate all keywords naturally
+- Follow the content brief's guidelines for each section
+- Do NOT include any commentary, explanations, or meta-text — ONLY the article`;
+
+    const prompt = `**CONTENT BRIEF (JSON):**
+${JSON.stringify(stripReasoningFromBrief(brief), null, 2)}
+
+---
+
+**CURRENT ARTICLE:**
+${currentArticle}
+
+---
+
+**ARTICLE METRICS ANALYSIS:**
+${metricsContext}
+
+---
+
+**USER INSTRUCTION:**
+${userInstruction}
+
+---
+
+Now rewrite the ENTIRE article incorporating the user's instruction. Return ONLY the complete article in markdown format.`;
+
+    try {
+        if (onStream) {
+            let fullText = '';
+            const stream = callGeminiStream(modelName, prompt, { systemInstruction });
+
+            for await (const chunk of stream) {
+                const chunkText = chunk.text || '';
+                fullText += chunkText;
+                onStream(chunkText);
+            }
+
+            if (!fullText) {
+                throw new Error("Received an empty response from the AI for article optimization.");
+            }
+            return fullText;
+        }
+
+        // Non-streaming fallback
+        return await retryOperation(async () => {
+            const response = await callGemini(modelName, prompt, { systemInstruction });
+            const text = response.text;
+            if (!text) throw new Error("Empty response from AI for article optimization.");
+            return text;
+        });
+    } catch (error) {
+        console.error("Error optimizing article:", error);
+        throw new Error("Failed to optimize article. Please try again.");
     }
 };

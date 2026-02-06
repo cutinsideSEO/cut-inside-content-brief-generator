@@ -1042,13 +1042,55 @@ const App: React.FC<AppProps> = ({
         // Update the contentParts entry for this section (heading + body)
         contentParts[sectionPartIndex] = heading + finalSectionBody;
 
-        // Auto-trim over-budget sections in strict mode
+        // Post-generation retry: if section is under 70% of target, regenerate once
+        let currentSectionBody = finalSectionBody;
         const sectionTarget = section.target_word_count || 0;
-        if (isStrictMode && sectionTarget > 0) {
-          const sectionWords = countWords(finalSectionBody);
-          const maxAllowed = sectionTarget * 1.2; // 20% buffer
+        if (sectionTarget > 0) {
+          const sectionWords = countWords(currentSectionBody);
+          if (sectionWords < sectionTarget * 0.7) {
+            if (import.meta.env.DEV) console.log(`Expanding "${section.heading}": ${sectionWords} words < 70% of ${sectionTarget} target`);
+            setGenerationProgress({
+              currentSection: `Expanding: ${section.heading}`,
+              currentIndex: i + 1,
+              total: allSections.length,
+            });
 
-          if (sectionWords > maxAllowed) {
+            const expandedContent = await generateArticleSection({
+              brief: briefData,
+              contentSoFar: fullContent.replace(currentSectionBody, ''),
+              sectionToWrite: {
+                ...section,
+                guidelines: [
+                  ...section.guidelines,
+                  `CRITICAL: Your previous attempt was only ${sectionWords} words. You MUST write at least ${Math.round(sectionTarget * 0.85)} words for this section. Expand with more detail, examples, and depth.`,
+                ],
+              },
+              upcomingHeadings,
+              language: outputLanguage,
+              writerInstructions: writerInstructions?.trim() || undefined,
+              globalWordTarget,
+              wordsWrittenSoFar: countWords(fullContent) - sectionWords,
+              totalSections: allSections.length,
+              currentSectionIndex: i,
+              strictMode: isStrictMode,
+            });
+
+            // Replace the under-budget content with the expanded version
+            fullContent = fullContent.replace(currentSectionBody, expandedContent);
+            currentSectionBody = expandedContent;
+            contentParts[sectionPartIndex] = heading + currentSectionBody;
+            setGeneratedArticle({ title: initialTitle, content: fullContent });
+          }
+        }
+
+        // Auto-trim over-budget sections (strict: >120%, non-strict: >150%)
+        if (sectionTarget > 0) {
+          const sectionWords = countWords(currentSectionBody);
+          const shouldTrim = isStrictMode
+            ? sectionWords > sectionTarget * 1.2
+            : sectionWords > sectionTarget * 1.5;
+
+          if (shouldTrim) {
             if (import.meta.env.DEV) console.log(`Trimming "${section.heading}": ${sectionWords} → ~${sectionTarget} words`);
             setGenerationProgress({
               currentSection: `Trimming: ${section.heading}`,
@@ -1057,7 +1099,7 @@ const App: React.FC<AppProps> = ({
             });
 
             const trimmedContent = await trimSectionToWordCount(
-              finalSectionBody,
+              currentSectionBody,
               sectionTarget,
               outputLanguage,
               section.heading
@@ -1083,6 +1125,11 @@ const App: React.FC<AppProps> = ({
         fullContent += faqHeading;
         setGeneratedArticle({ title: initialTitle, content: fullContent });
 
+        // Calculate remaining word budget for FAQs
+        const wordsBeforeFaqs = countWords(fullContent);
+        const faqBudget = globalWordTarget ? Math.max(0, globalWordTarget - wordsBeforeFaqs) : 0;
+        const perFaqBudget = faqBudget > 0 ? Math.round(faqBudget / briefData.faqs.questions.length) : 0;
+
         for (let i = 0; i < briefData.faqs.questions.length; i++) {
             const faq = briefData.faqs.questions[i];
             setGenerationProgress({
@@ -1096,12 +1143,18 @@ const App: React.FC<AppProps> = ({
             fullContent += faqHeadingText;
             setGeneratedArticle({ title: initialTitle, content: fullContent });
 
+            // Build FAQ guidelines with word budget if available
+            const faqGuidelines = [...faq.guidelines];
+            if (perFaqBudget > 0) {
+              faqGuidelines.push(`Target approximately ${perFaqBudget} words for this FAQ answer.`);
+            }
+
             const questionContent = await generateArticleSection({
                 brief: briefData,
                 contentSoFar: fullContent,
                 sectionToWrite: {
                     heading: `Answer the question: ${faq.question}`,
-                    guidelines: faq.guidelines,
+                    guidelines: faqGuidelines,
                     level: 'H3',
                     reasoning: 'Answering a user FAQ',
                     children: [], targeted_keywords: [], competitor_coverage: []

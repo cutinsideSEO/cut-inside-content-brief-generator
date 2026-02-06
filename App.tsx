@@ -5,7 +5,7 @@ import * as dataforseoService from './services/dataforseoService';
 import { parseMarkdownBrief } from './services/markdownParserService';
 import { extractTemplateFromUrl } from './services/templateExtractionService';
 import type { CompetitorPage, ContentBrief, CompetitorRanking, OutlineItem, ModelSettings, LengthConstraints, ExtractedTemplate, HeadingNode } from './types';
-import { UI_TO_LOGICAL_STEP_MAP, SOUND_EFFECTS, WC_EXPAND_THRESHOLD, WC_TRIM_STRICT, WC_TRIM_NONSTRICT } from './constants';
+import { UI_TO_LOGICAL_STEP_MAP, SOUND_EFFECTS, WC_EXPAND_THRESHOLD, WC_TRIM_STRICT, WC_TRIM_NONSTRICT, WC_PROMPT_MAX } from './constants';
 import { stripCompetitorFullText } from './services/briefContextService';
 import { BrainCircuitIcon } from './components/Icon';
 
@@ -780,7 +780,7 @@ const App: React.FC<AppProps> = ({
         language: outputLanguage,
         // Feature 1 & 3: Pass template and length constraints for step 5 (structure)
         templateHeadings: logicalNextStep === 5 && extractedTemplate ? extractedTemplate.headingStructure : undefined,
-        lengthConstraints: lengthConstraints.globalTarget ? lengthConstraints : undefined,
+        lengthConstraints: (lengthConstraints.globalTarget || Object.keys(lengthConstraints.sectionTargets || {}).length > 0) ? lengthConstraints : undefined,
         // Feature: Pass PAA questions for step 6 (FAQ generation)
         paaQuestions: logicalNextStep === 6 ? paaQuestions : undefined,
       });
@@ -847,7 +847,7 @@ const App: React.FC<AppProps> = ({
         previousStepsData: {},
         groundTruthText,
         language: outputLanguage,
-        lengthConstraints: lengthConstraints.globalTarget ? lengthConstraints : undefined,
+        lengthConstraints: (lengthConstraints.globalTarget || Object.keys(lengthConstraints.sectionTargets || {}).length > 0) ? lengthConstraints : undefined,
       });
       setBriefData(prev => ({ ...prev, ...result }));
     } catch (err) {
@@ -990,8 +990,10 @@ const App: React.FC<AppProps> = ({
     const contentParts: string[] = [];
     let fullContent = '';
 
-    // Extract word count constraints
-    const globalWordTarget = lengthConstraints.globalTarget;
+    // Extract word count constraints — fall back to the AI-computed target from Step 5
+    const globalWordTarget = lengthConstraints.globalTarget
+        || briefData.article_structure?.word_count_target
+        || null;
     const isStrictMode = lengthConstraints.strictMode;
 
     // Initialize with H1
@@ -1138,10 +1140,11 @@ const App: React.FC<AppProps> = ({
         fullContent += faqHeading;
         setGeneratedArticle({ title: initialTitle, content: fullContent });
 
-        // Calculate remaining word budget for FAQs
+        // Calculate remaining word budget for FAQs — default to 80 words each if no global target
         const wordsBeforeFaqs = countWords(fullContent);
+        const faqCount = briefData.faqs.questions.length;
         const faqBudget = globalWordTarget ? Math.max(0, globalWordTarget - wordsBeforeFaqs) : 0;
-        const perFaqBudget = faqBudget > 0 ? Math.round(faqBudget / briefData.faqs.questions.length) : 0;
+        const perFaqBudget = faqBudget > 0 ? Math.round(faqBudget / faqCount) : 80;
 
         for (let i = 0; i < briefData.faqs.questions.length; i++) {
             const faq = briefData.faqs.questions[i];
@@ -1156,12 +1159,11 @@ const App: React.FC<AppProps> = ({
             fullContent += faqHeadingText;
             setGeneratedArticle({ title: initialTitle, content: fullContent });
 
-            // Build FAQ guidelines with word budget if available
+            // Build FAQ guidelines with word budget
             const faqGuidelines = [...faq.guidelines];
-            if (perFaqBudget > 0) {
-              faqGuidelines.push(`Target approximately ${perFaqBudget} words for this FAQ answer.`);
-            }
+            faqGuidelines.push(`Target approximately ${perFaqBudget} words for this FAQ answer.`);
 
+            let faqStreamedContent = '';
             const questionContent = await generateArticleSection({
                 brief: briefData,
                 contentSoFar: fullContent,
@@ -1170,6 +1172,7 @@ const App: React.FC<AppProps> = ({
                     guidelines: faqGuidelines,
                     level: 'H3',
                     reasoning: 'Answering a user FAQ',
+                    target_word_count: perFaqBudget,
                     children: [], targeted_keywords: [], competitor_coverage: []
                 },
                 upcomingHeadings: [],
@@ -1181,18 +1184,103 @@ const App: React.FC<AppProps> = ({
                 currentSectionIndex: allSections.length + i,
                 strictMode: isStrictMode,
                 onStream: (chunk) => {
+                  faqStreamedContent += chunk;
                   fullContent += chunk;
                   setGeneratedArticle({ title: initialTitle, content: fullContent });
                 },
             });
 
-            // If streaming worked, content is already added via onStream
-            if (!fullContent.includes(questionContent)) {
+            // Determine final FAQ body text
+            let faqBody = faqStreamedContent || questionContent;
+
+            // If streaming didn't add content, add the fallback
+            if (!faqStreamedContent) {
               fullContent += questionContent;
+            }
+
+            // Auto-trim over-budget FAQs (same logic as main sections)
+            if (perFaqBudget > 0) {
+              const faqWords = countWords(faqBody);
+              const faqTrimThreshold = isStrictMode ? WC_TRIM_STRICT : WC_TRIM_NONSTRICT;
+              if (faqWords > perFaqBudget * faqTrimThreshold) {
+                if (import.meta.env.DEV) console.log(`Trimming FAQ "${faq.question}": ${faqWords} → ~${perFaqBudget} words`);
+                setGenerationProgress({
+                  currentSection: `Trimming FAQ: ${faq.question}`,
+                  currentIndex: allSections.length + 1 + i,
+                  total: totalSectionsWithFaqs,
+                });
+
+                const trimmedFaq = await trimSectionToWordCount(
+                  faqBody,
+                  perFaqBudget,
+                  outputLanguage,
+                  faq.question
+                );
+
+                fullContent = fullContent.replace(faqBody, trimmedFaq);
+                faqBody = trimmedFaq;
+                setGeneratedArticle({ title: initialTitle, content: fullContent });
+              }
             }
 
             fullContent += '\n\n';
             setGeneratedArticle({ title: initialTitle, content: fullContent });
+        }
+      }
+
+      // Final total word count check — trim worst offenders if article exceeds target
+      if (globalWordTarget && globalWordTarget > 0) {
+        const totalWords = countWords(fullContent);
+        const maxAllowed = Math.round(globalWordTarget * WC_PROMPT_MAX);
+        if (totalWords > maxAllowed) {
+          if (import.meta.env.DEV) console.log(`Final trim: ${totalWords} words > ${maxAllowed} max (target ${globalWordTarget})`);
+          setGenerationProgress({
+            currentSection: 'Trimming article to target word count...',
+            currentIndex: allSections.length + (briefData.faqs?.questions?.length || 0),
+            total: allSections.length + (briefData.faqs?.questions?.length || 0),
+          });
+
+          // Find the most over-budget sections to trim
+          const sectionOverages: { index: number; heading: string; overage: number; body: string; target: number }[] = [];
+          for (let idx = 0; idx < contentParts.length; idx++) {
+            const part = contentParts[idx];
+            // Skip non-content parts (newlines, heading-only)
+            if (!part || part.trim().length < 20) continue;
+            // Extract the heading and body from the part
+            const lines = part.split('\n');
+            const headingLine = lines.find(l => l.startsWith('#'));
+            if (!headingLine) continue;
+            const bodyText = lines.filter(l => !l.startsWith('#')).join('\n').trim();
+            if (!bodyText) continue;
+            const bodyWords = countWords(bodyText);
+            // Find the matching section's target
+            const matchedSection = allSections.find(s => headingLine.includes(s.heading));
+            const sTarget = matchedSection?.target_word_count || 0;
+            if (sTarget > 0 && bodyWords > sTarget) {
+              sectionOverages.push({ index: idx, heading: matchedSection!.heading, overage: bodyWords - sTarget, body: bodyText, target: sTarget });
+            }
+          }
+
+          // Sort by overage (worst first) and trim up to 3 worst offenders
+          sectionOverages.sort((a, b) => b.overage - a.overage);
+          const sectionsToTrim = sectionOverages.slice(0, 3);
+
+          for (const sec of sectionsToTrim) {
+            const trimmedContent = await trimSectionToWordCount(
+              sec.body,
+              sec.target,
+              outputLanguage,
+              sec.heading
+            );
+            const headingLine = contentParts[sec.index].split('\n').find(l => l.startsWith('#')) || '';
+            contentParts[sec.index] = headingLine + '\n\n' + trimmedContent;
+          }
+
+          if (sectionsToTrim.length > 0) {
+            fullContent = contentParts.join('');
+            setGeneratedArticle({ title: initialTitle, content: fullContent });
+            if (import.meta.env.DEV) console.log(`After final trim: ${countWords(fullContent)} words`);
+          }
         }
       }
 

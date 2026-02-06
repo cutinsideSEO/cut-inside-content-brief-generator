@@ -7,7 +7,7 @@ export const WC_STRICT_MIN = 0.90;
 export const WC_STRICT_MAX = 1.10;
 export const WC_EXPAND_THRESHOLD = 0.70;
 export const WC_TRIM_STRICT = 1.20;
-export const WC_TRIM_NONSTRICT = 1.50;
+export const WC_TRIM_NONSTRICT = 1.20;
 export const WC_OPTIMIZER_TOLERANCE = 0.10;
 
 // Thinking budget constants

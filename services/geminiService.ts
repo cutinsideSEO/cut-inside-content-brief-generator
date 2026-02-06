@@ -761,31 +761,24 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
         `;
     }
 
-    // Build word count constraint if specified
+    // Build unified word count instruction (single source of truth)
     let wordCountInstruction = '';
-    if (sectionToWrite.target_word_count && sectionToWrite.target_word_count > 0) {
-        wordCountInstruction = `
-        ---
+    const wordBudgetInstruction = ''; // kept as empty string to avoid changing prompt template below
 
-        **📏 WORD COUNT REQUIREMENT:**
-        You MUST write between **${Math.round(sectionToWrite.target_word_count * WC_PROMPT_MIN)} and ${Math.round(sectionToWrite.target_word_count * WC_PROMPT_MAX)} words** for this section (target: ${sectionToWrite.target_word_count}).
-        `;
-    }
+    const sectionHasTarget = sectionToWrite.target_word_count && sectionToWrite.target_word_count > 0;
 
-    // Build global word budget instruction
-    let wordBudgetInstruction = '';
     if (globalWordTarget && globalWordTarget > 0) {
         const wordsRemaining = Math.max(0, globalWordTarget - (wordsWrittenSoFar || 0));
         const sectionsRemaining = Math.max(1, (totalSections || 1) - (currentSectionIndex || 0));
         const suggestedWords = Math.round(wordsRemaining / sectionsRemaining);
 
         // Section-level target takes priority if set, otherwise use calculated budget
-        const effectiveTarget = (sectionToWrite.target_word_count && sectionToWrite.target_word_count > 0)
-            ? sectionToWrite.target_word_count
+        const effectiveTarget = sectionHasTarget
+            ? sectionToWrite.target_word_count!
             : suggestedWords;
 
         if (strictMode) {
-            wordBudgetInstruction = `
+            wordCountInstruction = `
 ---
 
 **STRICT WORD COUNT LIMIT — THIS IS MANDATORY:**
@@ -797,15 +790,25 @@ export const generateArticleSection = async ({ brief, contentSoFar, sectionToWri
 - If you need to cut content, prioritize the most valuable information.
 `;
         } else {
-            wordBudgetInstruction = `
+            wordCountInstruction = `
 ---
 
 **WORD COUNT REQUIREMENT:**
 - Total article target: ${globalWordTarget} words
 - Words written so far: ${wordsWrittenSoFar || 0}
+- Words remaining in budget: ${wordsRemaining}
 - You MUST write between **${Math.round(effectiveTarget * WC_PROMPT_MIN)} and ${Math.round(effectiveTarget * WC_PROMPT_MAX)} words** for this section (target: ${effectiveTarget}).
+- Exceeding this range will push the article over its total word count budget.
 `;
         }
+    } else if (sectionHasTarget) {
+        // No global target but section has its own target
+        wordCountInstruction = `
+---
+
+**WORD COUNT REQUIREMENT:**
+You MUST write between **${Math.round(sectionToWrite.target_word_count! * WC_PROMPT_MIN)} and ${Math.round(sectionToWrite.target_word_count! * WC_PROMPT_MAX)} words** for this section (target: ${sectionToWrite.target_word_count}).
+`;
     }
 
     // Build E-E-A-T signals instruction if available on the brief

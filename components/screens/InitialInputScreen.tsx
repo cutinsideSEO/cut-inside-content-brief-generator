@@ -303,7 +303,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         {inputMethod === 'csv' && (
           <>
             {!csvFile ? (
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-200 border-dashed rounded-lg cursor-pointer bg-gray-100 hover:bg-gray-200 transition-colors">
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-200 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
                 <div className="flex flex-col items-center justify-center py-6">
                   <UploadCloudIcon className="w-10 h-10 mb-2 text-gray-400" />
                   <p className="text-sm text-gray-600">

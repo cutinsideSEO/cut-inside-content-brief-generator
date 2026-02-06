@@ -102,11 +102,11 @@ const KeywordTableInput: React.FC<KeywordTableInputProps> = ({ value, onChange }
   }, [value.length, addRow]);
 
   return (
-    <div ref={tableRef} className="bg-black/50 rounded-lg border border-white/10 overflow-hidden">
+    <div ref={tableRef} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="grid grid-cols-[1fr_120px_40px] gap-2 p-3 bg-white/5 border-b border-white/10">
-        <div className="text-sm font-heading font-semibold text-gray-600/80">Keyword</div>
-        <div className="text-sm font-heading font-semibold text-gray-600/80">Volume</div>
+      <div className="grid grid-cols-[1fr_120px_40px] gap-2 p-3 bg-gray-50 border-b border-gray-200">
+        <div className="text-sm font-heading font-semibold text-gray-600">Keyword</div>
+        <div className="text-sm font-heading font-semibold text-gray-600">Volume</div>
         <div></div>
       </div>
 
@@ -115,7 +115,7 @@ const KeywordTableInput: React.FC<KeywordTableInputProps> = ({ value, onChange }
         {value.map((row, index) => (
           <div
             key={row.id}
-            className="grid grid-cols-[1fr_120px_40px] gap-2 p-2 border-b border-white/5 hover:bg-white/5 transition-colors"
+            className="grid grid-cols-[1fr_120px_40px] gap-2 p-2 border-b border-gray-100 hover:bg-gray-50 transition-colors"
           >
             <input
               type="text"
@@ -125,7 +125,7 @@ const KeywordTableInput: React.FC<KeywordTableInputProps> = ({ value, onChange }
               onPaste={(e) => handlePaste(e, row.id, 'keyword')}
               onKeyDown={(e) => handleKeyDown(e, index)}
               placeholder="Enter keyword..."
-              className="w-full px-3 py-2 bg-background border border-white/20 rounded text-gray-600 text-sm focus:ring-1 focus:ring-teal focus:border-teal"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-gray-900 text-sm focus:ring-1 focus:ring-teal focus:border-teal placeholder:text-gray-400"
             />
             <input
               type="text"
@@ -140,12 +140,12 @@ const KeywordTableInput: React.FC<KeywordTableInputProps> = ({ value, onChange }
               onPaste={(e) => handlePaste(e, row.id, 'volume')}
               onKeyDown={(e) => handleKeyDown(e, index)}
               placeholder="0"
-              className="w-full px-3 py-2 bg-background border border-white/20 rounded text-gray-600 text-sm text-right focus:ring-1 focus:ring-teal focus:border-teal"
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded text-gray-900 text-sm text-right focus:ring-1 focus:ring-teal focus:border-teal placeholder:text-gray-400"
             />
             <button
               onClick={() => removeRow(row.id)}
               disabled={value.length <= 1}
-              className="p-2 text-gray-600/40 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-600/40 disabled:hover:bg-transparent"
+              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent"
               title="Remove row"
             >
               <XIcon className="h-4 w-4" />
@@ -155,21 +155,21 @@ const KeywordTableInput: React.FC<KeywordTableInputProps> = ({ value, onChange }
       </div>
 
       {/* Footer with Add button and paste hint */}
-      <div className="p-3 bg-white/5 border-t border-white/10 flex items-center justify-between">
+      <div className="p-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
         <button
           onClick={addRow}
-          className="px-4 py-2 text-sm font-heading font-semibold text-teal hover:text-white bg-teal/10 hover:bg-teal/20 rounded transition-colors"
+          className="px-4 py-2 text-sm font-heading font-semibold text-teal hover:text-teal-700 bg-teal/10 hover:bg-teal/20 rounded transition-colors"
         >
           + Add Keyword
         </button>
-        <span className="text-xs text-gray-600/50">
+        <span className="text-xs text-gray-400">
           Tip: Paste from Excel/Sheets (Keyword + Volume columns)
         </span>
       </div>
 
       {/* Summary */}
       {value.some(r => r.keyword && r.volume) && (
-        <div className="px-3 py-2 bg-teal/10 border-t border-teal/20 text-xs text-teal">
+        <div className="px-3 py-2 bg-teal/10 border-t border-teal/20 text-xs text-teal font-medium">
           {value.filter(r => r.keyword && r.volume).length} keywords ready
           {' • '}
           Total volume: {value.reduce((sum, r) => sum + (parseInt(r.volume) || 0), 0).toLocaleString()}

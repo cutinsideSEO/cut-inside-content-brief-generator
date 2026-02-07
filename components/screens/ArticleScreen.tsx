@@ -269,6 +269,10 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
     return currentContent?.content ? countWords(currentContent.content) : 0;
   }, [currentContent?.content]);
 
+  // -- Resolved brief data (must be before handlers that reference it) --
+
+  const resolvedBriefData = briefContext || briefDataProp || null;
+
   // -- Handlers --
 
   const toggleSection = useCallback((index: number) => {
@@ -327,8 +331,6 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
     },
     [onBriefDataChange]
   );
-
-  const resolvedBriefData = briefContext || briefDataProp || null;
 
   const seoMetadata = useMemo(() => {
     const seo = resolvedBriefData?.on_page_seo;

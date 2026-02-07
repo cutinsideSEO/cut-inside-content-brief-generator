@@ -8,16 +8,16 @@ AI-powered SEO Content Strategist that generates comprehensive, data-driven cont
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 19.1.1 + TypeScript |
-| Build | Vite 6.4.1 |
-| Styling | Tailwind CSS v3 (CDN) with custom design tokens |
-| AI | Google Gemini 2.5 Flash/Pro |
-| Database | Supabase (PostgreSQL + RLS) |
-| SEO Data | DataForSEO API |
-| Document Parsing | PDF.js, Mammoth.js |
-| Testing | Vitest 4.0.17 |
+| Layer            | Technology                                      |
+| ---------------- | ----------------------------------------------- |
+| Frontend         | React 19.1.1 + TypeScript                       |
+| Build            | Vite 6.4.1                                      |
+| Styling          | Tailwind CSS v3 (CDN) with custom design tokens |
+| AI               | Google Gemini 3 Flash/Pro                       |
+| Database         | Supabase (PostgreSQL + RLS)                     |
+| SEO Data         | DataForSEO API                                  |
+| Document Parsing | PDF.js, Mammoth.js                              |
+| Testing          | Vitest 4.0.17                                   |
 
 ## Development Commands
 
@@ -126,6 +126,7 @@ index.tsx → AppWrapper.tsx → AuthProvider
 ### Database Schema (Supabase)
 
 7 tables with RLS enabled:
+
 - `access_codes` - Authentication via unique codes
 - `clients` - Folders/workspaces for organizing briefs
 - `briefs` - Main entity with all brief data as JSONB
@@ -137,6 +138,7 @@ index.tsx → AppWrapper.tsx → AuthProvider
 ### State Management
 
 `App.tsx` manages 20+ useState hooks. Key state:
+
 - `currentView` - Which screen is displayed
 - `briefingStep` - Current step (1-7) in brief wizard
 - `briefData` - The ContentBrief object being built
@@ -160,6 +162,7 @@ generatingBriefs: Record<string, {
 ```
 
 How it works:
+
 1. When user starts "I'm Feeling Lucky" or content generation, brief is added to `generatingBriefs` map
 2. Hidden `<App>` components are rendered for each generating brief to maintain React state
 3. User can navigate away (to brief list or client selection) while generation continues
@@ -173,6 +176,7 @@ Limits: No code cap, but API rate limits (Gemini, DataForSEO) will throttle 10+ 
 ### Authentication Flow
 
 Uses custom access code auth (not Supabase Auth):
+
 1. User enters access code
 2. `authService.loginWithAccessCode()` validates against `access_codes` table
 3. Session stored in localStorage
@@ -181,6 +185,7 @@ Uses custom access code auth (not Supabase Auth):
 ### Brief Persistence
 
 When in Supabase mode:
+
 1. Creating brief: `briefService.createBrief(clientId, name)`
 2. Auto-save: `useAutoSave` hook saves on state changes (500ms debounce)
 3. Loading: `useBriefLoader` restores full state from database
@@ -188,17 +193,20 @@ When in Supabase mode:
 ### API Services
 
 All external APIs are in `/services`:
+
 - `geminiService.ts` - Handles model selection, thinking levels, JSON parsing
 - `dataforseoService.ts` - SERP queries, on-page analysis, PAA extraction
 
 ### Environment Variable Access
 
 Vite requires `VITE_` prefix for client-side env vars:
+
 ```typescript
 const url = import.meta.env.VITE_SUPABASE_URL;
 ```
 
 Check if configured:
+
 ```typescript
 import { isSupabaseConfigured } from './services/supabaseClient';
 if (isSupabaseConfigured()) { /* use Supabase */ }
@@ -207,6 +215,7 @@ if (isSupabaseConfigured()) { /* use Supabase */ }
 ### Path Alias
 
 The `@/` alias maps to project root. Use for imports:
+
 ```typescript
 import { Card } from '@/components/ui';
 import { geminiService } from '@/services/geminiService';
@@ -215,6 +224,7 @@ import { geminiService } from '@/services/geminiService';
 ## Testing
 
 Tests are in `/tests/services/`:
+
 - `dataforseoService.test.ts` - 13 tests
 - `markdownParserService.test.ts` - 14 tests
 - `templateExtractionService.test.ts` - 12 tests
@@ -231,6 +241,7 @@ Push to `master` triggers auto-deploy.
 Reusable components in `components/ui/` follow a light theme design system:
 
 **Design Tokens (Tailwind classes):**
+
 - Surfaces: `bg-background` (#F9FAFB), `bg-card` (#FFFFFF), `bg-secondary` (#F3F4F6)
 - Text: `text-foreground` (#111827), `text-muted-foreground` (#6B7280)
 - Borders: `border-border` (#E5E7EB), `border-input` (#E5E7EB)
@@ -238,6 +249,7 @@ Reusable components in `components/ui/` follow a light theme design system:
 - Status: `text-status-complete`, `text-status-error`, `text-status-generating`, `text-status-draft`
 
 **Available Components:**
+
 - `Card` - Container with variants (default, elevated, outlined)
 - `Badge` - Status indicators (success, warning, error, info, default)
 - `Input`, `Textarea` - Form inputs with labels, hints, errors

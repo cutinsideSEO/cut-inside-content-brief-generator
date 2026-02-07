@@ -1511,6 +1511,10 @@ const App: React.FC<AppProps> = ({
                   brandInfo={brandInfo}
                   contextFiles={Array.from(contextFiles.values())}
                   outputLanguage={outputLanguage}
+                  // Save status
+                  saveStatus={saveStatus}
+                  lastSavedAt={lastSavedAt}
+                  isSupabaseMode={isSupabaseMode}
                   // Lifted sidebar state
                   selectedSection={dashboardSection}
                   onSelectSection={setDashboardSection}

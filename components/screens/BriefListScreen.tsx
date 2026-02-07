@@ -340,20 +340,23 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
       {/* Bulk Action Bar */}
       {selectedBriefs.size > 0 && (
-        <div className="flex items-center gap-3 mb-4 p-3 bg-teal/5 border border-teal/20 rounded-lg">
-          <span className="text-sm font-medium text-gray-900">
+        <div className="flex items-center gap-3 mb-4 px-4 py-2.5 bg-teal/5 border border-teal/20 rounded-lg">
+          <span className="text-sm font-semibold text-foreground">
             {selectedBriefs.size} selected
           </span>
           <div className="flex-1" />
           <Button variant="secondary" size="sm" onClick={handleBulkArchive}>
-            Archive All
+            Archive
           </Button>
           <Button variant="danger" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
-            Delete All
+            Delete
           </Button>
-          <Button variant="ghost" size="sm" onClick={clearSelection}>
-            Cancel
-          </Button>
+          <button
+            onClick={clearSelection}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+          >
+            Clear
+          </button>
         </div>
       )}
 

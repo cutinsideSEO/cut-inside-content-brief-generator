@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import type { ContentBrief, CompetitorPage, BriefValidation, EEATSignals, OutlineItem } from '../../types';
+import type { SaveStatus } from '../../types/appState';
 import { exportBriefToMarkdown } from '../../services/markdownService';
 import { validateBrief, generateEEATSignals } from '../../services/geminiService';
 import Button from '../Button';
 import Spinner from '../Spinner';
 import { Badge, Callout, Textarea, Modal, Separator, Table, TableHeader, TableBody, TableHead, TableRow, TableCell, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../ui';
+import SaveStatusIndicator from '../SaveStatusIndicator';
 
 // Import stage components for inline rendering
 import Stage1Goal from '../stages/Stage1Goal';
@@ -38,6 +40,10 @@ interface DashboardScreenProps {
   brandInfo: string;
   contextFiles: File[];
   outputLanguage?: string;
+  // Save status
+  saveStatus?: SaveStatus;
+  lastSavedAt?: Date | null;
+  isSupabaseMode?: boolean;
   // Lifted sidebar state
   selectedSection?: number | null;
   onSelectSection?: (section: number | null) => void;
@@ -150,8 +156,8 @@ const EEATSignalsDisplay: React.FC<{ signals: EEATSignals }> = ({ signals }) => 
 };
 
 // A new component for the "home" state of the dashboard
-const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'isUploadedBrief' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage'>> = ({
-    briefData, setBriefData, staleSteps, isUploadedBrief, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English',
+const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'isUploadedBrief' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'isSupabaseMode'>> = ({
+    briefData, setBriefData, staleSteps, isUploadedBrief, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, isSupabaseMode,
 }) => {
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingEEAT, setIsGeneratingEEAT] = useState(false);
@@ -195,16 +201,21 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
         }
     };
 
+    // Brief title: prefer H1, fall back to title tag, then generic
+    const briefTitle = briefData.on_page_seo?.h1?.value
+        || briefData.on_page_seo?.title_tag?.value
+        || 'Untitled Brief';
+
     const wordCount = briefData.article_structure?.word_count_target?.toLocaleString() || "N/A";
     const h2Count = briefData.article_structure?.outline?.length || 0;
     const faqCount = briefData.faqs?.questions?.length || 0;
 
     // Flatten the recursive outline tree into a flat array for display
     const flattenedOutline = useMemo(() => {
-        const result: { level: string; heading: string; target_word_count?: number; depth: number }[] = [];
+        const result: { level: string; heading: string; depth: number }[] = [];
         const flatten = (items: OutlineItem[], depth: number) => {
             for (const item of items) {
-                result.push({ level: item.level, heading: item.heading, target_word_count: item.target_word_count, depth });
+                result.push({ level: item.level, heading: item.heading, depth });
                 if (item.children?.length) flatten(item.children, depth + 1);
             }
         };
@@ -212,7 +223,7 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
         return result;
     }, [briefData.article_structure?.outline]);
 
-    // SEO fields for the overview table
+    // SEO fields for the overview
     const getCharCountVariant = (count: number, max: number): 'success' | 'warning' | 'error' => {
         if (count > max) return 'error';
         if (count > max * 0.9) return 'warning';
@@ -232,149 +243,162 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
     }, [briefData.on_page_seo]);
 
     return (
-        <div className="animate-fade-in space-y-8">
+        <div className="animate-fade-in space-y-6">
             {staleSteps.size > 0 && (
                 <Callout variant="warning" title="Stale Sections Detected">
                     <p className="text-sm">Some sections of the brief are out of date due to recent changes. It's recommended to regenerate them for consistency.</p>
                 </Callout>
             )}
 
-            {/* Article Structure */}
-            <div>
-                <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider">
-                        Article Structure
-                    </h2>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span>{wordCount} words</span>
-                        <Separator orientation="vertical" className="h-4" />
-                        <span>{h2Count} sections</span>
-                        <Separator orientation="vertical" className="h-4" />
-                        <span>{faqCount} FAQs</span>
+            {/* ── Header: Brief Title + Meta + Actions ── */}
+            <div className="pb-4 border-b border-border">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="min-w-0 flex-1">
+                        <h1 className="text-2xl font-heading font-bold text-foreground truncate">
+                            {briefTitle}
+                        </h1>
+                        <div className="flex items-center gap-3 mt-1.5 text-sm text-muted-foreground flex-wrap">
+                            <span>{wordCount} words</span>
+                            <Separator orientation="vertical" className="h-3.5" />
+                            <span>{h2Count} sections</span>
+                            <Separator orientation="vertical" className="h-3.5" />
+                            <span>{faqCount} FAQs</span>
+                            {isSupabaseMode && saveStatus && (
+                                <>
+                                    <Separator orientation="vertical" className="h-3.5" />
+                                    <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt ?? null} />
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
-                {(flattenedOutline.length > 0 || (briefData.faqs?.questions?.length ?? 0) > 0) ? (
-                    <div className="border border-border rounded-lg overflow-hidden">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-16">Level</TableHead>
-                                    <TableHead>Heading</TableHead>
-                                    <TableHead className="w-24 text-right">Words</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {flattenedOutline.map((item, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell>
-                                            <Badge variant="teal" size="sm">{item.level}</Badge>
-                                        </TableCell>
-                                        <TableCell style={item.depth > 0 ? { paddingLeft: `${1 + item.depth * 1.5}rem` } : undefined}>
-                                            <span className="text-sm text-foreground">{item.heading || 'Untitled section'}</span>
-                                        </TableCell>
-                                        <TableCell className="text-right text-sm text-muted-foreground">
-                                            {item.target_word_count ? item.target_word_count.toLocaleString() : '-'}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {briefData.faqs?.questions?.map((faq, i) => (
-                                    <TableRow key={`faq-${i}`} className="bg-secondary/30">
-                                        <TableCell>
-                                            <Badge variant="default" size="sm">FAQ</Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className="text-sm text-foreground">{faq.question || 'Untitled question'}</span>
-                                        </TableCell>
-                                        <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                ) : (
-                    <p className="text-sm text-muted-foreground italic py-4 text-center">No article structure generated yet.</p>
-                )}
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-2.5 flex-wrap">
+                    <Button variant="primary" size="sm" onClick={() => setShowGenerateConfirm(true)} glow>
+                        <BrainCircuitIcon className="h-4 w-4 mr-1.5" />
+                        Generate Full Article
+                    </Button>
+                    {!isUploadedBrief && (
+                        <>
+                            <Button variant="secondary" size="sm" onClick={handleValidateBrief} disabled={isValidating}>
+                                {isValidating ? (
+                                    <><Spinner className="h-3.5 w-3.5 mr-1.5" /> Validating...</>
+                                ) : (
+                                    <><CheckIcon className="h-3.5 w-3.5 mr-1.5" /> Validate Brief</>
+                                )}
+                            </Button>
+                            <Button variant="secondary" size="sm" onClick={handleGenerateEEAT} disabled={isGeneratingEEAT}>
+                                {isGeneratingEEAT ? (
+                                    <><Spinner className="h-3.5 w-3.5 mr-1.5" /> Generating...</>
+                                ) : (
+                                    <><StarIcon className="h-3.5 w-3.5 mr-1.5" /> E-E-A-T Signals</>
+                                )}
+                            </Button>
+                        </>
+                    )}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="secondary" size="sm" disabled={isUploadedBrief}>
+                                <ChevronDownIcon className="h-3.5 w-3.5 mr-1 transition-transform data-[state=open]:rotate-180" />
+                                Export Brief
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={() => handleExport(false)}>
+                                Full Brief
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExport(true)}>
+                                Concise Brief
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button variant="secondary" size="sm" onClick={() => setShowNewBriefConfirm(true)}>
+                        Start New Brief
+                    </Button>
+                </div>
             </div>
 
-            {/* On-Page SEO */}
-            <div>
-                <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                    On-Page SEO
-                </h2>
-                {seoFields.some(f => f.value) ? (
-                    <div className="border border-border rounded-lg overflow-hidden">
-                        <Table>
-                            <TableBody>
-                                {seoFields.map(field => (
-                                    <TableRow key={field.key}>
-                                        <TableCell className="font-heading font-semibold text-sm w-40 align-top">
-                                            <span>{field.label}</span>
-                                            {field.maxLength && field.value && (
-                                                <Badge variant={getCharCountVariant(field.value.length, field.maxLength)} size="sm" className="ml-2">
-                                                    {field.value.length}/{field.maxLength}
-                                                </Badge>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {field.value ? (
-                                                <span className="text-foreground">{field.value}</span>
-                                            ) : (
-                                                <span className="text-muted-foreground italic">Not set</span>
-                                            )}
-                                        </TableCell>
+            {/* ── Two-Column: Structure (left) + On-Page SEO (right) ── */}
+            <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+                {/* Article Structure — takes more space */}
+                <div className="xl:col-span-3">
+                    <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                        Article Structure
+                    </h2>
+                    {(flattenedOutline.length > 0 || (briefData.faqs?.questions?.length ?? 0) > 0) ? (
+                        <div className="border border-border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-16">Level</TableHead>
+                                        <TableHead>Heading</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                ) : (
-                    <p className="text-sm text-muted-foreground italic py-4 text-center">No SEO data generated yet.</p>
-                )}
-            </div>
+                                </TableHeader>
+                                <TableBody>
+                                    {flattenedOutline.map((item, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell>
+                                                <Badge variant="teal" size="sm">{item.level}</Badge>
+                                            </TableCell>
+                                            <TableCell style={item.depth > 0 ? { paddingLeft: `${1 + item.depth * 1.5}rem` } : undefined}>
+                                                <span className="text-sm text-foreground">{item.heading || 'Untitled section'}</span>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    {briefData.faqs?.questions?.map((faq, i) => (
+                                        <TableRow key={`faq-${i}`} className="bg-secondary/30">
+                                            <TableCell>
+                                                <Badge variant="default" size="sm">FAQ</Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="text-sm text-foreground">{faq.question || 'Untitled question'}</span>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground italic py-4 text-center border border-border rounded-lg">No article structure generated yet.</p>
+                    )}
+                </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-3 flex-wrap pt-2">
-                <Button variant="primary" onClick={() => setShowGenerateConfirm(true)} glow>
-                    <BrainCircuitIcon className="h-4 w-4 mr-2" />
-                    Generate Full Article
-                </Button>
-                {!isUploadedBrief && (
-                    <>
-                        <Button variant="secondary" onClick={handleValidateBrief} disabled={isValidating}>
-                            {isValidating ? (
-                                <><Spinner className="h-4 w-4 mr-2" /> Validating...</>
-                            ) : (
-                                <><CheckIcon className="h-4 w-4 mr-2" /> Validate Brief</>
-                            )}
-                        </Button>
-                        <Button variant="secondary" onClick={handleGenerateEEAT} disabled={isGeneratingEEAT}>
-                            {isGeneratingEEAT ? (
-                                <><Spinner className="h-4 w-4 mr-2" /> Generating...</>
-                            ) : (
-                                <><StarIcon className="h-4 w-4 mr-2" /> E-E-A-T Signals</>
-                            )}
-                        </Button>
-                    </>
-                )}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="secondary" disabled={isUploadedBrief}>
-                            <ChevronDownIcon className="h-4 w-4 mr-1 transition-transform data-[state=open]:rotate-180" />
-                            Export Brief
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                        <DropdownMenuItem onClick={() => handleExport(false)}>
-                            Full Brief
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExport(true)}>
-                            Concise Brief
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                <Button variant="secondary" onClick={() => setShowNewBriefConfirm(true)}>
-                    Start New Brief
-                </Button>
+                {/* On-Page SEO — narrower column */}
+                <div className="xl:col-span-2">
+                    <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                        On-Page SEO
+                    </h2>
+                    {seoFields.some(f => f.value) ? (
+                        <div className="border border-border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableBody>
+                                    {seoFields.map(field => (
+                                        <TableRow key={field.key}>
+                                            <TableCell className="font-heading font-semibold text-xs w-28 align-top text-muted-foreground whitespace-nowrap">
+                                                <span>{field.label}</span>
+                                                {field.maxLength && field.value && (
+                                                    <Badge variant={getCharCountVariant(field.value.length, field.maxLength)} size="sm" className="ml-1.5">
+                                                        {field.value.length}/{field.maxLength}
+                                                    </Badge>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {field.value ? (
+                                                    <span className="text-foreground break-words">{field.value}</span>
+                                                ) : (
+                                                    <span className="text-muted-foreground italic">Not set</span>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground italic py-4 text-center border border-border rounded-lg">No SEO data generated yet.</p>
+                    )}
+                </div>
             </div>
 
             {/* Writer Instructions for uploaded briefs */}
@@ -451,7 +475,7 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
 
 
 const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
-    const { briefData, setBriefData, staleSteps, userFeedbacks, onFeedbackChange, onRegenerate, isLoading, loadingStep, competitorData, keywordVolumeMap, isUploadedBrief, outputLanguage, selectedSection: externalSelectedSection, onSelectSection: externalOnSelectSection } = props;
+    const { briefData, setBriefData, staleSteps, userFeedbacks, onFeedbackChange, onRegenerate, isLoading, loadingStep, competitorData, keywordVolumeMap, isUploadedBrief, outputLanguage, saveStatus, lastSavedAt, isSupabaseMode, selectedSection: externalSelectedSection, onSelectSection: externalOnSelectSection } = props;
     const [internalSelectedSection, setInternalSelectedSection] = useState<number | null>(null);
     const selectedSection = externalSelectedSection !== undefined ? externalSelectedSection : internalSelectedSection;
     const setSelectedSection = externalOnSelectSection || setInternalSelectedSection;

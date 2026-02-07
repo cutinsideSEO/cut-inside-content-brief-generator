@@ -261,6 +261,7 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
   return (
     <div className="space-y-8">
       {/* Word count + reasoning */}
+      <div className="bg-card border border-border rounded-lg p-4 shadow-card">
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <label htmlFor="word_count" className="text-sm font-heading font-medium text-muted-foreground">Word Count Target</label>
@@ -277,6 +278,7 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
           />
         </div>
       </div>
+      </div>
 
       {/* Content Outline */}
       <div>
@@ -292,6 +294,7 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
             </button>
           )}
         </div>
+        <div className="bg-card border border-border rounded-lg p-4 shadow-card">
         <div className="space-y-1">
           {structure.outline?.map((item, index) => (
             <OutlineNode
@@ -305,8 +308,9 @@ const Stage5Structure: React.FC<StageProps> = ({ briefData, setBriefData }) => {
             />
           ))}
           {structure.outline?.length === 0 && (
-            <p className="text-sm text-muted-foreground italic py-4 text-center">No outline sections yet</p>
+            <p className="text-sm text-muted-foreground italic py-8 text-center">No outline sections yet</p>
           )}
+        </div>
         </div>
       </div>
     </div>

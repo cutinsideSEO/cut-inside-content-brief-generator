@@ -117,13 +117,13 @@ const EditableText: React.FC<EditableTextProps> = ({
   const isEmpty = displayText.trim().length === 0;
   const displayPlaceholder = placeholder || 'Click to edit...';
 
-  const defaultTextClasses = 'text-foreground text-sm leading-relaxed';
+  const defaultTextClasses = 'text-foreground text-base leading-relaxed';
   const resolvedTextClasses = textClassName || defaultTextClasses;
 
   // Edit mode
   if (isEditing) {
     const editStyles =
-      'w-full bg-card border border-border rounded-md text-foreground text-sm leading-relaxed py-3 px-4 focus:outline-none focus:border-teal resize-none';
+      'w-full bg-card border border-border rounded-md text-foreground text-base leading-relaxed py-3 px-4 focus:outline-none focus:border-teal resize-none';
 
     if (multiline) {
       return (
@@ -172,14 +172,14 @@ const EditableText: React.FC<EditableTextProps> = ({
     >
       <p
         className={cn(
-          'px-2 py-1.5 -mx-2 rounded-sm transition-colors duration-150 group-hover:bg-gray-100',
+          'px-2 py-1.5 -mx-2 rounded-sm transition-colors duration-150 group-hover:bg-teal-light',
           isEmpty ? 'text-gray-400 italic' : resolvedTextClasses
         )}
       >
         {isEmpty ? displayPlaceholder : displayText}
       </p>
       <span className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-        <PencilSvg className="w-3.5 h-3.5 text-gray-300" />
+        <PencilSvg className="w-3.5 h-3.5 text-gray-400" />
       </span>
     </div>
   );

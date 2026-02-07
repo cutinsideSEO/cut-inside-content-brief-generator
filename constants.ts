@@ -13,7 +13,7 @@ export const WC_OPTIMIZER_TOLERANCE = 0.10;
 // Thinking budget constants
 export const ARTICLE_THINKING_BUDGET = 8192;
 export const ARTICLE_OPTIMIZER_THINKING_BUDGET = 8192;
-export const VALIDATION_CHUNK_THRESHOLD = 3000;
+export const VALIDATION_CHUNK_THRESHOLD = 8000;
 
 export const getSystemPrompt = (step: number, language: string, isRegeneration?: boolean): string => {
   let basePrompt = `You are a specialized AI assistant named **"BriefStrategist"**. Your sole purpose is to function as an expert SEO Content Strategist. 

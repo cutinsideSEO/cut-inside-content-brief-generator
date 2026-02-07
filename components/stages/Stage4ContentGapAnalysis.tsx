@@ -1,7 +1,18 @@
 import React from 'react';
 import type { ContentBrief, ReasoningItem } from '../../types';
 import { XIcon } from '../Icon';
-import { AIReasoningIcon, EditableText } from '../ui';
+import {
+  AIReasoningIcon,
+  EditableText,
+  Badge,
+  Separator,
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from '../ui';
 import Button from '../Button';
 
 interface StageProps {
@@ -56,6 +67,76 @@ const Stage4ContentGapAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
     });
   };
 
+  const renderGapTable = (
+    items: ReasoningItem<string>[],
+    type: 'table_stakes' | 'strategic_opportunities',
+    placeholder: string,
+    emptyMessage: string
+  ) => (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[40px]">#</TableHead>
+            <TableHead>Topic</TableHead>
+            <TableHead className="w-[40px]"></TableHead>
+            <TableHead className="w-[40px]"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.length > 0 ? (
+            items.map((item, index) => (
+              <TableRow key={index} className="group">
+                <TableCell className="text-muted-foreground text-xs font-medium">
+                  {index + 1}
+                </TableCell>
+                <TableCell>
+                  <EditableText
+                    value={item.value}
+                    onChange={(val) => handleItemChange(index, type, val)}
+                    placeholder={placeholder}
+                  />
+                </TableCell>
+                <TableCell>
+                  {item.reasoning && <AIReasoningIcon reasoning={item.reasoning} />}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveItem(type, index)}
+                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center text-sm text-muted-foreground italic py-6">
+                {emptyMessage}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => handleAddItem(type)}
+        className={`mt-3 ${type === 'table_stakes' ? 'text-teal hover:text-teal' : 'text-amber-500 hover:text-amber-600'}`}
+        icon={
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        }
+      >
+        Add Item
+      </Button>
+    </>
+  );
+
   return (
     <div className="space-y-8">
       {gapData.reasoning && (
@@ -65,106 +146,40 @@ const Stage4ContentGapAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Table Stakes */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-3 h-3 rounded-full bg-teal"></div>
-            <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider">Table Stakes (Must-Have Topics)</h3>
-          </div>
-          <p className="text-xs text-muted-foreground mb-4">Topics that all top competitors cover — essential for credibility</p>
-          <div className="space-y-3">
-            {gapData.table_stakes.map((item, index) => (
-              <div key={index} className="group flex items-start gap-2">
-                <span className="text-teal mt-1 flex-shrink-0">
-                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /></svg>
-                </span>
-                <div className="flex-1 min-w-0">
-                  <EditableText
-                    value={item.value}
-                    onChange={(val) => handleItemChange(index, 'table_stakes', val)}
-                    placeholder="Essential topic to cover..."
-                  />
-                </div>
-                {item.reasoning && <AIReasoningIcon reasoning={item.reasoning} />}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemoveItem('table_stakes', index)}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity flex-shrink-0"
-                >
-                  <XIcon className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ))}
-            {gapData.table_stakes.length === 0 && (
-              <p className="text-sm text-muted-foreground italic py-4 text-center">No table stakes identified yet</p>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleAddItem('table_stakes')}
-            className="mt-3 text-teal hover:text-teal"
-            icon={
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            }
-          >
-            Add Item
-          </Button>
+      {/* Table Stakes */}
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <Badge variant="teal" size="sm">Table Stakes</Badge>
+          <span className="text-xs text-muted-foreground">Must-Have Topics</span>
         </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Topics that all top competitors cover — essential for credibility
+        </p>
+        {renderGapTable(
+          gapData.table_stakes,
+          'table_stakes',
+          'Essential topic to cover...',
+          'No table stakes identified yet'
+        )}
+      </div>
 
-        {/* Strategic Opportunities */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-            <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider">Strategic Opportunities (Content Gaps)</h3>
-          </div>
-          <p className="text-xs text-muted-foreground mb-4">Topics competitors miss — your chance to differentiate</p>
-          <div className="space-y-3">
-            {gapData.strategic_opportunities.map((item, index) => (
-              <div key={index} className="group flex items-start gap-2">
-                <span className="text-amber-500 mt-1 flex-shrink-0">
-                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /></svg>
-                </span>
-                <div className="flex-1 min-w-0">
-                  <EditableText
-                    value={item.value}
-                    onChange={(val) => handleItemChange(index, 'strategic_opportunities', val)}
-                    placeholder="Strategic opportunity to explore..."
-                  />
-                </div>
-                {item.reasoning && <AIReasoningIcon reasoning={item.reasoning} />}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemoveItem('strategic_opportunities', index)}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity flex-shrink-0"
-                >
-                  <XIcon className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ))}
-            {gapData.strategic_opportunities.length === 0 && (
-              <p className="text-sm text-muted-foreground italic py-4 text-center">No opportunities identified yet</p>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleAddItem('strategic_opportunities')}
-            className="mt-3 text-amber-500 hover:text-amber-600"
-            icon={
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            }
-          >
-            Add Item
-          </Button>
+      <Separator />
+
+      {/* Strategic Opportunities */}
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <Badge variant="warning" size="sm">Strategic Opportunities</Badge>
+          <span className="text-xs text-muted-foreground">Content Gaps</span>
         </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Topics competitors miss — your chance to differentiate
+        </p>
+        {renderGapTable(
+          gapData.strategic_opportunities,
+          'strategic_opportunities',
+          'Strategic opportunity to explore...',
+          'No opportunities identified yet'
+        )}
       </div>
     </div>
   );

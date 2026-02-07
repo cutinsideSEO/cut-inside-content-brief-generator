@@ -284,7 +284,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
               <p className="text-gray-600 py-8">No articles generated yet for this client.</p>
             </Card>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {articles.map(article => (
                 <ArticleListCard
                   key={article.id}
@@ -369,7 +369,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
       {/* Loading state */}
       {isLoading && (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2, 3].map((i) => (
             <Card key={i} padding="md">
               <div className="flex items-start justify-between mb-3">
@@ -454,7 +454,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                 <span className="w-3 h-3 bg-amber-500 rounded-full mr-3" />
                 In Progress ({inProgressBriefs.length})
               </h2>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {inProgressBriefs.map((brief) => {
                   const generating = generatingBriefs[brief.id];
                   return (
@@ -484,7 +484,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                 <span className="w-3 h-3 bg-gray-400 rounded-full mr-3" />
                 Drafts ({draftBriefs.length})
               </h2>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {draftBriefs.map((brief) => {
                   const generating = generatingBriefs[brief.id];
                   return (
@@ -514,7 +514,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                 <span className="w-3 h-3 bg-emerald-500 rounded-full mr-3" />
                 Complete ({completeBriefs.length})
               </h2>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {completeBriefs.map((brief) => {
                   const generating = generatingBriefs[brief.id];
                   return (

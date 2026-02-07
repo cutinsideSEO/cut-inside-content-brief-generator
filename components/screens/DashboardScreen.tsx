@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import type { ContentBrief, CompetitorPage, BriefValidation, EEATSignals } from '../../types';
+import type { ContentBrief, CompetitorPage, BriefValidation, EEATSignals, OutlineItem } from '../../types';
 import { exportBriefToMarkdown } from '../../services/markdownService';
 import { validateBrief, generateEEATSignals } from '../../services/geminiService';
 import Button from '../Button';
 import Spinner from '../Spinner';
-import { Badge, Callout, Textarea, Modal, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../ui';
+import { Badge, Callout, Textarea, Modal, Separator, Table, TableHeader, TableBody, TableHead, TableRow, TableCell, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../ui';
 
 // Import stage components for inline rendering
 import Stage1Goal from '../stages/Stage1Goal';
@@ -34,7 +34,6 @@ interface DashboardScreenProps {
   isUploadedBrief?: boolean;
   writerInstructions: string;
   setWriterInstructions: (value: string) => void;
-  // Props for Brief Strength
   subjectInfo: string;
   brandInfo: string;
   contextFiles: File[];
@@ -150,61 +149,9 @@ const EEATSignalsDisplay: React.FC<{ signals: EEATSignals }> = ({ signals }) => 
   );
 };
 
-const BriefStrengthMeter: React.FC<Pick<DashboardScreenProps, 'briefData' | 'competitorData' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks'>> = (
-    { briefData, competitorData, subjectInfo, brandInfo, contextFiles, userFeedbacks }
-) => {
-    const score = useMemo(() => {
-        let currentScore = 50; // Base score
-        if (subjectInfo.trim() || brandInfo.trim() || contextFiles.length > 0) currentScore += 15;
-        if (competitorData.some(c => c.is_starred)) currentScore += 15;
-        if (Object.values(userFeedbacks).some(feedback => typeof feedback === 'string' && feedback.trim())) currentScore += 10;
-
-        // Check if all major parts of the brief exist
-        const hasAllSections = briefData.page_goal && briefData.keyword_strategy && briefData.competitor_insights && briefData.content_gap_analysis && briefData.article_structure && briefData.faqs && briefData.on_page_seo;
-        if (hasAllSections) currentScore += 10;
-
-        return Math.min(currentScore, 100);
-    }, [briefData, competitorData, subjectInfo, brandInfo, contextFiles, userFeedbacks]);
-
-    const circumference = 30 * 2 * Math.PI;
-
-    return (
-        <div className="flex flex-col items-center">
-            <div className="relative inline-flex items-center justify-center overflow-hidden rounded-full">
-                <svg className="w-20 h-20">
-                    <circle className="text-gray-200" strokeWidth="4" stroke="currentColor" fill="transparent" r="30" cx="40" cy="40"/>
-                    <circle
-                        className="text-teal transition-all duration-500"
-                        strokeWidth="4"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={circumference - score / 100 * circumference}
-                        strokeLinecap="round"
-                        stroke="currentColor"
-                        fill="transparent"
-                        r="30"
-                        cx="40"
-                        cy="40"
-                        style={{ transform: 'rotate(-90deg)', transformOrigin: '40px 40px' }}
-                    />
-                </svg>
-                <span className="absolute text-xl font-bold font-heading text-foreground">{`${score}%`}</span>
-            </div>
-            <p className="font-heading font-semibold text-gray-600 mt-2">Brief Strength</p>
-        </div>
-    );
-};
-
-// Stat Card for dashboard overview
-const StatCard: React.FC<{ label: string; value: string | number; highlight?: boolean }> = ({ label, value, highlight }) => (
-    <div className="bg-secondary p-4 rounded-lg">
-        <p className="text-sm font-heading text-muted-foreground">{label}</p>
-        <p className={`text-lg font-bold truncate ${highlight ? 'text-teal' : 'text-foreground'}`} title={String(value)}>{value}</p>
-    </div>
-);
-
 // A new component for the "home" state of the dashboard
 const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'isUploadedBrief' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage'>> = ({
-    briefData, setBriefData, staleSteps, isUploadedBrief, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', ...strengthProps
+    briefData, setBriefData, staleSteps, isUploadedBrief, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English',
 }) => {
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingEEAT, setIsGeneratingEEAT] = useState(false);
@@ -248,39 +195,145 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
         }
     };
 
-    const primaryKeyword = briefData.keyword_strategy?.primary_keywords?.[0]?.keyword || (isUploadedBrief ? briefData.on_page_seo?.h1?.value : "N/A");
     const wordCount = briefData.article_structure?.word_count_target?.toLocaleString() || "N/A";
     const h2Count = briefData.article_structure?.outline?.length || 0;
     const faqCount = briefData.faqs?.questions?.length || 0;
 
-    return (
-        <div className="animate-fade-in space-y-6">
-            {/* Compact header with key stats */}
-            <div className="flex items-center gap-6 flex-wrap">
-                {!isUploadedBrief && (
-                    <BriefStrengthMeter {...strengthProps} briefData={briefData} competitorData={competitorData} />
-                )}
-                <div>
-                    <p className="text-sm text-muted-foreground">Primary Keyword</p>
-                    <p className="text-foreground font-heading font-semibold">{primaryKeyword}</p>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span>{wordCount} words</span>
-                    <span className="text-gray-300">|</span>
-                    <span>{h2Count} sections</span>
-                    <span className="text-gray-300">|</span>
-                    <span>{faqCount} FAQs</span>
-                </div>
-            </div>
+    // Flatten the recursive outline tree into a flat array for display
+    const flattenedOutline = useMemo(() => {
+        const result: { level: string; heading: string; target_word_count?: number; depth: number }[] = [];
+        const flatten = (items: OutlineItem[], depth: number) => {
+            for (const item of items) {
+                result.push({ level: item.level, heading: item.heading, target_word_count: item.target_word_count, depth });
+                if (item.children?.length) flatten(item.children, depth + 1);
+            }
+        };
+        flatten(briefData.article_structure?.outline || [], 0);
+        return result;
+    }, [briefData.article_structure?.outline]);
 
+    // SEO fields for the overview table
+    const getCharCountVariant = (count: number, max: number): 'success' | 'warning' | 'error' => {
+        if (count > max) return 'error';
+        if (count > max * 0.9) return 'warning';
+        return 'success';
+    };
+
+    const seoFields = useMemo(() => {
+        const seo = briefData.on_page_seo;
+        return [
+            { key: 'title_tag', label: 'Title Tag', value: seo?.title_tag?.value || '', maxLength: 60 },
+            { key: 'meta_description', label: 'Meta Description', value: seo?.meta_description?.value || '', maxLength: 160 },
+            { key: 'h1', label: 'H1', value: seo?.h1?.value || '', maxLength: undefined },
+            { key: 'url_slug', label: 'URL Slug', value: seo?.url_slug?.value || '', maxLength: undefined },
+            { key: 'og_title', label: 'OG Title', value: seo?.og_title?.value || '', maxLength: 70 },
+            { key: 'og_description', label: 'OG Description', value: seo?.og_description?.value || '', maxLength: 200 },
+        ];
+    }, [briefData.on_page_seo]);
+
+    return (
+        <div className="animate-fade-in space-y-8">
             {staleSteps.size > 0 && (
                 <Callout variant="warning" title="Stale Sections Detected">
                     <p className="text-sm">Some sections of the brief are out of date due to recent changes. It's recommended to regenerate them for consistency.</p>
                 </Callout>
             )}
 
-            {/* Action buttons — horizontal row */}
-            <div className="flex items-center gap-3 flex-wrap">
+            {/* Article Structure */}
+            <div>
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider">
+                        Article Structure
+                    </h2>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <span>{wordCount} words</span>
+                        <Separator orientation="vertical" className="h-4" />
+                        <span>{h2Count} sections</span>
+                        <Separator orientation="vertical" className="h-4" />
+                        <span>{faqCount} FAQs</span>
+                    </div>
+                </div>
+                {(flattenedOutline.length > 0 || (briefData.faqs?.questions?.length ?? 0) > 0) ? (
+                    <div className="border border-border rounded-lg overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-16">Level</TableHead>
+                                    <TableHead>Heading</TableHead>
+                                    <TableHead className="w-24 text-right">Words</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {flattenedOutline.map((item, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell>
+                                            <Badge variant="teal" size="sm">{item.level}</Badge>
+                                        </TableCell>
+                                        <TableCell style={item.depth > 0 ? { paddingLeft: `${1 + item.depth * 1.5}rem` } : undefined}>
+                                            <span className="text-sm text-foreground">{item.heading || 'Untitled section'}</span>
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm text-muted-foreground">
+                                            {item.target_word_count ? item.target_word_count.toLocaleString() : '-'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {briefData.faqs?.questions?.map((faq, i) => (
+                                    <TableRow key={`faq-${i}`} className="bg-secondary/30">
+                                        <TableCell>
+                                            <Badge variant="default" size="sm">FAQ</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-sm text-foreground">{faq.question || 'Untitled question'}</span>
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">No article structure generated yet.</p>
+                )}
+            </div>
+
+            {/* On-Page SEO */}
+            <div>
+                <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    On-Page SEO
+                </h2>
+                {seoFields.some(f => f.value) ? (
+                    <div className="border border-border rounded-lg overflow-hidden">
+                        <Table>
+                            <TableBody>
+                                {seoFields.map(field => (
+                                    <TableRow key={field.key}>
+                                        <TableCell className="font-heading font-semibold text-sm w-40 align-top">
+                                            <span>{field.label}</span>
+                                            {field.maxLength && field.value && (
+                                                <Badge variant={getCharCountVariant(field.value.length, field.maxLength)} size="sm" className="ml-2">
+                                                    {field.value.length}/{field.maxLength}
+                                                </Badge>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            {field.value ? (
+                                                <span className="text-foreground">{field.value}</span>
+                                            ) : (
+                                                <span className="text-muted-foreground italic">Not set</span>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">No SEO data generated yet.</p>
+                )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 flex-wrap pt-2">
                 <Button variant="primary" onClick={() => setShowGenerateConfirm(true)} glow>
                     <BrainCircuitIcon className="h-4 w-4 mr-2" />
                     Generate Full Article
@@ -303,10 +356,9 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                         </Button>
                     </>
                 )}
-                {/* Export dropdown */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" disabled={isUploadedBrief}>
+                        <Button variant="secondary" disabled={isUploadedBrief}>
                             <ChevronDownIcon className="h-4 w-4 mr-1 transition-transform data-[state=open]:rotate-180" />
                             Export Brief
                         </Button>
@@ -320,7 +372,7 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="ghost" onClick={() => setShowNewBriefConfirm(true)}>
+                <Button variant="secondary" onClick={() => setShowNewBriefConfirm(true)}>
                     Start New Brief
                 </Button>
             </div>
@@ -473,14 +525,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
 
     return (
         <div className="animate-fade-in">
-            {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-2xl font-heading font-bold text-foreground">Content Brief Dashboard</h1>
-                <p className="text-gray-600 mt-1">
-                    {isUploadedBrief ? "Your imported brief is ready." : "Your brief is ready."} Review, refine, and generate the article.
-                </p>
-            </div>
-
             {renderMainContent()}
         </div>
     );

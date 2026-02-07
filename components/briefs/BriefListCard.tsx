@@ -3,7 +3,7 @@ import React from 'react';
 import type { BriefWithClient } from '../../types/database';
 import BriefStatusBadge from './BriefStatusBadge';
 import Button from '../Button';
-import { Card, Badge, Progress } from '../ui';
+import { Card, Badge, Progress, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '../ui';
 
 // Generation status type
 type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
@@ -23,6 +23,24 @@ interface BriefListCardProps {
   // Article indicator
   articleCount?: number;
 }
+
+const MoreHorizontalIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+  </svg>
+);
+
+const CopyIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+  </svg>
+);
+
+const ArchiveIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /><line x1="10" y1="12" x2="14" y2="12" />
+  </svg>
+);
 
 const BriefListCard: React.FC<BriefListCardProps> = ({
   brief,
@@ -108,10 +126,9 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
       variant="default"
       padding="md"
       hover
-      glow="teal"
       statusBorder={getStatusBorder()}
       className={`
-        relative
+        flex flex-col h-full
         ${isSelected ? 'border-teal ring-1 ring-teal' : ''}
         ${isGenerating ? 'border-amber-400/50 ring-1 ring-status-generating/30' : ''}
       `}
@@ -136,27 +153,26 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
         </div>
       )}
 
-      {/* Generation indicator */}
-      {isGenerating && (
-        <div className="absolute top-3 right-3 flex items-center gap-2">
-          <Badge variant="warning" size="sm" pulse>
-            {generationStatus === 'analyzing_competitors' ? 'Analyzing' :
-             generationStatus === 'generating_brief' ? 'Generating Brief' : 'Generating Content'}
-          </Badge>
-        </div>
-      )}
-
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
+      <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-heading font-semibold text-gray-900 truncate">
+          <h3 className="text-base font-heading font-semibold text-gray-900 truncate">
             {brief.name}
           </h3>
           {brief.client && (
             <p className="text-sm text-gray-500 mt-0.5">{brief.client.name}</p>
           )}
         </div>
-        {!isGenerating && <BriefStatusBadge status={brief.status} className="ml-3 flex-shrink-0" />}
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          {isGenerating ? (
+            <Badge variant="warning" size="sm" pulse>
+              {generationStatus === 'analyzing_competitors' ? 'Analyzing' :
+               generationStatus === 'generating_brief' ? 'Generating Brief' : 'Generating Content'}
+            </Badge>
+          ) : (
+            <BriefStatusBadge status={brief.status} />
+          )}
+        </div>
       </div>
 
       {/* Keywords */}
@@ -177,7 +193,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
 
       {/* Progress bar for generation */}
       {isGenerating && (
-        <div className="mb-4">
+        <div className="mb-3">
           <Progress
             value={getGenerationProgress()}
             size="sm"
@@ -190,7 +206,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
 
       {/* Progress and metadata */}
       {!isGenerating && (
-        <div className="flex items-center text-sm text-gray-600 mb-4">
+        <div className="flex items-center flex-wrap text-sm text-gray-600 mb-3">
           <span className="mr-3">
             <span className="text-gray-400">Progress:</span>{' '}
             <span className="text-gray-900">{getProgressText()}</span>
@@ -211,62 +227,60 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+      {/* Actions — primary CTA left, dropdown menu right */}
+      <div className="flex items-center justify-between mt-auto pt-3">
         {isGenerating ? (
-          <>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => onContinue(brief.id)}
-            >
+          <div className="flex items-center gap-2">
+            <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
               View Progress
             </Button>
-            <span className="flex items-center text-xs text-amber-500 ml-2">
+            <span className="flex items-center text-xs text-amber-500">
               <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
               Keep this tab open
             </span>
-          </>
+          </div>
         ) : (
           <>
             {brief.status !== 'complete' && brief.status !== 'archived' && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => onContinue(brief.id)}
-              >
+              <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
                 Continue
               </Button>
             )}
             {brief.status === 'complete' && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => onEdit(brief.id)}
-              >
+              <Button variant="primary" size="sm" onClick={() => onEdit(brief.id)}>
                 View / Edit
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onUseAsTemplate(brief.id)}
-            >
-              Use as Template
-            </Button>
-            {brief.status !== 'archived' && (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => onArchive(brief.id)}
-              >
-                Archive
-              </Button>
-            )}
+            {brief.status === 'archived' && <div />}
           </>
+        )}
+
+        {!isGenerating && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-1.5 rounded-md hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
+                <MoreHorizontalIcon className="h-5 w-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onUseAsTemplate(brief.id)}>
+                <CopyIcon className="h-4 w-4 mr-2" />
+                Use as Template
+              </DropdownMenuItem>
+              {brief.status !== 'archived' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onArchive(brief.id)} className="text-red-500 focus:text-red-500">
+                    <ArchiveIcon className="h-4 w-4 mr-2" />
+                    Archive
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
     </Card>

@@ -275,6 +275,7 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialAnalysisRan = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
@@ -295,7 +296,19 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Abort pending requests on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   const runInitialAnalysis = useCallback(async () => {
+    // Abort any previous analysis
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsAnalyzing(true);
     setError(null);
     try {
@@ -305,6 +318,10 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
         lengthConstraints,
         language,
       });
+
+      // Don't update state if aborted (component unmounted or new analysis started)
+      if (controller.signal.aborted) return;
+
       setValidationResult(result);
 
       // Add initial AI message
@@ -317,10 +334,13 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
         },
       ]);
     } catch (err) {
+      if (controller.signal.aborted) return;
       const errorMessage = err instanceof Error ? err.message : 'Analysis failed';
       setError(errorMessage);
     } finally {
-      setIsAnalyzing(false);
+      if (!controller.signal.aborted) {
+        setIsAnalyzing(false);
+      }
     }
   }, [article.content, brief, lengthConstraints, language]);
 
@@ -338,7 +358,7 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
 
   const handleSendInstruction = useCallback(
     async (instruction: string) => {
-      if (!instruction.trim() || isOptimizing || !metrics) return;
+      if (!instruction.trim() || isOptimizing || isAnalyzing || !metrics) return;
 
       // Add user message
       const userMsg: ChatMessage = {
@@ -484,7 +504,7 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
         setIsOptimizing(false);
       }
     },
-    [isOptimizing, metrics, article.content, brief, lengthConstraints, language, buildConversationHistory, onBriefDataChange]
+    [isOptimizing, isAnalyzing, metrics, article.content, brief, lengthConstraints, language, buildConversationHistory, onBriefDataChange]
   );
 
   const handleSuggestionClick = useCallback(
@@ -807,11 +827,11 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
             onKeyDown={handleKeyDown}
             placeholder="Describe how to improve the article..."
             className="flex-1 p-2.5 bg-white border border-gray-200 rounded-lg text-sm text-foreground resize-none h-16 focus:ring-1 focus:ring-teal focus:border-teal placeholder:text-muted-foreground/60"
-            disabled={isOptimizing}
+            disabled={isOptimizing || isAnalyzing}
           />
           <button
             onClick={handleSendMessage}
-            disabled={isOptimizing || !userInput.trim()}
+            disabled={isOptimizing || isAnalyzing || !userInput.trim()}
             className="px-3.5 bg-teal-50 hover:bg-teal-100 disabled:bg-gray-100 disabled:text-gray-300 text-teal rounded-lg transition-colors border border-teal-200 disabled:border-gray-200"
           >
             <SendIcon className="h-5 w-5" />

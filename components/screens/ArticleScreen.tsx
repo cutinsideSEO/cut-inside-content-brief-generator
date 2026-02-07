@@ -325,11 +325,15 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
   const handleBriefDataChange = useCallback(
     (updates: Partial<ContentBrief>) => {
       // Update local brief context so the SEO table reactively updates
-      setBriefContext((prev) => (prev ? { ...prev, ...updates } : updates));
+      // When prev is null (just-generated article flow), merge with briefDataProp as fallback
+      setBriefContext((prev) => {
+        const base = prev || briefDataProp || {};
+        return { ...base, ...updates };
+      });
       // Propagate to parent for auto-save
       onBriefDataChange?.(updates);
     },
-    [onBriefDataChange]
+    [onBriefDataChange, briefDataProp]
   );
 
   const seoMetadata = useMemo(() => {

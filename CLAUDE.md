@@ -4,20 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AI-powered SEO Content Strategist that generates comprehensive, data-driven content briefs. Built for the Cut Inside team with a multi-stage wizard that analyzes competitor content, generates SEO strategies, and produces structured content briefs.
+AI-powered SEO Content Strategist that generates comprehensive, data-driven content briefs. Built for the Cut Inside team with a multi-stage wizard that analyzes competitor content, generates SEO strategies, and produces structured content briefs with full article generation.
 
 ## Tech Stack
 
-| Layer            | Technology                                      |
-| ---------------- | ----------------------------------------------- |
-| Frontend         | React 19.1.1 + TypeScript                       |
-| Build            | Vite 6.4.1                                      |
-| Styling          | Tailwind CSS v3 (CDN) with custom design tokens |
-| AI               | Google Gemini 3 Flash/Pro                       |
-| Database         | Supabase (PostgreSQL + RLS)                     |
-| SEO Data         | DataForSEO API                                  |
-| Document Parsing | PDF.js, Mammoth.js                              |
-| Testing          | Vitest 4.0.17                                   |
+| Layer            | Technology                                       |
+| ---------------- | ------------------------------------------------ |
+| Frontend         | React 19.1.1 + TypeScript                        |
+| Build            | Vite 6.4.1                                       |
+| Styling          | Tailwind CSS v4 (`@tailwindcss/vite` plugin)     |
+| AI               | Google Gemini via Supabase Edge Function proxy    |
+| Database         | Supabase (PostgreSQL + RLS)                      |
+| SEO Data         | DataForSEO API                                   |
+| UI Primitives    | Radix UI (Popover, Collapsible, Accordion, etc.) |
+| Document Parsing | PDF.js, Mammoth.js                               |
+| Testing          | Vitest 4.0.17                                    |
 
 ## Development Commands
 
@@ -33,24 +34,39 @@ npm run test:coverage # Run tests with coverage report
 npx vitest run tests/services/dataforseoService.test.ts
 ```
 
+Tests are in `tests/services/` (39 tests across 3 files). Test environment is `node` (not jsdom).
+
 ## Environment Variables
 
 ```env
-# Required
-GEMINI_API_KEY=your_gemini_api_key
-
-# Supabase (optional - enables persistence & auth)
+# Supabase (required for full functionality — auth, persistence, AI proxy)
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-# DataForSEO (optional - auto-fills credentials in UI)
+# DataForSEO (optional — auto-fills credentials in UI)
 VITE_DATAFORSEO_LOGIN=your-dataforseo-login
 VITE_DATAFORSEO_PASSWORD=your-dataforseo-password
 ```
 
 When Supabase env vars are not set, app runs in standalone mode without persistence.
 
+**Important:** There is no client-side `GEMINI_API_KEY`. All Gemini calls go through a Supabase Edge Function (`gemini-proxy`) which holds the API key in its secrets. See `services/geminiService.ts` — both `callGemini()` and `callGeminiStream()` hit the edge function endpoint.
+
+Vite requires `VITE_` prefix for all client-side env vars (`import.meta.env.VITE_*`). Check Supabase availability with `isSupabaseConfigured()` from `services/supabaseClient.ts`.
+
 ## Architecture
+
+### Source Layout
+
+All source files are at the **project root** — there is no `src/` directory.
+
+- `App.tsx` — Main brief wizard logic, state hub with 20+ useState hooks
+- `AppWrapper.tsx` — Auth flow, navigation between screens, background generation orchestration
+- `constants.ts` — All Gemini system prompts, word count thresholds, thinking budget configs
+- `types.ts` — Core domain types (`ContentBrief`, `CompetitorPage`, `OnPageSeo`, etc.)
+- `types/appState.ts` — Full `AppState` interface, `SaveStatus` type
+- `types/database.ts` — Supabase table row types
+- `styles/globals.css` — Tailwind v4 `@theme` block with all design tokens
 
 ### Application Modes
 
@@ -59,8 +75,6 @@ The app has two modes controlled by `AppWrapper.tsx`:
 1. **Standalone Mode** (no Supabase): Direct access to brief wizard, no persistence
 2. **Supabase Mode**: Login → Client Select → Brief List → Brief Editor with auto-save
 
-### Entry Point Flow
-
 ```
 index.tsx → AppWrapper.tsx → AuthProvider
                            ↓
@@ -68,200 +82,126 @@ index.tsx → AppWrapper.tsx → AuthProvider
               │                         │
         isConfigured?              standalone
               │                         │
-        LoginScreen                 OriginalApp
+        LoginScreen                 App (no briefId)
               ↓
         ClientSelectScreen
               ↓
         BriefListScreen
               ↓
-        OriginalApp (with briefId)
+        App (with briefId)
 ```
 
 ### Brief Generation Pipeline (7 Steps)
 
-1. **Page Goal & Audience** - Purpose, target readers, search intent classification
-2. **Keyword Strategy** - Primary/secondary keyword mapping
-3. **Competitor Analysis** - Breakdown of top competitors
-4. **Content Gap Analysis** - Table stakes vs opportunities
-5. **Article Structure** - Hierarchical outline, featured snippet targeting
-6. **FAQ Generation** - Questions from PAA data
-7. **On-Page SEO** - Title, meta, H1, slug, OG tags
+Each step is a screen in `components/stages/Stage{1-7}*.tsx` and a Gemini prompt in `constants.ts`:
 
-### Key Directories
+1. **Page Goal & Audience** — Search intent classification, target readers
+2. **Keyword Strategy** — Primary/secondary keyword mapping
+3. **Competitor Analysis** — Per-competitor breakdown with strengths/weaknesses
+4. **Content Gap Analysis** — Table stakes vs strategic opportunities
+5. **Article Structure** — Hierarchical outline, featured snippet targeting
+6. **FAQ Generation** — Questions from People Also Ask data
+7. **On-Page SEO** — Title tag, meta description, H1, slug, OG tags
+
+### Gemini AI Integration
+
+All AI calls route through `services/geminiService.ts` → Supabase Edge Function `gemini-proxy`:
+
+- `callGemini()` — Non-streaming, returns full response
+- `callGeminiStream()` — SSE streaming via fetch, yields chunks
+- `generateBriefStep()` — Brief pipeline (steps 1-7), uses structured JSON output with schemas
+- `generateArticleSection()` — Article content generation with streaming
+- System prompts and JSON schemas live in `constants.ts` (`getSystemPrompt()`, `getContentGenerationPrompt()`, etc.)
+
+### Key Component Layers
 
 ```
-├── components/
-│   ├── ui/             # Reusable UI component library (Card, Badge, Input, Tabs, Modal, etc.)
-│   ├── screens/        # Full-page views (Login, ClientSelect, BriefList, etc.)
-│   ├── stages/         # Brief step components (Stage1-7)
-│   ├── briefs/         # Brief-related components (BriefListCard, BriefStatusBadge)
-│   └── clients/        # Client-related components (ClientCard)
-├── contexts/
-│   ├── AuthContext.tsx # Access code authentication state
-│   └── ToastContext.tsx # Global toast notification system
-├── hooks/
-│   ├── useAutoSave.ts  # Debounced auto-save to Supabase (500ms debounce)
-│   └── useBriefLoader.ts # Load brief data from Supabase
-├── services/
-│   ├── supabaseClient.ts    # Supabase client + isSupabaseConfigured()
-│   ├── authService.ts       # Access code login/logout
-│   ├── briefService.ts      # Brief CRUD operations
-│   ├── clientService.ts     # Client/folder management
-│   ├── competitorService.ts # Save/load competitor data
-│   ├── contextService.ts    # Context files/URLs (uploads to Supabase Storage)
-│   ├── articleService.ts    # Generated articles
-│   ├── geminiService.ts     # Google Gemini API with streaming
-│   ├── dataforseoService.ts # SERP & on-page analysis
-│   └── markdownService.ts   # Brief export/import
-├── types/
-│   ├── database.ts     # Supabase table types
-│   └── appState.ts     # App state types
-├── supabase/
-│   └── schema.sql      # Database schema (7 tables)
-├── App.tsx             # Main brief wizard logic (state hub with 20+ useState hooks)
-├── AppWrapper.tsx      # Auth + navigation wrapper + background generation
-└── types.ts            # Core types (ContentBrief, CompetitorPage, etc.)
+components/
+├── screens/     # Full-page views (11 screens: Login, ClientSelect, BriefList,
+│                #   InitialInput, ContextInput, CompetitionViz, Briefing,
+│                #   Dashboard, ContentGeneration, Article, BriefUpload)
+├── stages/      # Brief step editors (Stage1Goal through Stage7Seo)
+├── ui/          # Reusable component library — custom + Radix primitives
+│   ├── *.tsx          # Custom components (Card, Badge, Input, Modal, etc.)
+│   ├── primitives/    # Radix UI wrappers (accordion, popover, tooltip, etc.)
+│   └── index.ts       # Barrel export — import everything from '../ui'
+├── briefs/      # Brief list cards, status badges
+└── clients/     # Client selection cards
 ```
-
-### Database Schema (Supabase)
-
-7 tables with RLS enabled:
-
-- `access_codes` - Authentication via unique codes
-- `clients` - Folders/workspaces for organizing briefs
-- `briefs` - Main entity with all brief data as JSONB
-- `brief_competitors` - Competitor analysis data
-- `brief_context_files` - Uploaded file metadata
-- `brief_context_urls` - Scraped URL content
-- `brief_articles` - Generated article versions
 
 ### State Management
 
-`App.tsx` manages 20+ useState hooks. Key state:
+`App.tsx` manages 20+ useState hooks (no external state library). Key state:
 
-- `currentView` - Which screen is displayed
-- `briefingStep` - Current step (1-7) in brief wizard
-- `briefData` - The ContentBrief object being built
-- `competitorData` - SERP analysis results
-- `staleSteps` - Set of steps needing regeneration
+- `currentView: AppView` — Which screen is displayed (`'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'article_view' | 'brief_upload'`)
+- `briefingStep` — Current step (1-7) in brief wizard
+- `briefData: Partial<ContentBrief>` — The brief object being built
+- `competitorData: CompetitorPage[]` — SERP analysis results
+- `staleSteps: Set<number>` — Steps needing regeneration after edits
 
-Auto-save is handled by `useAutoSave` hook which debounces updates to Supabase.
+Auto-save: `useAutoSave` hook debounces state changes (500ms) and persists to Supabase.
 
 ### Parallel Background Generation
 
-Users can run multiple brief generations simultaneously. Architecture in `AppWrapper.tsx`:
+`AppWrapper.tsx` tracks multiple simultaneous brief generations via `generatingBriefs: Record<string, GeneratingBrief>`. Hidden `<App>` instances render off-screen to maintain React state while the user navigates elsewhere. A floating panel shows progress with "View" buttons.
 
-```typescript
-// Track multiple generating briefs in a map
-generatingBriefs: Record<string, {
-  clientId: string;
-  clientName: string;
-  status: 'analyzing_competitors' | 'generating_brief' | 'generating_content';
-  step: number | null;  // Step 1-7 for brief generation
-}>;
-```
+### Database Schema (Supabase)
 
-How it works:
+7 tables with RLS enabled (schema in `supabase/schema.sql`):
 
-1. When user starts "I'm Feeling Lucky" or content generation, brief is added to `generatingBriefs` map
-2. Hidden `<App>` components are rendered for each generating brief to maintain React state
-3. User can navigate away (to brief list or client selection) while generation continues
-4. Floating indicator panel shows all active generations with "View" buttons
-5. When generation completes, brief is removed from map and status updated in Supabase
+- `access_codes` — Custom auth (not Supabase Auth), codes validated against this table
+- `clients` — Folders/workspaces for organizing briefs
+- `briefs` — Main entity, brief data stored as JSONB
+- `brief_competitors` — Competitor analysis data per brief
+- `brief_context_files` — Uploaded file metadata (files in Supabase Storage)
+- `brief_context_urls` — Scraped URL content
+- `brief_articles` — Generated article versions with `is_current` flag
 
-Limits: No code cap, but API rate limits (Gemini, DataForSEO) will throttle 10+ parallel generations.
-
-## Key Patterns
-
-### Authentication Flow
+### Authentication
 
 Uses custom access code auth (not Supabase Auth):
 
-1. User enters access code
-2. `authService.loginWithAccessCode()` validates against `access_codes` table
-3. Session stored in localStorage
-4. `AuthContext` provides `isAuthenticated`, `userId`, `isAdmin`
+1. User enters access code → `authService.loginWithAccessCode()` validates against `access_codes` table
+2. Session stored in localStorage
+3. `AuthContext` provides `isAuthenticated`, `userId`, `isAdmin`
 
-### Brief Persistence
+## UI Design System
 
-When in Supabase mode:
+**Prefer shadcn/ui components and patterns whenever possible.** The project is configured for shadcn (new-york style, `components.json` at root). When adding new UI elements, check if a shadcn component exists first (`npx shadcn@latest add <component>`) before building custom. Existing primitives in `components/ui/primitives/` are shadcn-generated. Use the `cn()` utility from `lib/utils.ts` for conditional class merging.
 
-1. Creating brief: `briefService.createBrief(clientId, name)`
-2. Auto-save: `useAutoSave` hook saves on state changes (500ms debounce)
-3. Loading: `useBriefLoader` restores full state from database
+### Styling: Tailwind CSS v4
 
-### API Services
+Tailwind v4 uses the `@tailwindcss/vite` plugin (not CDN). All design tokens are defined as CSS custom properties in `styles/globals.css` using `@theme {}` blocks — not a `tailwind.config.ts` file.
 
-All external APIs are in `/services`:
+### Design Tokens
 
-- `geminiService.ts` - Handles model selection, thinking levels, JSON parsing
-- `dataforseoService.ts` - SERP queries, on-page analysis, PAA extraction
+- **Surfaces:** `bg-background` (#F9FAFB), `bg-card` (#FFFFFF), `bg-secondary` (#F3F4F6)
+- **Text:** `text-foreground` (#111827), `text-muted-foreground` (#6B7280)
+- **Borders:** `border-border` (#E5E7EB)
+- **Brand:** `text-primary`/`bg-primary` (#0D9488), `text-teal`/`bg-teal` (#0D9488)
+- **Status:** `text-status-complete`, `text-status-error`, `text-status-generating`, `text-status-draft`
+- **Fonts:** `font-sans` (Inter), `font-heading` (Familjen Grotesk)
 
-### Environment Variable Access
+### Component Patterns
 
-Vite requires `VITE_` prefix for client-side env vars:
-
-```typescript
-const url = import.meta.env.VITE_SUPABASE_URL;
-```
-
-Check if configured:
-
-```typescript
-import { isSupabaseConfigured } from './services/supabaseClient';
-if (isSupabaseConfigured()) { /* use Supabase */ }
-```
+- **Barrel exports:** Import UI components from `'../ui'` (e.g., `import { Card, Badge, Alert } from '../ui'`)
+- **Radix primitives:** Wrapped in `components/ui/primitives/` — Accordion, Collapsible, Popover, Tooltip, DropdownMenu, ScrollArea, etc.
+- **`AIReasoningIcon`:** Sparkle icon + Popover showing AI reasoning text. Replaces older `Callout variant="ai"` pattern.
+- **`EditableText`:** Click-to-edit text display. Replaces scroll-box Textareas for brief content.
+- **`PreWizardHeader`:** Shared header for pre-wizard screens (Login, ClientSelect, BriefList).
+- **`Sidebar`:** Has two view modes — brief editor mode and `brief_list` mode (with `clientName`, `onBackToClients`, `briefCounts` props).
 
 ### Path Alias
 
-The `@/` alias maps to project root. Use for imports:
+The `@/` alias maps to project root: `import { Card } from '@/components/ui'`
 
-```typescript
-import { Card } from '@/components/ui';
-import { geminiService } from '@/services/geminiService';
-```
+## Gotchas
 
-## Testing
-
-Tests are in `/tests/services/`:
-
-- `dataforseoService.test.ts` - 13 tests
-- `markdownParserService.test.ts` - 14 tests
-- `templateExtractionService.test.ts` - 12 tests
-
-Run with: `npm test` or `npm run test:run`
+- **Variable ordering in components:** `const` declarations used in `useCallback`/`useMemo` dependency arrays must be declared BEFORE the hooks that reference them. The dependency array is evaluated eagerly — referencing a later `const` causes a TDZ (Temporal Dead Zone) crash in production builds that is invisible in dev mode.
+- **`SaveStatus` type:** `'saved' | 'saving' | 'unsaved' | 'error'` — there is no `'idle'` state.
+- **App.tsx prop renaming:** When `App` receives `saveStatus` and `lastSavedAt` as props, they're renamed internally: `saveStatus: externalSaveStatus`, `lastSavedAt: externalLastSavedAt`.
+- **Build warning:** Production build produces a single ~980KB chunk. This is expected — the chunk size warning is pre-existing and not a regression.
 
 ## Deployment
 
-Deployed to Vercel. Environment variables must be set in Vercel dashboard.
-Push to `master` triggers auto-deploy.
-
-## UI Component Library
-
-Reusable components in `components/ui/` follow a light theme design system:
-
-**Design Tokens (Tailwind classes):**
-
-- Surfaces: `bg-background` (#F9FAFB), `bg-card` (#FFFFFF), `bg-secondary` (#F3F4F6)
-- Text: `text-foreground` (#111827), `text-muted-foreground` (#6B7280)
-- Borders: `border-border` (#E5E7EB), `border-input` (#E5E7EB)
-- Brand: `text-primary`/`bg-primary` (#0D9488), `text-teal`/`bg-teal` (#0D9488)
-- Status: `text-status-complete`, `text-status-error`, `text-status-generating`, `text-status-draft`
-
-**Available Components:**
-
-- `Card` - Container with variants (default, elevated, outlined)
-- `Badge` - Status indicators (success, warning, error, info, default)
-- `Input`, `Textarea` - Form inputs with labels, hints, errors
-- `Tabs` - Tab navigation with `items`, `activeId`, `onChange` props
-- `Modal` - Dialog overlay with header/footer slots
-- `Progress` - Progress bar with percentage
-- `Callout` - Highlighted information boxes
-- `Alert` - Dismissible alerts
-- `Tooltip`, `Toast` - Contextual information
-
-Import from: `import { Card, Badge, Input, Tabs } from './components/ui';`
-
-## Brief Naming
-
-Brief names are automatically updated to the primary keyword (highest search volume) when analysis starts, making them identifiable in the dashboard instead of generic "New Brief - {date}".
+Deployed to Vercel. Environment variables set in Vercel dashboard. Push to `master` triggers auto-deploy.

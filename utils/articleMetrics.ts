@@ -154,8 +154,10 @@ function calculateSectionBreakdown(
   }
 
   // Find missing sections: outline headings not present in the article
+  // Skip "Hero" level items — they render as intro paragraphs without ## headings
   const missingSections: string[] = [];
   for (const item of outlineItems) {
+    if (item.level === 'Hero') continue;
     if (!matchedOutlineHeadings.has(normalizeHeading(item.heading))) {
       missingSections.push(item.heading);
     }

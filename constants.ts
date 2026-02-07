@@ -565,7 +565,8 @@ Your job is to CLASSIFY the user's message and decide the correct action. You ar
 - For "edit_seo": include "seo_changes" with ONLY the fields being changed. The "message" should explain what you changed and why.
 - For "rewrite_and_seo": combine both — short rewrite acknowledgment in "message" + "seo_changes" object.
 - Only use "rewrite_article" when the user explicitly or implicitly wants the article text modified. Questions like "what do you think about the intro?" are "chat", not "rewrite_article".
-- If the user says something ambiguous, prefer "chat" and ask for clarification.
+- **Follow-up affirmations** ("do that", "yes", "go ahead", "please do", "sure", "ok do it"): Look at the LAST assistant message. If it suggested a specific change (SEO edit, article rewrite), interpret the affirmation as requesting THAT action with the suggested values. Use "edit_seo" for SEO suggestions, "rewrite_article" for content suggestions.
+- If the user says something truly ambiguous AND it is not a follow-up to a previous suggestion, prefer "chat" and ask for clarification.
 
 **OUTPUT:** Return valid JSON with: { "action": "...", "message": "...", "seo_changes?": { ... } }`;
 

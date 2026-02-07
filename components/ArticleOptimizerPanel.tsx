@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import Button from './Button';
 import Spinner from './Spinner';
 import {
@@ -210,6 +211,45 @@ function formatSeoMetadata(brief: Partial<ContentBrief>): string {
   return lines.join('\n');
 }
 
+/** Convert basic markdown in chat messages to sanitized HTML */
+function formatMessageHtml(text: string): string {
+  if (!text) return '';
+  let html = text
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Italic
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
+    // Unordered list items
+    .replace(/^[-*] (.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
+    // Ordered list items
+    .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal">$1</li>');
+
+  // Wrap consecutive <li> in <ul>/<ol>
+  html = html.replace(
+    /((?:<li class="ml-4 list-disc">.*?<\/li>\n?)+)/g,
+    '<ul class="my-1 space-y-0.5">$1</ul>'
+  );
+  html = html.replace(
+    /((?:<li class="ml-4 list-decimal">.*?<\/li>\n?)+)/g,
+    '<ol class="my-1 space-y-0.5">$1</ol>'
+  );
+
+  // Wrap remaining non-tag lines in <p> with whitespace handling
+  html = html
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return '';
+      if (/^<(ul|ol|li|p|strong|em|code|div)/.test(trimmed)) return trimmed;
+      return `<p class="mb-1">${trimmed}</p>`;
+    })
+    .join('\n');
+
+  return DOMPurify.sanitize(html);
+}
+
 const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
   article,
   brief,
@@ -234,11 +274,12 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
   const [showSections, setShowSections] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const initialAnalysisRan = useRef(false);
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamedContent]);
+  }, [messages]);
 
   // Calculate metrics on mount
   useEffect(() => {
@@ -246,8 +287,10 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
     setMetrics(m);
   }, [article.content, brief, lengthConstraints]);
 
-  // Run initial AI analysis on mount
+  // Run initial AI analysis on mount (guarded to prevent StrictMode double-fire)
   useEffect(() => {
+    if (initialAnalysisRan.current) return;
+    initialAnalysisRan.current = true;
     runInitialAnalysis();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -676,7 +719,10 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
                     <span className="text-sm text-muted-foreground">Rewriting article...</span>
                   </div>
                 ) : (
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  <div
+                    className="text-sm [&_p]:mb-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:ml-4"
+                    dangerouslySetInnerHTML={{ __html: formatMessageHtml(msg.content) }}
+                  />
                 )}
                 <span className="text-xs text-muted-foreground/60 mt-1 block">
                   {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

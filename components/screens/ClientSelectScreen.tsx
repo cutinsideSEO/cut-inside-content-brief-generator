@@ -32,7 +32,7 @@ interface GeneratingBrief {
 }
 
 interface ClientSelectScreenProps {
-  onSelectClient: (clientId: string, clientName: string) => void;
+  onSelectClient: (clientId: string, clientName: string, logoUrl?: string) => void;
   onOpenClientProfile?: (clientId: string, clientName: string) => void;
   // Background generation props - now supports multiple parallel generations
   generatingBriefs?: Record<string, GeneratingBrief>;
@@ -343,7 +343,7 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
               <div key={client.id} className="relative group">
                 <ClientCard
                   client={client}
-                  onClick={() => onSelectClient(client.id, client.name)}
+                  onClick={() => onSelectClient(client.id, client.name, client.brand_identity?.logo_url)}
                   isGenerating={getGeneratingBriefsForClient(client.id).length > 0}
                   generatingCount={getGeneratingBriefsForClient(client.id).length}
                   colorIndex={clients.indexOf(client)}

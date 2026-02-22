@@ -23,6 +23,7 @@ interface GeneratingBrief {
 interface BriefListScreenProps {
   clientId: string;
   clientName: string;
+  clientLogoUrl?: string | null;
   onBack: () => void;
   onCreateBrief: () => void;
   onContinueBrief: (briefId: string) => void;
@@ -39,6 +40,7 @@ type FilterStatus = 'all' | 'draft' | 'in_progress' | 'complete';
 const BriefListScreen: React.FC<BriefListScreenProps> = ({
   clientId,
   clientName,
+  clientLogoUrl,
   onBack,
   onCreateBrief,
   onContinueBrief,
@@ -238,7 +240,16 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-gray-900">{clientName}</h1>
+          <div className="flex items-center gap-3">
+            {clientLogoUrl && (
+              <img
+                src={clientLogoUrl}
+                alt=""
+                className="h-8 w-8 rounded-lg object-contain border border-gray-100"
+              />
+            )}
+            <h1 className="text-2xl font-heading font-bold text-gray-900">{clientName}</h1>
+          </div>
           <p className="text-gray-600 mt-0.5">{briefs.length} {briefs.length === 1 ? 'brief' : 'briefs'}</p>
         </div>
         <Button

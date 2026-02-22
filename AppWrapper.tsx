@@ -48,6 +48,7 @@ interface WrapperState {
   // Selected context
   selectedClientId: string | null;
   selectedClientName: string | null;
+  selectedClientLogoUrl: string | null;
   currentBriefId: string | null;
 
   // Save status for auto-save
@@ -73,6 +74,7 @@ const AppWrapperInner: React.FC = () => {
     mode: 'standalone',
     selectedClientId: null,
     selectedClientName: null,
+    selectedClientLogoUrl: null,
     currentBriefId: null,
     saveStatus: 'saved',
     lastSavedAt: null,
@@ -134,6 +136,7 @@ const AppWrapperInner: React.FC = () => {
       mode: 'standalone',
       selectedClientId: null,
       selectedClientName: null,
+      selectedClientLogoUrl: null,
       currentBriefId: null,
       saveStatus: 'saved',
       lastSavedAt: null,
@@ -219,12 +222,13 @@ const AppWrapperInner: React.FC = () => {
   }, []);
 
   // Handle client selection
-  const handleSelectClient = useCallback((clientId: string, clientName: string) => {
+  const handleSelectClient = useCallback((clientId: string, clientName: string, logoUrl?: string) => {
     setState((prev) => ({
       ...prev,
       mode: 'brief_list',
       selectedClientId: clientId,
       selectedClientName: clientName,
+      selectedClientLogoUrl: logoUrl || null,
     }));
   }, []);
 
@@ -236,6 +240,7 @@ const AppWrapperInner: React.FC = () => {
       // Client info is now stored in each generating brief, so we can clear it
       selectedClientId: null,
       selectedClientName: null,
+      selectedClientLogoUrl: null,
       currentBriefId: null,
       selectedArticleId: null,
     }));
@@ -453,6 +458,7 @@ const AppWrapperInner: React.FC = () => {
           <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
             <PreWizardHeader
               clientName={state.selectedClientName}
+              clientLogoUrl={state.selectedClientLogoUrl}
               onClientClick={handleBackToClients}
               onLogout={handleLogout}
               userName={userName}
@@ -481,6 +487,7 @@ const AppWrapperInner: React.FC = () => {
                     <BriefListScreen
                       clientId={state.selectedClientId!}
                       clientName={state.selectedClientName!}
+                      clientLogoUrl={state.selectedClientLogoUrl}
                       onBack={handleBackToClients}
                       onCreateBrief={handleCreateBrief}
                       onContinueBrief={handleContinueBrief}
@@ -528,6 +535,7 @@ const AppWrapperInner: React.FC = () => {
         <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
           <PreWizardHeader
             clientName={state.selectedClientName}
+            clientLogoUrl={state.selectedClientLogoUrl}
             onClientClick={handleBackToClients}
             onLogout={handleLogout}
             userName={userName}

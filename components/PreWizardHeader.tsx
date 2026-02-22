@@ -2,6 +2,7 @@ import React from 'react';
 
 export interface PreWizardHeaderProps {
   clientName?: string | null;
+  clientLogoUrl?: string | null;
   onClientClick?: () => void;
   onLogout?: () => void;
   userName?: string;
@@ -39,6 +40,7 @@ const LogOutSvg: React.FC<{ className?: string }> = ({ className }) => (
 
 const PreWizardHeader: React.FC<PreWizardHeaderProps> = ({
   clientName,
+  clientLogoUrl,
   onClientClick,
   onLogout,
   userName,
@@ -61,18 +63,27 @@ const PreWizardHeader: React.FC<PreWizardHeaderProps> = ({
               {clientName && (
                 <>
                   <ChevronRightSvg className="h-3.5 w-3.5 text-gray-400" />
-                  {onClientClick ? (
-                    <button
-                      onClick={onClientClick}
-                      className="text-sm text-gray-400 hover:text-teal transition-colors font-heading"
-                    >
-                      {clientName}
-                    </button>
-                  ) : (
-                    <span className="text-sm text-gray-400 font-heading">
-                      {clientName}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {clientLogoUrl && (
+                      <img
+                        src={clientLogoUrl}
+                        alt=""
+                        className="h-5 w-5 rounded object-contain"
+                      />
+                    )}
+                    {onClientClick ? (
+                      <button
+                        onClick={onClientClick}
+                        className="text-sm text-gray-400 hover:text-teal transition-colors font-heading"
+                      >
+                        {clientName}
+                      </button>
+                    ) : (
+                      <span className="text-sm text-gray-400 font-heading">
+                        {clientName}
+                      </span>
+                    )}
+                  </div>
                 </>
               )}
             </div>

@@ -364,85 +364,87 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                     )}
                 </div>
 
-                {/* On-Page SEO — narrower column */}
-                <div className="xl:col-span-2">
-                    <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                        On-Page SEO
-                    </h2>
-                    {seoFields.some(f => f.value) ? (
-                        <div className="border border-border rounded-lg overflow-hidden">
-                            <Table>
-                                <TableBody>
-                                    {seoFields.map(field => (
-                                        <TableRow key={field.key}>
-                                            <TableCell className="font-heading font-semibold text-xs w-28 align-top text-muted-foreground whitespace-nowrap">
-                                                <span>{field.label}</span>
-                                                {field.maxLength && field.value && (
-                                                    <Badge variant={getCharCountVariant(field.value.length, field.maxLength)} size="sm" className="ml-1.5">
-                                                        {field.value.length}/{field.maxLength}
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {field.value ? (
-                                                    <span className="text-foreground break-words">{field.value}</span>
-                                                ) : (
-                                                    <span className="text-muted-foreground italic">Not set</span>
-                                                )}
-                                            </TableCell>
+                {/* On-Page SEO + Keywords — narrower column */}
+                <div className="xl:col-span-2 space-y-6">
+                    <div>
+                        <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                            On-Page SEO
+                        </h2>
+                        {seoFields.some(f => f.value) ? (
+                            <div className="border border-border rounded-lg overflow-hidden">
+                                <Table>
+                                    <TableBody>
+                                        {seoFields.map(field => (
+                                            <TableRow key={field.key}>
+                                                <TableCell className="font-heading font-semibold text-xs w-28 align-top text-muted-foreground whitespace-nowrap">
+                                                    <span>{field.label}</span>
+                                                    {field.maxLength && field.value && (
+                                                        <Badge variant={getCharCountVariant(field.value.length, field.maxLength)} size="sm" className="ml-1.5">
+                                                            {field.value.length}/{field.maxLength}
+                                                        </Badge>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-sm">
+                                                    {field.value ? (
+                                                        <span className="text-foreground break-words">{field.value}</span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground italic">Not set</span>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground italic py-4 text-center border border-border rounded-lg">No SEO data generated yet.</p>
+                        )}
+                    </div>
+
+                    {/* Keywords — same column, below SEO */}
+                    {(briefData.keyword_strategy?.primary_keywords?.length || briefData.keyword_strategy?.secondary_keywords?.length) ? (
+                        <div>
+                            <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                                Keywords
+                            </h2>
+                            <div className="border border-border rounded-lg overflow-hidden">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Keyword</TableHead>
+                                            <TableHead className="w-24 text-right">Volume</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {briefData.keyword_strategy?.primary_keywords?.map((kw, i) => (
+                                            <TableRow key={`p-${i}`}>
+                                                <TableCell>
+                                                    <span className="text-sm text-foreground">{kw.keyword}</span>
+                                                    <Badge variant="teal" size="sm" className="ml-2">Primary</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right text-sm tabular-nums">
+                                                    {keywordVolumeMap.get(kw.keyword)?.toLocaleString() ?? '—'}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        {briefData.keyword_strategy?.secondary_keywords?.map((kw, i) => (
+                                            <TableRow key={`s-${i}`}>
+                                                <TableCell>
+                                                    <span className="text-sm text-foreground">{kw.keyword}</span>
+                                                    <Badge variant="secondary" size="sm" className="ml-2">Secondary</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right text-sm tabular-nums">
+                                                    {keywordVolumeMap.get(kw.keyword)?.toLocaleString() ?? '—'}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </div>
-                    ) : (
-                        <p className="text-sm text-muted-foreground italic py-4 text-center border border-border rounded-lg">No SEO data generated yet.</p>
-                    )}
+                    ) : null}
                 </div>
             </div>
-
-            {/* ── Keywords ── */}
-            {(briefData.keyword_strategy?.primary_keywords?.length || briefData.keyword_strategy?.secondary_keywords?.length) ? (
-                <div>
-                    <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                        Keywords
-                    </h2>
-                    <div className="border border-border rounded-lg overflow-hidden">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Keyword</TableHead>
-                                    <TableHead className="w-24 text-right">Volume</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {briefData.keyword_strategy?.primary_keywords?.map((kw, i) => (
-                                    <TableRow key={`p-${i}`}>
-                                        <TableCell>
-                                            <span className="text-sm text-foreground">{kw.keyword}</span>
-                                            <Badge variant="teal" size="sm" className="ml-2">Primary</Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right text-sm tabular-nums">
-                                            {keywordVolumeMap.get(kw.keyword)?.toLocaleString() ?? '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {briefData.keyword_strategy?.secondary_keywords?.map((kw, i) => (
-                                    <TableRow key={`s-${i}`}>
-                                        <TableCell>
-                                            <span className="text-sm text-foreground">{kw.keyword}</span>
-                                            <Badge variant="secondary" size="sm" className="ml-2">Secondary</Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right text-sm tabular-nums">
-                                            {keywordVolumeMap.get(kw.keyword)?.toLocaleString() ?? '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </div>
-            ) : null}
 
             {/* Writer Instructions for uploaded briefs */}
             {isUploadedBrief && (

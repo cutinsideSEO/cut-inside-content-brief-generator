@@ -32,10 +32,6 @@ interface BriefListScreenProps {
   generatingBriefs?: Record<string, GeneratingBrief>;
   // Article navigation
   onViewArticle: (articleId: string) => void;
-  /** Profile completeness score (0-100), used for nudge banner */
-  profileCompleteness?: number;
-  /** Navigate to client profile */
-  onOpenClientProfile?: () => void;
 }
 
 type FilterStatus = 'all' | 'draft' | 'in_progress' | 'complete';
@@ -50,8 +46,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   onUseAsTemplate,
   generatingBriefs = {},
   onViewArticle,
-  profileCompleteness,
-  onOpenClientProfile,
 }) => {
   const [briefs, setBriefs] = useState<BriefWithClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,7 +56,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const [articles, setArticles] = useState<ArticleWithBrief[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [archiveConfirm, setArchiveConfirm] = useState<string | null>(null);
-  const [profileNudgeDismissed, setProfileNudgeDismissed] = useState(false);
 
   // Sort state
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'modified' | 'name'>('newest');
@@ -261,31 +254,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         </Button>
       </div>
 
-      {/* Profile completeness nudge */}
-      {profileCompleteness !== undefined && profileCompleteness < 30 && !profileNudgeDismissed && onOpenClientProfile && (
-        <div className="mb-4 flex items-center gap-3 bg-teal-50 border border-teal-100 rounded-lg px-4 py-3">
-          <svg className="w-5 h-5 text-teal flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <p className="text-sm text-teal-800 flex-1">
-            Improve your briefs — Add brand context to help the AI generate more relevant content.{' '}
-            <button
-              onClick={onOpenClientProfile}
-              className="font-medium underline hover:no-underline"
-            >
-              Set Up Client Profile
-            </button>
-          </p>
-          <button
-            onClick={() => setProfileNudgeDismissed(true)}
-            className="text-teal-400 hover:text-teal-600 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      )}
 
       {/* Top-level Briefs / Articles toggle */}
       <div className="flex items-center gap-4 mb-6">

@@ -5,7 +5,6 @@ import { INDUSTRY_LABELS } from '../../types/clientProfile';
 import type { IndustryVertical } from '../../types/clientProfile';
 import { Card, Badge } from '../ui';
 import { getClientColor } from '../../lib/clientColors';
-import { calculateProfileCompleteness } from '../../lib/clientProfile';
 
 interface ClientCardProps {
   client: ClientWithBriefCount;
@@ -37,7 +36,6 @@ const ClientCard: React.FC<ClientCardProps> = ({
   const brandColor = client.brand_identity?.brand_color;
   const logoUrl = client.brand_identity?.logo_url;
   const industry = client.brand_identity?.industry as IndustryVertical | undefined;
-  const completeness = calculateProfileCompleteness(client);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -127,22 +125,6 @@ const ClientCard: React.FC<ClientCardProps> = ({
           )}
         </div>
       </div>
-
-      {/* Profile completeness bar */}
-      {completeness.score > 0 && completeness.score < 100 && (
-        <div className="mt-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-gray-400">Profile</span>
-            <span className="text-xs text-gray-400">{completeness.score}%</span>
-          </div>
-          <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-teal rounded-full transition-all duration-300"
-              style={{ width: `${completeness.score}%` }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Stats */}
       <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-sm">

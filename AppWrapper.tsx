@@ -8,9 +8,7 @@ import { createArticle, getArticleCountForClient } from './services/articleServi
 import { toast } from 'sonner';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
-import { getClientWithContext } from './services/clientService';
-import { calculateProfileCompleteness } from './lib/clientProfile';
-import type { Brief, AppView as DatabaseAppView, ClientWithContext } from './types/database';
+import type { Brief, AppView as DatabaseAppView } from './types/database';
 import type { SaveStatus } from './types/appState';
 
 // Import screens
@@ -91,10 +89,7 @@ const AppWrapperInner: React.FC = () => {
   // Brief counts for sidebar
   const [briefCounts, setBriefCounts] = useState<{ draft: number; in_progress: number; complete: number }>({ draft: 0, in_progress: 0, complete: 0 });
 
-  // Client profile for completeness scoring
-  const [clientProfileForList, setClientProfileForList] = useState<ClientWithContext | null>(null);
-
-  // Fetch article count, brief counts, and client profile when in brief_list mode
+  // Fetch article count and brief counts when in brief_list mode
   useEffect(() => {
     if (state.mode === 'brief_list' && state.selectedClientId) {
       getArticleCountForClient(state.selectedClientId).then(setArticleCount);
@@ -107,9 +102,6 @@ const AppWrapperInner: React.FC = () => {
           });
         }
       });
-      getClientWithContext(state.selectedClientId).then(profile => {
-        if (profile) setClientProfileForList(profile);
-      }).catch(() => {});
     }
   }, [state.mode, state.selectedClientId]);
 
@@ -496,8 +488,6 @@ const AppWrapperInner: React.FC = () => {
                       onUseAsTemplate={handleUseAsTemplate}
                       generatingBriefs={state.generatingBriefs}
                       onViewArticle={handleViewArticle}
-                      profileCompleteness={clientProfileForList ? calculateProfileCompleteness(clientProfileForList).score : undefined}
-                      onOpenClientProfile={state.selectedClientId && state.selectedClientName ? () => handleOpenClientProfile(state.selectedClientId!, state.selectedClientName!) : undefined}
                     />
                   )}
                 </div>

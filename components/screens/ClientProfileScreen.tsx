@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getClientWithContext, updateClient, deleteClient } from '../../services/clientService';
 import { toast } from 'sonner';
-import { calculateProfileCompleteness } from '../../lib/clientProfile';
 import SaveStatusIndicator from '../SaveStatusIndicator';
 import Button from '../Button';
 import { Modal } from '../ui';
@@ -195,26 +194,6 @@ const ClientProfileScreen: React.FC<ClientProfileScreenProps> = ({
     setShowDeleteConfirm(false);
   };
 
-  // Profile completeness
-  const completeness = calculateProfileCompleteness(
-    {
-      id: clientId,
-      name: clientName,
-      slug: '',
-      description: clientDescription,
-      created_by: null,
-      created_at: '',
-      updated_at: '',
-      brand_identity: brandIdentity,
-      brand_voice: brandVoice,
-      target_audience: targetAudience,
-      content_strategy: contentStrategy,
-      operational_settings: operationalSettings,
-    },
-    contextFiles,
-    contextUrls
-  );
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -239,45 +218,33 @@ const ClientProfileScreen: React.FC<ClientProfileScreenProps> = ({
             Back
           </button>
 
-          {/* Profile completeness */}
-          <div className="mb-6">
-            <div className="flex items-center gap-3 mb-3">
-              {brandIdentity.logo_url ? (
-                <div className="w-10 h-10 rounded-lg overflow-hidden border border-gray-100">
-                  <img
-                    src={brandIdentity.logo_url}
-                    alt={clientName}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              ) : brandIdentity.brand_color ? (
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-heading font-bold text-sm"
-                  style={{ backgroundColor: brandIdentity.brand_color }}
-                >
-                  {clientName.slice(0, 2).toUpperCase()}
-                </div>
-              ) : (
-                <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
-                  </svg>
-                </div>
-              )}
-              <div>
-                <h3 className="text-sm font-heading font-semibold text-foreground truncate max-w-[160px]">
-                  {clientName || 'New Client'}
-                </h3>
-                <p className="text-xs text-muted-foreground">{completeness.score}% complete</p>
+          {/* Client identity */}
+          <div className="mb-6 flex items-center gap-3">
+            {brandIdentity.logo_url ? (
+              <div className="w-10 h-10 rounded-lg overflow-hidden border border-gray-100">
+                <img
+                  src={brandIdentity.logo_url}
+                  alt={clientName}
+                  className="w-full h-full object-contain"
+                />
               </div>
-            </div>
-            {/* Progress bar */}
-            <div className="w-full bg-gray-200 rounded-full h-1.5">
+            ) : brandIdentity.brand_color ? (
               <div
-                className="bg-teal h-1.5 rounded-full transition-all duration-300"
-                style={{ width: `${completeness.score}%` }}
-              />
-            </div>
+                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-heading font-bold text-sm"
+                style={{ backgroundColor: brandIdentity.brand_color }}
+              >
+                {clientName.slice(0, 2).toUpperCase()}
+              </div>
+            ) : (
+              <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
+                </svg>
+              </div>
+            )}
+            <h3 className="text-sm font-heading font-semibold text-foreground truncate max-w-[160px]">
+              {clientName || 'New Client'}
+            </h3>
           </div>
 
           {/* Section nav */}
@@ -304,7 +271,7 @@ const ClientProfileScreen: React.FC<ClientProfileScreenProps> = ({
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 lg:px-8 py-8">
+        <div className="max-w-5xl mx-auto px-6 lg:px-10 py-8">
           {/* Save status */}
           <div className="flex items-center justify-end mb-6">
             <SaveStatusIndicator status={saveStatus} />

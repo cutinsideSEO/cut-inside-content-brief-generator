@@ -8,7 +8,9 @@ import { createArticle, getArticleCountForClient } from './services/articleServi
 import { toast } from 'sonner';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
-import type { Brief, AppView as DatabaseAppView } from './types/database';
+import { getClientWithContext } from './services/clientService';
+import { calculateProfileCompleteness } from './lib/clientProfile';
+import type { Brief, AppView as DatabaseAppView, ClientWithContext } from './types/database';
 import type { SaveStatus } from './types/appState';
 
 // Import screens
@@ -16,6 +18,7 @@ import LoginScreen from './components/screens/LoginScreen';
 import ClientSelectScreen from './components/screens/ClientSelectScreen';
 import BriefListScreen from './components/screens/BriefListScreen';
 import ArticleScreen from './components/screens/ArticleScreen';
+import ClientProfileScreen from './components/screens/ClientProfileScreen';
 import PreWizardHeader from './components/PreWizardHeader';
 import Sidebar from './components/Sidebar';
 
@@ -42,7 +45,7 @@ interface GeneratingBrief {
 // Types for the wrapper state
 interface WrapperState {
   // Navigation mode
-  mode: 'standalone' | 'client_select' | 'brief_list' | 'brief_editor';
+  mode: 'standalone' | 'client_select' | 'brief_list' | 'brief_editor' | 'client_profile';
 
   // Selected context
   selectedClientId: string | null;
@@ -88,7 +91,10 @@ const AppWrapperInner: React.FC = () => {
   // Brief counts for sidebar
   const [briefCounts, setBriefCounts] = useState<{ draft: number; in_progress: number; complete: number }>({ draft: 0, in_progress: 0, complete: 0 });
 
-  // Fetch article count and brief counts when in brief_list mode
+  // Client profile for completeness scoring
+  const [clientProfileForList, setClientProfileForList] = useState<ClientWithContext | null>(null);
+
+  // Fetch article count, brief counts, and client profile when in brief_list mode
   useEffect(() => {
     if (state.mode === 'brief_list' && state.selectedClientId) {
       getArticleCountForClient(state.selectedClientId).then(setArticleCount);
@@ -101,6 +107,9 @@ const AppWrapperInner: React.FC = () => {
           });
         }
       });
+      getClientWithContext(state.selectedClientId).then(profile => {
+        if (profile) setClientProfileForList(profile);
+      }).catch(() => {});
     }
   }, [state.mode, state.selectedClientId]);
 
@@ -305,6 +314,24 @@ const AppWrapperInner: React.FC = () => {
     }));
   }, []);
 
+  // Handle opening client profile
+  const handleOpenClientProfile = useCallback((clientId: string, clientName: string) => {
+    setState(prev => ({
+      ...prev,
+      mode: 'client_profile',
+      selectedClientId: clientId,
+      selectedClientName: clientName,
+    }));
+  }, []);
+
+  // Handle back from client profile
+  const handleBackFromProfile = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      mode: prev.selectedClientId ? 'brief_list' : 'client_select',
+    }));
+  }, []);
+
   // Handle save status changes from the brief editor (foreground)
   const handleSaveStatusChange = useCallback((status: SaveStatus, savedAt?: Date) => {
     setState((prev) => ({
@@ -378,6 +405,7 @@ const AppWrapperInner: React.FC = () => {
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <ClientSelectScreen
                   onSelectClient={handleSelectClient}
+                  onOpenClientProfile={handleOpenClientProfile}
                   generatingBriefs={state.generatingBriefs}
                   onViewGeneratingBrief={(briefId) => {
                     const brief = state.generatingBriefs[briefId];
@@ -444,6 +472,11 @@ const AppWrapperInner: React.FC = () => {
                 onBackToClients={handleBackToClients}
                 briefCounts={briefCounts}
                 articleCount={articleCount}
+                onOpenClientSettings={() => {
+                  if (state.selectedClientId && state.selectedClientName) {
+                    handleOpenClientProfile(state.selectedClientId, state.selectedClientName);
+                  }
+                }}
               />
               <main className="flex-1 overflow-y-auto">
                 <div className="px-6 lg:px-8 py-8">
@@ -463,6 +496,8 @@ const AppWrapperInner: React.FC = () => {
                       onUseAsTemplate={handleUseAsTemplate}
                       generatingBriefs={state.generatingBriefs}
                       onViewArticle={handleViewArticle}
+                      profileCompleteness={clientProfileForList ? calculateProfileCompleteness(clientProfileForList).score : undefined}
+                      onOpenClientProfile={state.selectedClientId && state.selectedClientName ? () => handleOpenClientProfile(state.selectedClientId!, state.selectedClientName!) : undefined}
                     />
                   )}
                 </div>
@@ -496,6 +531,24 @@ const AppWrapperInner: React.FC = () => {
             </div>
           )}
         </>
+      );
+
+    case 'client_profile':
+      return (
+        <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
+          <PreWizardHeader
+            clientName={state.selectedClientName}
+            onClientClick={handleBackToClients}
+            onLogout={handleLogout}
+            userName={userName}
+          />
+          <div className="flex-1 flex overflow-hidden">
+            <ClientProfileScreen
+              clientId={state.selectedClientId!}
+              onBack={handleBackFromProfile}
+            />
+          </div>
+        </div>
       );
 
     case 'brief_editor':

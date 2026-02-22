@@ -1,7 +1,7 @@
 // Client Select Screen - Choose a client folder
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getAccessibleClients, createClient, updateClient, deleteClient } from '../../services/clientService';
+import { getAccessibleClients, createClient, deleteClient } from '../../services/clientService';
 import { toast } from 'sonner';
 import type { ClientWithBriefCount } from '../../types/database';
 import ClientCard from '../clients/ClientCard';
@@ -33,6 +33,7 @@ interface GeneratingBrief {
 
 interface ClientSelectScreenProps {
   onSelectClient: (clientId: string, clientName: string) => void;
+  onOpenClientProfile?: (clientId: string, clientName: string) => void;
   // Background generation props - now supports multiple parallel generations
   generatingBriefs?: Record<string, GeneratingBrief>;
   onViewGeneratingBrief?: (briefId: string) => void;
@@ -40,6 +41,7 @@ interface ClientSelectScreenProps {
 
 const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   onSelectClient,
+  onOpenClientProfile,
   generatingBriefs = {},
   onViewGeneratingBrief,
 }) => {
@@ -55,12 +57,6 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   const [newClientDescription, setNewClientDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-
-  // Edit client modal state
-  const [editingClient, setEditingClient] = useState<ClientWithBriefCount | null>(null);
-  const [editClientName, setEditClientName] = useState('');
-  const [editClientDescription, setEditClientDescription] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
 
   // Delete client modal state
   const [deletingClient, setDeletingClient] = useState<ClientWithBriefCount | null>(null);
@@ -194,37 +190,6 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
     setNewClientName('');
     setNewClientDescription('');
     setCreateError(null);
-  };
-
-  // Edit client
-  const handleEditClient = (client: ClientWithBriefCount) => {
-    setEditingClient(client);
-    setEditClientName(client.name);
-    setEditClientDescription(client.description || '');
-  };
-
-  const handleEditSubmit = async () => {
-    if (!editingClient || !editClientName.trim()) return;
-    setIsEditing(true);
-
-    const { data, error: editError } = await updateClient(editingClient.id, {
-      name: editClientName.trim(),
-      description: editClientDescription.trim() || null,
-    });
-
-    if (editError) {
-      toast.error(`Failed to update client: ${editError}`);
-    } else if (data) {
-      setClients(prev => prev.map(c =>
-        c.id === editingClient.id
-          ? { ...c, name: data.name, description: data.description }
-          : c
-      ));
-      toast.success('Client updated');
-    }
-
-    setIsEditing(false);
-    setEditingClient(null);
   };
 
   // Delete client
@@ -383,17 +348,20 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
                   generatingCount={getGeneratingBriefsForClient(client.id).length}
                   colorIndex={clients.indexOf(client)}
                 />
-                {/* Edit/Delete overlay buttons */}
+                {/* Edit/Delete/Settings overlay buttons */}
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleEditClient(client); }}
-                    className="p-1.5 bg-white rounded-md shadow-sm border border-gray-200 text-gray-500 hover:text-teal hover:border-teal transition-colors"
-                    title="Edit client"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </button>
+                  {onOpenClientProfile && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onOpenClientProfile(client.id, client.name); }}
+                      className="p-1.5 bg-white rounded-md shadow-sm border border-gray-200 text-gray-500 hover:text-teal hover:border-teal transition-colors"
+                      title="Client settings"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </button>
+                  )}
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteClient(client); }}
                     className="p-1.5 bg-white rounded-md shadow-sm border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors"
@@ -525,48 +493,6 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
           {createError && newClientName.trim() && (
             <Alert variant="error">{createError}</Alert>
           )}
-        </div>
-      </Modal>
-
-      {/* Edit Client Modal */}
-      <Modal
-        isOpen={!!editingClient}
-        onClose={() => setEditingClient(null)}
-        title="Edit Client"
-        size="md"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setEditingClient(null)} disabled={isEditing}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleEditSubmit}
-              loading={isEditing}
-              disabled={!editClientName.trim()}
-            >
-              Save Changes
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Input
-            label="Client Name"
-            value={editClientName}
-            onChange={(e) => setEditClientName(e.target.value)}
-            placeholder="e.g., Acme Corp"
-            disabled={isEditing}
-          />
-          <Textarea
-            label="Description"
-            hint="Optional"
-            value={editClientDescription}
-            onChange={(e) => setEditClientDescription(e.target.value)}
-            placeholder="Brief description of the client"
-            rows={3}
-            disabled={isEditing}
-          />
         </div>
       </Modal>
 

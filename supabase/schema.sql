@@ -285,3 +285,70 @@ CREATE TRIGGER mark_previous_articles
 -- Sample data for testing (optional)
 -- INSERT INTO access_codes (code, name, email, is_admin)
 -- VALUES ('ADMIN123', 'Admin User', 'admin@cutinside.com', true);
+
+-- ============================================
+-- MIGRATION: Client Brand Intelligence Hub
+-- ============================================
+
+-- Add brand profile JSONB columns to clients table
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS brand_identity JSONB DEFAULT '{}';
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS brand_voice JSONB DEFAULT '{}';
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS target_audience JSONB DEFAULT '{}';
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS content_strategy JSONB DEFAULT '{}';
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS operational_settings JSONB DEFAULT '{}';
+
+-- ============================================
+-- 8. Client Context Files
+-- ============================================
+CREATE TABLE IF NOT EXISTS client_context_files (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  file_name TEXT NOT NULL,
+  file_size INTEGER,
+  file_type TEXT,
+  storage_path TEXT NOT NULL,
+  parsed_content TEXT,
+  parse_status TEXT DEFAULT 'pending' CHECK (parse_status IN ('pending', 'parsing', 'done', 'error')),
+  parse_error TEXT,
+  category TEXT DEFAULT 'general' CHECK (category IN ('brand_guidelines', 'style_guide', 'product_info', 'competitor_analysis', 'general')),
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_context_files_client_id ON client_context_files(client_id);
+
+-- ============================================
+-- 9. Client Context URLs
+-- ============================================
+CREATE TABLE IF NOT EXISTS client_context_urls (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  label TEXT,
+  scraped_content TEXT,
+  scrape_status TEXT DEFAULT 'pending' CHECK (scrape_status IN ('pending', 'scraping', 'done', 'error')),
+  scrape_error TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_context_urls_client_id ON client_context_urls(client_id);
+
+-- Enable RLS on new tables
+ALTER TABLE client_context_files ENABLE ROW LEVEL SECURITY;
+ALTER TABLE client_context_urls ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for client context files
+CREATE POLICY "Users can manage client context files"
+  ON client_context_files FOR ALL
+  USING (true);
+
+-- RLS Policies for client context URLs
+CREATE POLICY "Users can manage client context URLs"
+  ON client_context_urls FOR ALL
+  USING (true);
+
+-- ============================================
+-- Storage Bucket for Client Context Files
+-- ============================================
+-- Run this in the Supabase dashboard under Storage:
+-- Create a bucket named "client-context-files" with public access disabled

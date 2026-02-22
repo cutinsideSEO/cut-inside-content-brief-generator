@@ -21,6 +21,10 @@ interface ContextInputScreenProps {
   urlContents: Map<string, { content: string | null; error: string | null; status: 'pending' | 'scraping' | 'done' }>;
   onAddUrl: (url: string) => void;
   onRemoveUrl: (url: string) => void;
+  /** Inherited brand context summary from client profile */
+  inheritedBrandContext?: string;
+  /** Client name for display */
+  clientName?: string;
 }
 
 const ThemedLoader: React.FC<{ header: string }> = ({ header }) => {
@@ -67,11 +71,14 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
   urlContents,
   onAddUrl,
   onRemoveUrl,
+  inheritedBrandContext,
+  clientName,
 }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [showLog, setShowLog] = useState(false);
+  const [showInherited, setShowInherited] = useState(false);
 
   useEffect(() => {
     if (logContainerRef.current) {
@@ -165,6 +172,37 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                 </div>
             )}
 
+            {/* Inherited Brand Context */}
+            {inheritedBrandContext && (
+                <div className="bg-teal-50 border border-teal-100 rounded-lg p-4">
+                    <button
+                        type="button"
+                        onClick={() => setShowInherited(!showInherited)}
+                        className="flex items-center gap-2 w-full text-left"
+                    >
+                        <svg className="w-4 h-4 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <span className="text-sm font-medium text-teal-700 flex-1">
+                            Inherited from {clientName || 'client'} profile
+                        </span>
+                        <svg
+                            className={`w-4 h-4 text-teal-500 transition-transform duration-200 ${showInherited ? 'rotate-180' : ''}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {showInherited && (
+                        <pre className="mt-3 text-xs text-teal-800 whitespace-pre-wrap font-mono bg-teal-50 max-h-48 overflow-y-auto">
+                            {inheritedBrandContext}
+                        </pre>
+                    )}
+                </div>
+            )}
+
             {/* Subject Matter & Brand Info - Side by Side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Subject Matter Details */}
@@ -197,13 +235,16 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                         </div>
                         <div>
                             <h2 className="text-base font-heading font-semibold text-gray-900">Brand Information</h2>
-                            <p className="text-xs text-gray-400">Brand voice, style, and audience</p>
+                            <p className="text-xs text-gray-400">{inheritedBrandContext ? 'Brief-specific notes (supplements client profile)' : 'Brand voice, style, and audience'}</p>
                         </div>
                     </div>
                     <Textarea
                         value={brandInfo}
                         onChange={(e) => setBrandInfo(e.target.value)}
-                        placeholder="e.g., We are a B2B SaaS company. Our tone is professional yet approachable. Avoid jargon..."
+                        placeholder={inheritedBrandContext
+                            ? "Using client brand context. Type here to add brief-specific notes..."
+                            : "e.g., We are a B2B SaaS company. Our tone is professional yet approachable. Avoid jargon..."
+                        }
                         rows={4}
                     />
                 </Card>

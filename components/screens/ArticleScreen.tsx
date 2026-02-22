@@ -58,6 +58,8 @@ interface ArticleScreenProps {
   onArticleChange?: (article: { title: string; content: string }) => void;
   /** Notify parent when brief data changes (e.g., SEO edits from optimizer chat) */
   onBriefDataChange?: (updates: Partial<ContentBrief>) => void;
+  /** Brand context for AI optimizer */
+  brandContext?: string;
 }
 
 // --- Types ---
@@ -183,6 +185,7 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
   onBack,
   onArticleChange,
   onBriefDataChange,
+  brandContext,
 }) => {
   const [articleData, setArticleData] = useState<BriefArticle | null>(null);
   const [currentContent, setCurrentContent] = useState<{
@@ -595,6 +598,7 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
               mode="inline"
               onSaveStatusChange={handleSaveStatusChange}
               onBriefDataChange={handleBriefDataChange}
+              brandContext={brandContext}
             />
           </div>
         )}

@@ -466,7 +466,7 @@ interface GenerationParams {
   step: number;
   competitorDataJson: string;
   subjectInfo: string;
-  brandInfo: string;
+  brandInfo: string; // Now receives rich merged brand context from brandContextBuilder
   previousStepsData: Partial<ContentBrief>;
   language: string;
   groundTruthText?: string;
@@ -779,6 +779,7 @@ interface ArticleSectionParams {
     upcomingHeadings: string[];
     language: string;
     writerInstructions?: string;
+    brandContext?: string; // Rich brand voice/tone context from brandContextBuilder
     onStream?: (chunk: string) => void;  // Streaming callback
     signal?: AbortSignal;
     // Word budget context
@@ -789,7 +790,7 @@ interface ArticleSectionParams {
     strictMode?: boolean;
 }
 
-export const generateArticleSection = async ({ brief, contentSoFar, sectionToWrite, upcomingHeadings, language, writerInstructions, onStream, signal, globalWordTarget, wordsWrittenSoFar, totalSections, currentSectionIndex, strictMode }: ArticleSectionParams): Promise<string> => {
+export const generateArticleSection = async ({ brief, contentSoFar, sectionToWrite, upcomingHeadings, language, writerInstructions, brandContext, onStream, signal, globalWordTarget, wordsWrittenSoFar, totalSections, currentSectionIndex, strictMode }: ArticleSectionParams): Promise<string> => {
     const systemInstruction = getContentGenerationPrompt(language, writerInstructions);
     const modelName = currentModelSettings.model;
 
@@ -928,6 +929,17 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
         `;
     }
 
+    // Build brand context instruction for article writing
+    let brandInstruction = '';
+    if (brandContext) {
+        brandInstruction = `
+        ---
+
+        **BRAND VOICE & GUIDELINES (match this tone and style):**
+        ${brandContext}
+        `;
+    }
+
     const prompt = `
         **FULL CONTENT BRIEF (JSON, reasoning fields stripped for brevity):**
         ${JSON.stringify(stripReasoningFromBrief(brief), null, 2)}
@@ -936,6 +948,7 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
 
         **CONTENT WRITTEN SO FAR:**
         ${contentSoFar.slice(-16000)}
+        ${brandInstruction}
 
         ---
 
@@ -1573,10 +1586,11 @@ export const optimizeArticleWithChat = async (params: {
     userInstruction: string;
     metricsContext: string;
     language: string;
+    brandContext?: string;
     conversationHistory?: { role: 'user' | 'assistant'; content: string }[];
     onStream?: (chunk: string) => void;
 }): Promise<string> => {
-    const { currentArticle, brief, lengthConstraints, userInstruction, metricsContext, language, conversationHistory, onStream } = params;
+    const { currentArticle, brief, lengthConstraints, userInstruction, metricsContext, language, brandContext, conversationHistory, onStream } = params;
     const modelName = currentModelSettings.model;
 
     const targetWordCount = lengthConstraints?.globalTarget || brief.article_structure?.word_count_target || 0;
@@ -1589,6 +1603,10 @@ export const optimizeArticleWithChat = async (params: {
         ? `**RECENT CONVERSATION CONTEXT:**\n${recentHistory.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n\n')}\n\n---\n\n`
         : '';
 
+    const brandSection = brandContext
+        ? `\n---\n\n**BRAND VOICE & GUIDELINES:**\n${brandContext}\n`
+        : '';
+
     const prompt = `**CONTENT BRIEF (JSON):**
 ${JSON.stringify(stripReasoningFromBrief(brief), null, 2)}
 
@@ -1596,7 +1614,7 @@ ${JSON.stringify(stripReasoningFromBrief(brief), null, 2)}
 
 **CURRENT ARTICLE:**
 ${currentArticle}
-
+${brandSection}
 ---
 
 **ARTICLE METRICS ANALYSIS:**

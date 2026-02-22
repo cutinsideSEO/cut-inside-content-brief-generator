@@ -33,6 +33,7 @@ interface ArticleOptimizerPanelProps {
   mode?: 'overlay' | 'inline';
   onSaveStatusChange?: (status: SaveStatus, savedAt?: Date) => void;
   onBriefDataChange?: (updates: Partial<ContentBrief>) => void;
+  brandContext?: string;
 }
 
 interface ChatMessage {
@@ -261,6 +262,7 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
   mode = 'overlay',
   onSaveStatusChange,
   onBriefDataChange,
+  brandContext,
 }) => {
   const [metrics, setMetrics] = useState<ArticleMetrics | null>(null);
   const [validationResult, setValidationResult] = useState<ContentValidationResult | null>(null);
@@ -462,6 +464,7 @@ const ArticleOptimizerPanel: React.FC<ArticleOptimizerPanelProps> = ({
           metricsContext,
           language,
           conversationHistory,
+          brandContext,
           onStream: (chunk) => {
             accumulated += chunk;
             setStreamedContent(accumulated);

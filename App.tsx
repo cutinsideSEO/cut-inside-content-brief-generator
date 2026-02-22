@@ -7,6 +7,9 @@ import { extractTemplateFromUrl } from './services/templateExtractionService';
 import type { CompetitorPage, ContentBrief, CompetitorRanking, OutlineItem, ModelSettings, LengthConstraints, ExtractedTemplate, HeadingNode } from './types';
 import { UI_TO_LOGICAL_STEP_MAP, SOUND_EFFECTS, WC_EXPAND_THRESHOLD, WC_TRIM_STRICT, WC_TRIM_NONSTRICT, WC_PROMPT_MAX } from './constants';
 import { stripCompetitorFullText } from './services/briefContextService';
+import { getClientWithContext } from './services/clientService';
+import { buildBrandContext, mergeBrandContext, formatForBriefGeneration, formatForArticleGeneration } from './services/brandContextBuilder';
+import type { ClientWithContext } from './types/database';
 import { BrainCircuitIcon } from './components/Icon';
 
 // Import the new screen components
@@ -203,6 +206,9 @@ const App: React.FC<AppProps> = ({
   const [generatedArticleDbId, setGeneratedArticleDbId] = useState<string | null>(null);
   const [generationProgress, setGenerationProgress] = useState<{ currentSection: string; currentIndex: number; total: number } | null>(null);
 
+  // Client brand profile for brand context injection (must be declared before useEffects that reference it)
+  const [clientProfile, setClientProfile] = useState<ClientWithContext | null>(null);
+
   // AbortController for cancelling in-flight AI generation requests on unmount
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -212,6 +218,37 @@ const App: React.FC<AppProps> = ({
       abortControllerRef.current?.abort();
     };
   }, []);
+
+  // Fetch client brand profile when clientId is available
+  useEffect(() => {
+    if (!clientId || !isSupabaseMode) return;
+    let cancelled = false;
+    getClientWithContext(clientId).then(profile => {
+      if (!cancelled && profile) {
+        setClientProfile(profile);
+      }
+    }).catch(err => {
+      console.warn('Failed to load client profile:', err);
+    });
+    return () => { cancelled = true; };
+  }, [clientId, isSupabaseMode]);
+
+  // Apply client defaults to new briefs when profile loads
+  const hasAppliedDefaults = useRef(false);
+  useEffect(() => {
+    if (!clientProfile || hasAppliedDefaults.current) return;
+    const cs = clientProfile.content_strategy;
+    const os = clientProfile.operational_settings;
+    if (!cs && !os) return;
+
+    // Only apply defaults if brief is new (still on initial_input with no saved data)
+    if (currentView === 'initial_input' && !subjectInfo && !brandInfo) {
+      hasAppliedDefaults.current = true;
+      if (cs?.default_output_language) setOutputLanguage(cs.default_output_language);
+      if (cs?.default_serp_language) setSerpLanguage(cs.default_serp_language);
+      if (cs?.default_serp_country) setSerpCountry(cs.default_serp_country);
+    }
+  }, [clientProfile, currentView, subjectInfo, brandInfo]);
 
   // "I'm Feeling Lucky" flow state
   const [isFeelingLuckyFlow, setIsFeelingLuckyFlow] = useState<boolean>(shouldAutoGenerate);
@@ -743,6 +780,19 @@ const App: React.FC<AppProps> = ({
   }, []);
 
 
+  // Build merged brand context from client profile + brief-level brandInfo
+  const mergedBrandInfoForBrief = React.useMemo(() => {
+    if (!clientProfile) return brandInfo;
+    const clientContext = buildBrandContext(clientProfile, clientProfile.context_files, clientProfile.context_urls);
+    const merged = mergeBrandContext(clientContext, brandInfo);
+    return formatForBriefGeneration(merged);
+  }, [clientProfile, brandInfo]);
+
+  const brandContextForArticle = React.useMemo(() => {
+    if (!clientProfile) return undefined;
+    return formatForArticleGeneration(clientProfile);
+  }, [clientProfile]);
+
   const handleProceedToVisualization = useCallback(() => {
     setCurrentView('visualization');
   }, []);
@@ -789,7 +839,7 @@ const App: React.FC<AppProps> = ({
         step: logicalNextStep,
         competitorDataJson: JSON.stringify(competitorDataForStep),
         subjectInfo: combinedSubjectInfo || subjectInfo,
-        brandInfo,
+        brandInfo: mergedBrandInfoForBrief,
         previousStepsData: briefData,
         groundTruthText: needsGroundTruth ? groundTruthText : undefined,
         userFeedback,
@@ -815,7 +865,7 @@ const App: React.FC<AppProps> = ({
       setIsLoading(false);
       setLoadingStep(null);
     }
-  }, [briefingStep, competitorData, subjectInfo, combinedSubjectInfo, brandInfo, briefData, keywordVolumeMap, outputLanguage, extractedTemplate, lengthConstraints, paaQuestions, briefId, onGenerationComplete]);
+  }, [briefingStep, competitorData, subjectInfo, combinedSubjectInfo, mergedBrandInfoForBrief, briefData, keywordVolumeMap, outputLanguage, extractedTemplate, lengthConstraints, paaQuestions, briefId, onGenerationComplete]);
 
   // Navigate to a previous step without regenerating (just show existing data)
   const handlePrevStep = useCallback(() => {
@@ -866,7 +916,7 @@ const App: React.FC<AppProps> = ({
         step: 1,
         competitorDataJson: JSON.stringify(stripCompetitorFullText(competitorData)),
         subjectInfo: combinedSubjectInfoLocal.trim(),
-        brandInfo,
+        brandInfo: mergedBrandInfoForBrief,
         previousStepsData: {},
         groundTruthText,
         language: outputLanguage,
@@ -882,7 +932,7 @@ const App: React.FC<AppProps> = ({
       setIsLoading(false);
       setLoadingStep(null);
     }
-  }, [competitorData, subjectInfo, brandInfo, fileContents, urlContents, outputLanguage, lengthConstraints]);
+  }, [competitorData, subjectInfo, mergedBrandInfoForBrief, fileContents, urlContents, outputLanguage, lengthConstraints]);
   
   const handleFeelingLucky = useCallback(() => {
     setIsFeelingLuckyFlow(true);
@@ -961,7 +1011,7 @@ const App: React.FC<AppProps> = ({
         step: logicalStepToRegen,
         competitorDataJson: JSON.stringify(competitorDataForStep),
         subjectInfo: combinedSubjectInfo || subjectInfo,
-        brandInfo,
+        brandInfo: mergedBrandInfoForBrief,
         previousStepsData: briefData,
         groundTruthText: needsGroundTruth ? groundTruthText : undefined,
         userFeedback: userFeedback,
@@ -1001,7 +1051,7 @@ const App: React.FC<AppProps> = ({
       setIsLoading(false);
       setLoadingStep(null);
     }
-  }, [currentView, competitorData, subjectInfo, combinedSubjectInfo, brandInfo, briefData, keywordVolumeMap, userFeedbacks, outputLanguage, paaQuestions]);
+  }, [currentView, competitorData, subjectInfo, combinedSubjectInfo, mergedBrandInfoForBrief, briefData, keywordVolumeMap, userFeedbacks, outputLanguage, paaQuestions]);
   
   const handleUserFeedbackChange = (step: number, value: string) => {
     setUserFeedbacks(prev => ({ ...prev, [step]: value }));
@@ -1090,6 +1140,7 @@ const App: React.FC<AppProps> = ({
           upcomingHeadings,
           language: outputLanguage,
           writerInstructions: writerInstructions?.trim() || undefined,
+          brandContext: brandContextForArticle,
           signal,
           globalWordTarget,
           wordsWrittenSoFar: countWords(fullContent),
@@ -1140,6 +1191,7 @@ const App: React.FC<AppProps> = ({
               upcomingHeadings,
               language: outputLanguage,
               writerInstructions: writerInstructions?.trim() || undefined,
+              brandContext: brandContextForArticle,
               signal,
               globalWordTarget,
               wordsWrittenSoFar: countWords(fullContent) - sectionWords,
@@ -1236,6 +1288,7 @@ const App: React.FC<AppProps> = ({
                 upcomingHeadings: [],
                 language: outputLanguage,
                 writerInstructions: writerInstructions?.trim() || undefined,
+                brandContext: brandContextForArticle,
                 signal,
                 globalWordTarget,
                 wordsWrittenSoFar: countWords(fullContent),
@@ -1509,8 +1562,8 @@ const App: React.FC<AppProps> = ({
                   onBack={handleRestart}
                 />;
       case 'context_input':
-        return <ContextInputScreen 
-                  subjectInfo={subjectInfo} 
+        return <ContextInputScreen
+                  subjectInfo={subjectInfo}
                   setSubjectInfo={setSubjectInfo}
                   brandInfo={brandInfo}
                   setBrandInfo={setBrandInfo}
@@ -1524,6 +1577,8 @@ const App: React.FC<AppProps> = ({
                   urlContents={urlContents}
                   onAddUrl={addContextUrl}
                   onRemoveUrl={removeContextUrl}
+                  inheritedBrandContext={clientProfile ? buildBrandContext(clientProfile, clientProfile.context_files, clientProfile.context_urls) : undefined}
+                  clientName={clientName || undefined}
                  />;
       case 'visualization':
         return <CompetitionVizScreen 
@@ -1589,6 +1644,7 @@ const App: React.FC<AppProps> = ({
             onBack={() => setCurrentView('dashboard')}
             onArticleChange={(updated) => setGeneratedArticle(updated)}
             onBriefDataChange={(updates) => setBriefData(prev => ({ ...prev, ...updates }))}
+            brandContext={brandContextForArticle}
           />;
       case 'content_generation':
           return <ContentGenerationScreen
@@ -1603,6 +1659,7 @@ const App: React.FC<AppProps> = ({
               briefData={briefData}
               lengthConstraints={lengthConstraints}
               onArticleReady={() => setCurrentView('article_view')}
+              brandContext={brandContextForArticle}
           />
       default:
         return <InitialInputScreen 

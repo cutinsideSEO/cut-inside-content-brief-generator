@@ -22,6 +22,7 @@ interface ContentGenerationScreenProps {
   briefData?: Partial<ContentBrief>;
   lengthConstraints?: LengthConstraints;
   onArticleReady?: () => void;
+  brandContext?: string;
 }
 
 // Parse markdown into structured elements for paragraph-level editing
@@ -226,6 +227,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
   briefData,
   lengthConstraints,
   onArticleReady,
+  brandContext,
 }) => {
   const [showCelebration, setShowCelebration] = useState(true);
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
@@ -563,6 +565,7 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
             language={language}
             onApplyChanges={handleValidationApplyChanges}
             onClose={() => setShowValidationPanel(false)}
+            brandContext={brandContext}
           />
         )}
     </div>

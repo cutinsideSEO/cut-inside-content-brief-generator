@@ -1,8 +1,11 @@
 // Client Card - Card component for displaying client folders
 import React from 'react';
 import type { ClientWithBriefCount } from '../../types/database';
+import { INDUSTRY_LABELS } from '../../types/clientProfile';
+import type { IndustryVertical } from '../../types/clientProfile';
 import { Card, Badge } from '../ui';
 import { getClientColor } from '../../lib/clientColors';
+import { calculateProfileCompleteness } from '../../lib/clientProfile';
 
 interface ClientCardProps {
   client: ClientWithBriefCount;
@@ -11,6 +14,15 @@ interface ClientCardProps {
   isGenerating?: boolean;
   generatingCount?: number;
   colorIndex?: number;
+}
+
+/** Get initials from client name (max 2 chars) */
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
 }
 
 const ClientCard: React.FC<ClientCardProps> = ({
@@ -22,6 +34,11 @@ const ClientCard: React.FC<ClientCardProps> = ({
   colorIndex = 0,
 }) => {
   const clientColor = getClientColor(colorIndex);
+  const brandColor = client.brand_identity?.brand_color;
+  const logoUrl = client.brand_identity?.logo_url;
+  const industry = client.brand_identity?.industry as IndustryVertical | undefined;
+  const completeness = calculateProfileCompleteness(client);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -31,6 +48,15 @@ const ClientCard: React.FC<ClientCardProps> = ({
     });
   };
 
+  // Use brand_color for border and icon background if set, otherwise fall back to palette
+  const borderStyle = brandColor
+    ? { borderLeftColor: brandColor }
+    : undefined;
+  const borderClass = brandColor ? 'border-l-4' : `border-l-4 ${clientColor.border}`;
+  const iconBg = brandColor ? undefined : clientColor.bg;
+  const iconBgStyle = brandColor ? { backgroundColor: `${brandColor}15` } : undefined;
+  const initialsColor = brandColor ? { color: brandColor } : undefined;
+
   return (
     <Card
       variant="interactive"
@@ -38,10 +64,11 @@ const ClientCard: React.FC<ClientCardProps> = ({
       hover
       glow={isGenerating ? 'yellow' : 'teal'}
       className={`
-        relative cursor-pointer border-l-4 ${clientColor.border}
+        relative cursor-pointer ${borderClass}
         ${isGenerating ? 'border-amber-400/50 ring-1 ring-status-generating/30' : ''}
         ${isSelected ? 'border-teal ring-1 ring-teal' : ''}
       `}
+      style={borderStyle}
       onClick={() => onClick(client.id)}
     >
       {/* Generation indicator */}
@@ -53,37 +80,72 @@ const ClientCard: React.FC<ClientCardProps> = ({
         </div>
       )}
 
-      {/* Folder Icon and Name */}
+      {/* Icon/Logo/Initials and Name */}
       <div className="flex items-start">
-        <div className={`flex-shrink-0 w-12 h-12 ${clientColor.bg} rounded-lg flex items-center justify-center mr-4`}>
-          <svg
-            className={`w-6 h-6 ${clientColor.icon}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+        {logoUrl ? (
+          <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden mr-4 border border-gray-100">
+            <img
+              src={logoUrl}
+              alt={client.name}
+              className="w-full h-full object-contain"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
-          </svg>
-        </div>
+          </div>
+        ) : (
+          <div
+            className={`flex-shrink-0 w-12 h-12 ${iconBg || ''} rounded-lg flex items-center justify-center mr-4`}
+            style={iconBgStyle}
+          >
+            <span
+              className={`text-base font-heading font-bold ${!brandColor ? clientColor.icon : ''}`}
+              style={initialsColor}
+            >
+              {getInitials(client.name)}
+            </span>
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <h3 className="text-lg font-heading font-semibold text-gray-900 truncate">
             {client.name}
           </h3>
-          {client.description && (
-            <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
+          <div className="flex items-center gap-2 mt-0.5">
+            {industry && INDUSTRY_LABELS[industry] && (
+              <Badge variant="secondary" size="sm">
+                {INDUSTRY_LABELS[industry]}
+              </Badge>
+            )}
+            {client.description && !industry && (
+              <p className="text-sm text-gray-500 line-clamp-1">
+                {client.description}
+              </p>
+            )}
+          </div>
+          {client.description && industry && (
+            <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">
               {client.description}
             </p>
           )}
         </div>
       </div>
 
+      {/* Profile completeness bar */}
+      {completeness.score > 0 && completeness.score < 100 && (
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gray-400">Profile</span>
+            <span className="text-xs text-gray-400">{completeness.score}%</span>
+          </div>
+          <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-teal rounded-full transition-all duration-300"
+              style={{ width: `${completeness.score}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
-      <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
+      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
         <span className="text-gray-600">
           <span className="text-gray-900 font-medium">{client.brief_count}</span>
           {' '}{client.brief_count === 1 ? 'brief' : 'briefs'}

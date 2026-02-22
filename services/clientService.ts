@@ -1,7 +1,8 @@
 // Client Service - CRUD operations for client folders
 import { supabase } from './supabaseClient';
 import { getCurrentUserId, isAdmin, getAccessibleClientIds, addClientToUser } from './authService';
-import type { Client, ClientInsert, ClientUpdate, ClientWithBriefCount, ApiResponse } from '../types/database';
+import type { Client, ClientInsert, ClientUpdate, ClientWithBriefCount, ClientWithContext, ApiResponse } from '../types/database';
+import type { ClientContextFile, ClientContextUrl } from '../types/clientProfile';
 
 /**
  * Get all clients accessible to the current user
@@ -161,6 +162,46 @@ export async function deleteClient(clientId: string): Promise<ApiResponse<boolea
     }
 
     return { data: true, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    return { data: null, error: message };
+  }
+}
+
+/**
+ * Get a client with all context data (files + URLs)
+ */
+export async function getClientWithContext(clientId: string): Promise<ApiResponse<ClientWithContext>> {
+  try {
+    const { data: client, error: clientError } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', clientId)
+      .single();
+
+    if (clientError) {
+      return { data: null, error: clientError.message };
+    }
+
+    const { data: contextFiles } = await supabase
+      .from('client_context_files')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: true });
+
+    const { data: contextUrls } = await supabase
+      .from('client_context_urls')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: true });
+
+    const clientWithContext: ClientWithContext = {
+      ...(client as Client),
+      context_files: (contextFiles as ClientContextFile[]) || [],
+      context_urls: (contextUrls as ClientContextUrl[]) || [],
+    };
+
+    return { data: clientWithContext, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
     return { data: null, error: message };

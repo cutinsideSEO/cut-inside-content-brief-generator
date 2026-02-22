@@ -26,7 +26,9 @@ export const getSystemPrompt = (step: number, language: string, isRegeneration?:
   
   **CRITICAL LANGUAGE DIRECTIVE:** Your entire response, including all text values within the JSON object (like 'reasoning', 'value', 'notes', 'heading', etc.), MUST be in **${language}**.
 
-  **DATA INTEGRITY:** Base all analysis ONLY on the provided competitor data, keywords, and user context. Do not fabricate statistics, studies, or claims. When referencing competitor behavior, cite the specific URL. Flag uncertain recommendations as suggestions rather than facts.`;
+  **DATA INTEGRITY:** Base all analysis ONLY on the provided competitor data, keywords, and user context. Do not fabricate statistics, studies, or claims. When referencing competitor behavior, cite the specific URL. Flag uncertain recommendations as suggestions rather than facts.
+
+  **BRAND ALIGNMENT DIRECTIVE:** When brand context is provided (under "User-Provided Brand Information"), ensure all recommendations align with the brand's voice, positioning, audience, and content guidelines. Never recommend approaches that conflict with the brand's DON'T list or banned terms. Favor the brand's preferred terminology. If known competitors are listed, flag them when they appear in SERP data.`;
 
   if (isRegeneration) {
     basePrompt += `\n\n**REGENERATION TASK:** You are being asked to regenerate the output for this stage based on user feedback. The user's previous data for this stage is provided in the prompt under "Original JSON for this step". Your task is to **modify the existing JSON** to incorporate the feedback, not create it from scratch. The changes should be specific and targeted to the user's request. Focus your changes on the user's feedback.`;

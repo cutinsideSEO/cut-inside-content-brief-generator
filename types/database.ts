@@ -2,6 +2,7 @@
 // These types mirror the database schema defined in supabase/schema.sql
 
 import type { ContentBrief, ModelSettings, LengthConstraints, ExtractedTemplate, CompetitorRanking } from '../types';
+import type { BrandIdentity, BrandVoice, TargetAudience, ContentStrategy, OperationalSettings, ClientContextFile, ClientContextUrl } from './clientProfile';
 
 // ============================================
 // Access Codes
@@ -33,6 +34,12 @@ export interface Client {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Brand profile JSONB columns
+  brand_identity: BrandIdentity;
+  brand_voice: BrandVoice;
+  target_audience: TargetAudience;
+  content_strategy: ContentStrategy;
+  operational_settings: OperationalSettings;
 }
 
 export type ClientInsert = Omit<Client, 'id' | 'created_at' | 'updated_at'>;
@@ -199,6 +206,12 @@ export interface BriefWithRelations extends Brief {
 // Client with brief count
 export interface ClientWithBriefCount extends Client {
   brief_count: number;
+}
+
+// Client with all context data (files + URLs)
+export interface ClientWithContext extends Client {
+  context_files: ClientContextFile[];
+  context_urls: ClientContextUrl[];
 }
 
 // ============================================

@@ -561,7 +561,7 @@ const AppWrapperInner: React.FC = () => {
             await saveNowRef.current();
           } catch (err) {
             console.error('Failed to save before navigation:', err);
-            // Continue with navigation even if save fails
+            toast.warning('Changes may not have been saved. Please check your work.');
           }
         }
         setState((prev) => ({

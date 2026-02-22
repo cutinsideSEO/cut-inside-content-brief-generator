@@ -674,32 +674,40 @@ const App: React.FC<AppProps> = ({
   }, []);
   
   const addContextFiles = useCallback(async (files: File[]) => {
-    const newFilesMap = new Map(contextFiles);
-    const newContentsMap = new Map(fileContents);
     const filesToParse: File[] = [];
 
-    for (const file of files) {
-        if (!newFilesMap.has(file.name)) {
-            newFilesMap.set(file.name, file);
-            if (file.size > MAX_FILE_SIZE_BYTES) {
-                newContentsMap.set(file.name, {
-                    content: null,
-                    error: `File is too large (max ${MAX_FILE_SIZE_MB}MB).`,
-                    status: 'done'
-                });
-            } else {
-                filesToParse.push(file);
-            }
+    // Use functional updates to avoid depending on contextFiles/fileContents
+    setContextFiles(prev => {
+      const newMap = new Map(prev);
+      for (const file of files) {
+        if (!newMap.has(file.name)) {
+          newMap.set(file.name, file);
+          if (file.size <= MAX_FILE_SIZE_BYTES) {
+            filesToParse.push(file);
+          }
         }
-    }
-
-    if (newFilesMap.size >= 3 && !hasAchievedDataMaven) {
+      }
+      if (newMap.size >= 3 && !hasAchievedDataMaven) {
         addToast("Accolade Unlocked!", "Data Maven: You've provided 3+ context files for superior accuracy.");
         setHasAchievedDataMaven(true);
-    }
+      }
+      return newMap;
+    });
 
-    setContextFiles(newFilesMap);
-    if(newContentsMap.size > fileContents.size) setFileContents(newContentsMap);
+    // Set error status for oversized files
+    setFileContents(prev => {
+      const newMap = new Map(prev);
+      for (const file of files) {
+        if (!newMap.has(file.name) && file.size > MAX_FILE_SIZE_BYTES) {
+          newMap.set(file.name, {
+            content: null,
+            error: `File is too large (max ${MAX_FILE_SIZE_MB}MB).`,
+            status: 'done'
+          });
+        }
+      }
+      return newMap;
+    });
 
     await Promise.all(filesToParse.map(async (file) => {
         try {
@@ -720,7 +728,7 @@ const App: React.FC<AppProps> = ({
             setFileContents(prev => new Map(prev).set(file.name, { content: null, error: String(err), status: 'done' }));
         }
     }));
-  }, [contextFiles, fileContents, parseFile, addToast, hasAchievedDataMaven, briefId, isSupabaseMode]);
+  }, [parseFile, addToast, hasAchievedDataMaven, briefId, isSupabaseMode]);
 
   const removeContextFile = useCallback((fileName: string) => {
     setContextFiles(prev => {
@@ -1164,6 +1172,8 @@ const App: React.FC<AppProps> = ({
 
         // Update the contentParts entry for this section (heading + body)
         contentParts[sectionPartIndex] = heading + finalSectionBody;
+        // Rebuild fullContent from contentParts to stay in sync after streaming
+        fullContent = contentParts.join('');
 
         // Post-generation retry: if section is under 70% of target, regenerate once
         let currentSectionBody = finalSectionBody;
@@ -1178,9 +1188,13 @@ const App: React.FC<AppProps> = ({
               total: allSections.length,
             });
 
+            // Remove current section body from contentParts to build contentSoFar without it
+            contentParts[sectionPartIndex] = heading;
+            const contentSoFarWithoutSection = contentParts.join('');
+
             const expandedContent = await generateArticleSection({
               brief: briefData,
-              contentSoFar: fullContent.replace(currentSectionBody, ''),
+              contentSoFar: contentSoFarWithoutSection,
               sectionToWrite: {
                 ...section,
                 guidelines: [
@@ -1194,16 +1208,16 @@ const App: React.FC<AppProps> = ({
               brandContext: brandContextForArticle,
               signal,
               globalWordTarget,
-              wordsWrittenSoFar: countWords(fullContent) - sectionWords,
+              wordsWrittenSoFar: countWords(contentSoFarWithoutSection),
               totalSections: allSections.length,
               currentSectionIndex: i,
               strictMode: isStrictMode,
             });
 
-            // Replace the under-budget content with the expanded version
-            fullContent = fullContent.replace(currentSectionBody, expandedContent);
+            // Update contentParts and rebuild fullContent from parts
             currentSectionBody = expandedContent;
             contentParts[sectionPartIndex] = heading + currentSectionBody;
+            fullContent = contentParts.join('');
             setGeneratedArticle({ title: initialTitle, content: fullContent });
           }
         }
@@ -1232,7 +1246,7 @@ const App: React.FC<AppProps> = ({
 
             // Replace the section at its known index instead of ambiguous string matching
             contentParts[sectionPartIndex] = heading + trimmedContent;
-            fullContent = contentParts.join('\n\n');
+            fullContent = contentParts.join('');
             setGeneratedArticle({ title: initialTitle, content: fullContent });
           }
         }
@@ -1243,11 +1257,12 @@ const App: React.FC<AppProps> = ({
       }
 
       // Add FAQs if they exist
-      if (briefData.faqs && briefData.faqs.questions.length > 0) {
+      if (briefData.faqs?.questions?.length && briefData.faqs.questions.length > 0) {
         const totalSectionsWithFaqs = allSections.length + briefData.faqs.questions.length;
         setGenerationProgress({ currentSection: 'FAQs', currentIndex: allSections.length + 1, total: totalSectionsWithFaqs});
         const faqHeading = `## Frequently Asked Questions\n\n`;
-        fullContent += faqHeading;
+        contentParts.push(faqHeading);
+        fullContent = contentParts.join('');
         setGeneratedArticle({ title: initialTitle, content: fullContent });
 
         // Calculate remaining word budget for FAQs — default to 80 words each if no global target
@@ -1268,6 +1283,10 @@ const App: React.FC<AppProps> = ({
             const faqHeadingText = `### ${faq.question}\n\n`;
             fullContent += faqHeadingText;
             setGeneratedArticle({ title: initialTitle, content: fullContent });
+
+            // Track FAQ content in contentParts
+            const faqPartIndex = contentParts.length;
+            contentParts.push(faqHeadingText);
 
             // Build FAQ guidelines with word budget
             const faqGuidelines = [...faq.guidelines];
@@ -1310,6 +1329,9 @@ const App: React.FC<AppProps> = ({
               fullContent += questionContent;
             }
 
+            // Update contentParts entry for this FAQ (heading + body)
+            contentParts[faqPartIndex] = faqHeadingText + faqBody;
+
             // Auto-trim over-budget FAQs (same logic as main sections)
             if (perFaqBudget > 0) {
               const faqWords = countWords(faqBody);
@@ -1329,13 +1351,16 @@ const App: React.FC<AppProps> = ({
                   faq.question
                 );
 
-                fullContent = fullContent.replace(faqBody, trimmedFaq);
+                // Update contentParts and rebuild fullContent from parts
                 faqBody = trimmedFaq;
+                contentParts[faqPartIndex] = faqHeadingText + faqBody;
+                fullContent = contentParts.join('');
                 setGeneratedArticle({ title: initialTitle, content: fullContent });
               }
             }
 
-            fullContent += '\n\n';
+            contentParts.push('\n\n');
+            fullContent = contentParts.join('');
             setGeneratedArticle({ title: initialTitle, content: fullContent });
         }
       }
@@ -1346,10 +1371,11 @@ const App: React.FC<AppProps> = ({
         const maxAllowed = Math.round(globalWordTarget * WC_PROMPT_MAX);
         if (totalWords > maxAllowed) {
           if (import.meta.env.DEV) console.log(`Final trim: ${totalWords} words > ${maxAllowed} max (target ${globalWordTarget})`);
+          const faqQuestionCount = briefData.faqs?.questions?.length || 0;
           setGenerationProgress({
             currentSection: 'Trimming article to target word count...',
-            currentIndex: allSections.length + (briefData.faqs?.questions?.length || 0),
-            total: allSections.length + (briefData.faqs?.questions?.length || 0),
+            currentIndex: allSections.length + faqQuestionCount + 1,
+            total: allSections.length + faqQuestionCount + 1,
           });
 
           // Find the most over-budget sections to trim

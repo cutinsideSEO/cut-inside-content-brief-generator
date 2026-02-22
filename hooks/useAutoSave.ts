@@ -6,6 +6,36 @@ import type { AppState, SaveStatus } from '../types/appState';
 import type { AppView } from '../types/database';
 import type { ContentBrief, CompetitorPage, ExtractedTemplate, ModelSettings, LengthConstraints } from '../types';
 
+/**
+ * Last-resort save using keepalive fetch on unmount/page unload.
+ * keepalive fetch survives page teardown in modern browsers (unlike regular fetch).
+ * sendBeacon won't work here because Supabase REST requires PATCH with custom headers.
+ */
+function beaconSave(briefId: string, data: Record<string, unknown>): void {
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) return;
+
+    const url = `${supabaseUrl}/rest/v1/briefs?id=eq.${briefId}`;
+    fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(data),
+      keepalive: true,
+    }).catch(() => {
+      // Silently fail — this is a best-effort save
+    });
+  } catch {
+    // Silently fail — this is a best-effort save
+  }
+}
+
 interface AutoSaveData {
   current_view: AppView;
   current_step: number;
@@ -238,6 +268,7 @@ export function useAutoSave(
   // Store a ref to the latest performSave function and state for unmount cleanup
   const performSaveRef = useRef(performSave);
   const hasDataChangedRef = useRef(hasDataChanged);
+  const buildSaveDataRef = useRef(buildSaveData);
   const enabledRef = useRef(enabled);
   const briefIdRef = useRef(briefId);
 
@@ -245,6 +276,7 @@ export function useAutoSave(
   useEffect(() => {
     performSaveRef.current = performSave;
     hasDataChangedRef.current = hasDataChanged;
+    buildSaveDataRef.current = buildSaveData;
     enabledRef.current = enabled;
     briefIdRef.current = briefId;
   });
@@ -256,21 +288,26 @@ export function useAutoSave(
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      // Fire a save on unmount if there are pending changes
-      // This helps prevent data loss when navigating away
+      // Fire a save on unmount if there are pending changes.
+      // Note: React cleanup functions can't be async, so performSave is fire-and-forget here.
+      // The primary mitigation for data loss is handleBackToBriefListWithSave in AppWrapper.tsx,
+      // which explicitly awaits the save before navigating. This cleanup is a best-effort fallback.
       if (enabledRef.current && briefIdRef.current && hasDataChangedRef.current()) {
         performSaveRef.current();
+        // Also fire a keepalive fetch as a last-resort backup that survives unmount
+        beaconSave(briefIdRef.current, buildSaveDataRef.current());
       }
     };
   }, []);
 
-  // Save before unload
+  // Save before unload — prompt user and attempt keepalive save
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (state.saveStatus === 'unsaved' && briefId && enabled) {
-        // Try to save synchronously (won't always work)
         e.preventDefault();
         e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        // Fire a keepalive fetch to save data even if the page is closing
+        beaconSave(briefId, buildSaveDataRef.current());
       }
     };
 

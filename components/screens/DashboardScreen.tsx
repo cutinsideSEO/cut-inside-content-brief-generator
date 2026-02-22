@@ -401,6 +401,49 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                 </div>
             </div>
 
+            {/* ── Keywords ── */}
+            {(briefData.keyword_strategy?.primary_keywords?.length || briefData.keyword_strategy?.secondary_keywords?.length) ? (
+                <div>
+                    <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                        Keywords
+                    </h2>
+                    <div className="border border-border rounded-lg overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Keyword</TableHead>
+                                    <TableHead className="w-24 text-right">Volume</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {briefData.keyword_strategy?.primary_keywords?.map((kw, i) => (
+                                    <TableRow key={`p-${i}`}>
+                                        <TableCell>
+                                            <span className="text-sm text-foreground">{kw.keyword}</span>
+                                            <Badge variant="teal" size="sm" className="ml-2">Primary</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm tabular-nums">
+                                            {keywordVolumeMap.get(kw.keyword)?.toLocaleString() ?? '—'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {briefData.keyword_strategy?.secondary_keywords?.map((kw, i) => (
+                                    <TableRow key={`s-${i}`}>
+                                        <TableCell>
+                                            <span className="text-sm text-foreground">{kw.keyword}</span>
+                                            <Badge variant="secondary" size="sm" className="ml-2">Secondary</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm tabular-nums">
+                                            {keywordVolumeMap.get(kw.keyword)?.toLocaleString() ?? '—'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+            ) : null}
+
             {/* Writer Instructions for uploaded briefs */}
             {isUploadedBrief && (
                 <div>

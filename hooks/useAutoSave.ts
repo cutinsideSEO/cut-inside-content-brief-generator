@@ -131,7 +131,10 @@ export function useAutoSave(
     return currentData !== lastSavedDataRef.current;
   }, [buildSaveData]);
 
-  // Perform the save
+  // Perform the save with retry on failure
+  const MAX_SAVE_RETRIES = 3;
+  const RETRY_DELAY_MS = 1000;
+
   const performSave = useCallback(async () => {
     if (!briefId || !enabled || isSavingRef.current || isPausedRef.current) {
       return;
@@ -146,33 +149,46 @@ export function useAutoSave(
     setIsSavingState(true);
     onSaveStart?.();
 
-    try {
-      const saveData = buildSaveData();
+    let lastError: string | null = null;
 
-      // Save brief state
-      const { error } = await saveBriefState(briefId, saveData);
+    for (let attempt = 0; attempt < MAX_SAVE_RETRIES; attempt++) {
+      try {
+        const saveData = buildSaveData();
 
-      if (error) {
-        throw new Error(error);
+        // Save brief state
+        const { error } = await saveBriefState(briefId, saveData);
+
+        if (error) {
+          throw new Error(error);
+        }
+
+        // Save competitors if they exist
+        if (state.competitorData.length > 0) {
+          await saveCompetitors(briefId, state.competitorData);
+        }
+
+        // Update last saved data reference
+        lastSavedDataRef.current = JSON.stringify(saveData);
+
+        const savedAt = new Date();
+        onSaveSuccess?.(savedAt);
+        lastError = null;
+        break; // Success — exit retry loop
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : 'Failed to save';
+        if (attempt < MAX_SAVE_RETRIES - 1) {
+          console.warn(`Auto-save attempt ${attempt + 1} failed, retrying in ${RETRY_DELAY_MS * (attempt + 1)}ms...`, err);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
+        }
       }
-
-      // Save competitors if they exist
-      if (state.competitorData.length > 0) {
-        await saveCompetitors(briefId, state.competitorData);
-      }
-
-      // Update last saved data reference
-      lastSavedDataRef.current = JSON.stringify(saveData);
-
-      const savedAt = new Date();
-      onSaveSuccess?.(savedAt);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save';
-      onSaveError?.(message);
-    } finally {
-      isSavingRef.current = false;
-      setIsSavingState(false);
     }
+
+    if (lastError) {
+      onSaveError?.(lastError);
+    }
+
+    isSavingRef.current = false;
+    setIsSavingState(false);
   }, [
     briefId,
     enabled,

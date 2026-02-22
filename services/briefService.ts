@@ -36,6 +36,7 @@ export async function getBriefsForClient(clientId: string): Promise<ApiResponse<
     return { data: data as BriefWithClient[], error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    console.error('getBriefsForClient failed:', err);
     return { data: null, error: message };
   }
 }
@@ -64,6 +65,7 @@ export async function getBrief(briefId: string): Promise<ApiResponse<Brief>> {
     return { data: data as Brief, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    console.error('getBrief failed:', err);
     return { data: null, error: message };
   }
 }
@@ -99,6 +101,7 @@ export async function getBriefWithRelations(briefId: string): Promise<ApiRespons
     return { data: data as BriefWithRelations, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    console.error('getBriefWithRelations failed:', err);
     return { data: null, error: message };
   }
 }
@@ -163,6 +166,7 @@ export async function createBrief(
     return { data: data as Brief, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    console.error('createBrief failed:', err);
     return { data: null, error: message };
   }
 }
@@ -189,6 +193,7 @@ export async function updateBrief(
     return { data: data as Brief, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    console.error('updateBrief failed:', err);
     return { data: null, error: message };
   }
 }
@@ -319,6 +324,7 @@ export async function deleteBrief(briefId: string): Promise<ApiResponse<boolean>
     return { data: true, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    console.error('deleteBrief failed:', err);
     return { data: null, error: message };
   }
 }
@@ -385,6 +391,7 @@ export async function cloneBriefAsTemplate(
     return { data: data as Brief, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    console.error('cloneBriefAsTemplate failed:', err);
     return { data: null, error: message };
   }
 }
@@ -411,6 +418,7 @@ export async function getRecentBriefs(limit: number = 10): Promise<ApiResponse<B
     return { data: data as BriefWithClient[], error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    console.error('getRecentBriefs failed:', err);
     return { data: null, error: message };
   }
 }
@@ -447,6 +455,7 @@ export async function searchBriefs(
     return { data: data as BriefWithClient[], error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
+    console.error('searchBriefs failed:', err);
     return { data: null, error: message };
   }
 }

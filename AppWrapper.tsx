@@ -36,6 +36,7 @@ interface GeneratingBrief {
   clientName: string;
   status: GenerationStatus;
   step: number | null;
+  saveStatus?: SaveStatus;
 }
 
 // Types for the wrapper state
@@ -186,19 +187,34 @@ const AppWrapperInner: React.FC = () => {
     });
   }, []);
 
-  // Handle generation complete - removes from the map
+  // Handle generation complete - delays removal to allow final save to complete
   const handleGenerationComplete = useCallback((briefId: string, success: boolean) => {
-    setState((prev) => {
-      const { [briefId]: removed, ...remaining } = prev.generatingBriefs;
-      return {
-        ...prev,
-        generatingBriefs: remaining,
-      };
-    });
-    // Update brief status in Supabase
+    // Update brief status in Supabase immediately
     if (success) {
       updateBriefStatus(briefId, 'complete');
     }
+    // Mark generation as complete but keep mounted for 3 seconds to let final save flush
+    setState((prev) => {
+      const brief = prev.generatingBriefs[briefId];
+      if (!brief) return prev;
+      return {
+        ...prev,
+        generatingBriefs: {
+          ...prev.generatingBriefs,
+          [briefId]: { ...brief, status: 'idle' },
+        },
+      };
+    });
+    // Remove from map after delay to prevent premature unmount during save
+    setTimeout(() => {
+      setState((prev) => {
+        const { [briefId]: removed, ...remaining } = prev.generatingBriefs;
+        return {
+          ...prev,
+          generatingBriefs: remaining,
+        };
+      });
+    }, 3000);
   }, []);
 
   // Handle client selection
@@ -289,13 +305,28 @@ const AppWrapperInner: React.FC = () => {
     }));
   }, []);
 
-  // Handle save status changes from the brief editor
+  // Handle save status changes from the brief editor (foreground)
   const handleSaveStatusChange = useCallback((status: SaveStatus, savedAt?: Date) => {
     setState((prev) => ({
       ...prev,
       saveStatus: status,
       lastSavedAt: savedAt || prev.lastSavedAt,
     }));
+  }, []);
+
+  // Handle save status changes for background-generating briefs (per-brief)
+  const handleBriefSaveStatusChange = useCallback((briefId: string, status: SaveStatus) => {
+    setState((prev) => {
+      const brief = prev.generatingBriefs[briefId];
+      if (!brief) return prev;
+      return {
+        ...prev,
+        generatingBriefs: {
+          ...prev.generatingBriefs,
+          [briefId]: { ...brief, saveStatus: status },
+        },
+      };
+    });
   }, []);
 
   // Handle brief completion
@@ -376,14 +407,15 @@ const AppWrapperInner: React.FC = () => {
                     clientId={brief.clientId}
                     clientName={brief.clientName}
                     onBackToBriefList={() => {}}
-                    onSaveStatusChange={handleSaveStatusChange}
-                    saveStatus={state.saveStatus}
-                    lastSavedAt={state.lastSavedAt}
+                    onSaveStatusChange={(status) => handleBriefSaveStatusChange(briefId, status)}
+                    saveStatus={brief.saveStatus || 'saved'}
+                    lastSavedAt={null}
                     isSupabaseMode={true}
                     onGenerationStart={(type, id) => handleGenerationStart(type, id, brief.clientId, brief.clientName)}
                     onGenerationProgress={(step) => handleGenerationProgress(briefId, step)}
                     onGenerationComplete={handleGenerationComplete}
                     isBackgroundMode={true}
+                    shouldAutoGenerate={true}
                   />
                 );
               })}
@@ -449,14 +481,15 @@ const AppWrapperInner: React.FC = () => {
                     clientId={brief.clientId}
                     clientName={brief.clientName}
                     onBackToBriefList={() => {}} // No-op since we're in background
-                    onSaveStatusChange={handleSaveStatusChange}
-                    saveStatus={state.saveStatus}
-                    lastSavedAt={state.lastSavedAt}
+                    onSaveStatusChange={(status) => handleBriefSaveStatusChange(briefId, status)}
+                    saveStatus={brief.saveStatus || 'saved'}
+                    lastSavedAt={null}
                     isSupabaseMode={true}
                     onGenerationStart={(type, id) => handleGenerationStart(type, id, brief.clientId, brief.clientName)}
                     onGenerationProgress={(step) => handleGenerationProgress(briefId, step)}
                     onGenerationComplete={handleGenerationComplete}
                     isBackgroundMode={true}
+                    shouldAutoGenerate={true}
                   />
                 );
               })}

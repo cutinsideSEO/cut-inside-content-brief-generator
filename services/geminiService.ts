@@ -11,10 +11,32 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 /**
  * Call the Gemini proxy edge function (non-streaming).
  */
-const callGemini = async (model: string, contents: string, config: any): Promise<{ text: string }> => {
-  const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+const callGemini = async (model: string, contents: string, config: any, signal?: AbortSignal): Promise<{ text: string }> => {
+  // Check if already aborted before making the call
+  if (signal?.aborted) {
+    throw new DOMException('The operation was aborted.', 'AbortError');
+  }
+
+  const invokePromise = supabase.functions.invoke('gemini-proxy', {
     body: { model, contents, config },
   });
+
+  // If signal provided, race against abort
+  let result: { data: any; error: any };
+  if (signal) {
+    result = await Promise.race([
+      invokePromise,
+      new Promise<never>((_, reject) => {
+        const onAbort = () => reject(new DOMException('The operation was aborted.', 'AbortError'));
+        if (signal.aborted) { onAbort(); return; }
+        signal.addEventListener('abort', onAbort, { once: true });
+      }),
+    ]);
+  } else {
+    result = await invokePromise;
+  }
+
+  const { data, error } = result;
 
   if (error) {
     throw new Error(`Gemini proxy error: ${error.message}`);
@@ -30,7 +52,7 @@ const callGemini = async (model: string, contents: string, config: any): Promise
 /**
  * Call the Gemini proxy edge function with streaming (SSE).
  */
-const callGeminiStream = async function* (model: string, contents: string, config: any): AsyncGenerator<{ text: string }> {
+const callGeminiStream = async function* (model: string, contents: string, config: any, signal?: AbortSignal): AsyncGenerator<{ text: string }> {
   const url = `${supabaseUrl}/functions/v1/gemini-proxy`;
   const response = await fetch(url, {
     method: 'POST',
@@ -39,6 +61,7 @@ const callGeminiStream = async function* (model: string, contents: string, confi
       'Authorization': `Bearer ${supabaseAnonKey}`,
     },
     body: JSON.stringify({ model, contents, config, stream: true }),
+    signal,
   });
 
   if (!response.ok) {
@@ -50,28 +73,39 @@ const callGeminiStream = async function* (model: string, contents: string, confi
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      // Check abort signal before each read
+      if (signal?.aborted) {
+        await reader.cancel();
+        throw new DOMException('The operation was aborted.', 'AbortError');
+      }
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') return;
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) throw new Error(parsed.error);
-          yield parsed;
-        } catch (e) {
-          if (e instanceof SyntaxError) continue;
-          throw e;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') return;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) throw new Error(parsed.error);
+            yield parsed;
+          } catch (e) {
+            if (e instanceof SyntaxError) continue;
+            throw e;
+          }
         }
       }
     }
+  } finally {
+    // Ensure reader is released if we exit early (e.g., abort)
+    try { reader.releaseLock(); } catch { /* already released */ }
   }
 };
 
@@ -129,12 +163,23 @@ const buildGenerationConfig = (step: number, schema?: any) => {
 };
 
 // Retry utility to handle transient errors or occasional schema validation hiccups
-const retryOperation = async <T>(operation: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
+const retryOperation = async <T>(operation: () => Promise<T>, retries = 3, delay = 2000, timeoutMs = 60000): Promise<T> => {
     let lastError: any;
     for (let i = 0; i < retries; i++) {
         try {
-            return await operation();
+            // Race the operation against a per-attempt timeout
+            const result = await Promise.race([
+                operation(),
+                new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
+                ),
+            ]);
+            return result;
         } catch (error) {
+            // Don't retry on abort — propagate immediately
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                throw error;
+            }
             console.warn(`Attempt ${i + 1} failed. Retrying...`, error);
             lastError = error;
             if (i < retries - 1) await new Promise(resolve => setTimeout(resolve, delay));
@@ -431,6 +476,7 @@ interface GenerationParams {
   lengthConstraints?: LengthConstraints;
   templateHeadings?: HeadingNode[];
   paaQuestions?: string[];  // People Also Ask questions from SERPs
+  signal?: AbortSignal;
 }
 
 // Helper function to ensure every node in the outline has a `children` array
@@ -448,7 +494,7 @@ const normalizeOutline = (items: OutlineItem[]): OutlineItem[] => {
 };
 
 const generateHierarchicalArticleStructure = async (params: GenerationParams): Promise<{ article_structure: ArticleStructure }> => {
-    const { competitorDataJson, subjectInfo, brandInfo, previousStepsData, userFeedback, isRegeneration, groundTruthText, language, lengthConstraints, templateHeadings } = params;
+    const { competitorDataJson, subjectInfo, brandInfo, previousStepsData, userFeedback, isRegeneration, groundTruthText, language, lengthConstraints, templateHeadings, signal } = params;
     const modelName = getModelForStep(5);
     const schema = getSchemaForStep(5);
     const genConfig = buildGenerationConfig(5, schema);
@@ -521,7 +567,8 @@ const generateHierarchicalArticleStructure = async (params: GenerationParams): P
                 systemInstruction: structureSystemInstruction,
                 responseMimeType: "application/json",
                 responseSchema: schema,
-            }
+            },
+            signal
         );
         const text = response.text;
         if (!text) throw new Error("Received an empty response from the AI for structure generation (Part 1).");
@@ -556,7 +603,8 @@ const generateHierarchicalArticleStructure = async (params: GenerationParams): P
                 systemInstruction: enrichmentSystemInstruction,
                 responseMimeType: "application/json",
                 responseSchema: schema,
-            }
+            },
+            signal
         );
         const text = response.text;
         if (!text) throw new Error("Received an empty response from the AI for structure enrichment (Part 2).");
@@ -582,7 +630,8 @@ const generateHierarchicalArticleStructure = async (params: GenerationParams): P
                     systemInstruction: resourceAnalysisSystemInstruction,
                     responseMimeType: "application/json",
                     responseSchema: schema,
-                }
+                },
+                signal
             );
             const text = response.text;
             if (!text) throw new Error("Received empty response for resource analysis.");
@@ -606,7 +655,7 @@ const generateHierarchicalArticleStructure = async (params: GenerationParams): P
 
 
 export const generateBriefStep = async (params: GenerationParams): Promise<Partial<ContentBrief>> => {
-  const { step, competitorDataJson, subjectInfo, brandInfo, previousStepsData, groundTruthText, userFeedback, availableKeywords, isRegeneration, language, lengthConstraints, templateHeadings, paaQuestions } = params;
+  const { step, competitorDataJson, subjectInfo, brandInfo, previousStepsData, groundTruthText, userFeedback, availableKeywords, isRegeneration, language, lengthConstraints, templateHeadings, paaQuestions, signal } = params;
 
   try {
     if (step === 5) {
@@ -703,7 +752,8 @@ export const generateBriefStep = async (params: GenerationParams): Promise<Parti
             {
                 systemInstruction: systemInstruction,
                 ...genConfig,
-            }
+            },
+            signal
         );
 
         const text = response.text;
@@ -730,6 +780,7 @@ interface ArticleSectionParams {
     language: string;
     writerInstructions?: string;
     onStream?: (chunk: string) => void;  // Streaming callback
+    signal?: AbortSignal;
     // Word budget context
     globalWordTarget?: number | null;
     wordsWrittenSoFar?: number;
@@ -738,7 +789,7 @@ interface ArticleSectionParams {
     strictMode?: boolean;
 }
 
-export const generateArticleSection = async ({ brief, contentSoFar, sectionToWrite, upcomingHeadings, language, writerInstructions, onStream, globalWordTarget, wordsWrittenSoFar, totalSections, currentSectionIndex, strictMode }: ArticleSectionParams): Promise<string> => {
+export const generateArticleSection = async ({ brief, contentSoFar, sectionToWrite, upcomingHeadings, language, writerInstructions, onStream, signal, globalWordTarget, wordsWrittenSoFar, totalSections, currentSectionIndex, strictMode }: ArticleSectionParams): Promise<string> => {
     const systemInstruction = getContentGenerationPrompt(language, writerInstructions);
     const modelName = currentModelSettings.model;
 
@@ -922,10 +973,15 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
                 {
                     systemInstruction,
                     ...(currentModelSettings.model.includes('gemini-3') ? { thinkingConfig: { thinkingBudget: ARTICLE_THINKING_BUDGET } } : {}),
-                }
+                },
+                signal
             );
 
             for await (const chunk of stream) {
+                // Check abort between chunks
+                if (signal?.aborted) {
+                    throw new DOMException('The operation was aborted.', 'AbortError');
+                }
                 const chunkText = chunk.text || '';
                 fullText += chunkText;
                 onStream(chunkText);
@@ -945,7 +1001,8 @@ ${improvementsToShow.map(imp => `- **${imp.section}:** ${imp.issue} → ${imp.su
                 {
                     systemInstruction,
                     ...(currentModelSettings.model.includes('gemini-3') ? { thinkingConfig: { thinkingBudget: ARTICLE_THINKING_BUDGET } } : {}),
-                }
+                },
+                signal
             );
             const text = response.text;
             if (!text) {

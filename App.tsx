@@ -48,6 +48,7 @@ interface AppProps {
   onGenerationProgress?: (step: number) => void;
   onGenerationComplete?: (briefId: string, success: boolean) => void;
   isBackgroundMode?: boolean;
+  shouldAutoGenerate?: boolean;
   // Callback for parent to request an immediate save (for save-before-navigation)
   onSaveNowRef?: React.MutableRefObject<(() => Promise<void>) | null>;
 }
@@ -154,6 +155,7 @@ const App: React.FC<AppProps> = ({
   onGenerationProgress,
   onGenerationComplete,
   isBackgroundMode = false,
+  shouldAutoGenerate = false,
   onSaveNowRef,
 }) => {
   const [currentView, setCurrentView] = useState<AppView>('initial_input');
@@ -201,8 +203,18 @@ const App: React.FC<AppProps> = ({
   const [generatedArticleDbId, setGeneratedArticleDbId] = useState<string | null>(null);
   const [generationProgress, setGenerationProgress] = useState<{ currentSection: string; currentIndex: number; total: number } | null>(null);
 
+  // AbortController for cancelling in-flight AI generation requests on unmount
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Abort all in-flight generation requests on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   // "I'm Feeling Lucky" flow state
-  const [isFeelingLuckyFlow, setIsFeelingLuckyFlow] = useState<boolean>(false);
+  const [isFeelingLuckyFlow, setIsFeelingLuckyFlow] = useState<boolean>(shouldAutoGenerate);
 
   // "Fun Factor" State
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -760,6 +772,11 @@ const App: React.FC<AppProps> = ({
     setIsLoading(true);
     setLoadingStep(nextUiStep);
     try {
+      // Create a fresh AbortController for this generation call
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
       const keywordsWithVolume = Array.from(keywordVolumeMap.entries()).map(([keyword, volume]) => ({ keyword, volume }));
       const logicalNextStep = UI_TO_LOGICAL_STEP_MAP[nextUiStep];
       const needsFullText = [3, 4, 5].includes(logicalNextStep);
@@ -783,6 +800,7 @@ const App: React.FC<AppProps> = ({
         lengthConstraints: (lengthConstraints.globalTarget || Object.keys(lengthConstraints.sectionTargets || {}).length > 0) ? lengthConstraints : undefined,
         // Feature: Pass PAA questions for step 6 (FAQ generation)
         paaQuestions: logicalNextStep === 6 ? paaQuestions : undefined,
+        signal,
       });
       setBriefData(prev => ({ ...prev, ...result }));
     } catch (err) {
@@ -790,14 +808,14 @@ const App: React.FC<AppProps> = ({
       setBriefingStep(prev => prev - 1); // Revert on error
       setIsFeelingLuckyFlow(false); // Stop lucky flow on error
       // Notify parent that brief generation failed
-      if (briefId && onGenerationComplete && isFeelingLuckyFlow) {
+      if (briefId && onGenerationComplete) {
         onGenerationComplete(briefId, false);
       }
     } finally {
       setIsLoading(false);
       setLoadingStep(null);
     }
-  }, [briefingStep, competitorData, subjectInfo, combinedSubjectInfo, brandInfo, briefData, keywordVolumeMap, outputLanguage, extractedTemplate, lengthConstraints, paaQuestions, briefId, onGenerationComplete, isFeelingLuckyFlow]);
+  }, [briefingStep, competitorData, subjectInfo, combinedSubjectInfo, brandInfo, briefData, keywordVolumeMap, outputLanguage, extractedTemplate, lengthConstraints, paaQuestions, briefId, onGenerationComplete]);
 
   // Navigate to a previous step without regenerating (just show existing data)
   const handlePrevStep = useCallback(() => {
@@ -818,13 +836,18 @@ const App: React.FC<AppProps> = ({
     setIsLoading(true);
     setLoadingStep(1);
     try {
+      // Create a fresh AbortController for this generation pipeline
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
       const groundTruthCompetitors = getGroundTruthCompetitors(competitorData);
       const groundTruthText = groundTruthCompetitors.map(c => `URL: ${c.URL}\nTEXT: ${c.Full_Text}`).join('\n\n---\n\n');
-      
+
       const fileContexts = Array.from(fileContents.entries())
         .filter(([, f]) => f.status === 'done' && f.content)
         .map(([, f]) => f.content as string);
-      
+
       const urlContexts = Array.from(urlContents.entries())
         .filter(([, u]) => u.status === 'done' && u.content)
         .map(([url, u]) => `SOURCE URL: ${url}\n\n${u.content as string}`);
@@ -848,6 +871,7 @@ const App: React.FC<AppProps> = ({
         groundTruthText,
         language: outputLanguage,
         lengthConstraints: (lengthConstraints.globalTarget || Object.keys(lengthConstraints.sectionTargets || {}).length > 0) ? lengthConstraints : undefined,
+        signal,
       });
       setBriefData(prev => ({ ...prev, ...result }));
     } catch (err) {
@@ -868,6 +892,27 @@ const App: React.FC<AppProps> = ({
     }
     handleProceedToBriefing();
   }, [handleProceedToBriefing, briefId, onGenerationStart]);
+
+  // Auto-start generation for background mode: once brief loads from DB and
+  // competitor data is available, kick off the briefing pipeline automatically.
+  const hasAutoStarted = useRef(false);
+  useEffect(() => {
+    if (
+      shouldAutoGenerate &&
+      !hasAutoStarted.current &&
+      !isBriefLoading &&
+      competitorData.length > 0 &&
+      currentView !== 'briefing' &&
+      currentView !== 'dashboard'
+    ) {
+      hasAutoStarted.current = true;
+      // Notify parent that brief generation is starting
+      if (briefId && onGenerationStart) {
+        onGenerationStart('brief', briefId);
+      }
+      handleProceedToBriefing();
+    }
+  }, [shouldAutoGenerate, isBriefLoading, competitorData, currentView, briefId, onGenerationStart, handleProceedToBriefing]);
 
   // Use refs to avoid re-firing the Feeling Lucky effect when callbacks change
   const handleNextStepRef = useRef(handleNextStep);
@@ -894,11 +939,16 @@ const App: React.FC<AppProps> = ({
   const handleRegenerateStep = useCallback(async (logicalStepToRegen: number, feedback?: string) => {
     setError(null);
     if (logicalStepToRegen < 1 || logicalStepToRegen > 7) return;
-    
+
     setIsLoading(true);
     setLoadingStep(logicalStepToRegen);
-    
+
     try {
+      // Create a fresh AbortController for this regeneration
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
       const userFeedback = feedback || userFeedbacks[logicalStepToRegen] || '';
       const keywordsWithVolume = Array.from(keywordVolumeMap.entries()).map(([keyword, volume]) => ({ keyword, volume }));
       const needsFullText = [3, 4, 5].includes(logicalStepToRegen);
@@ -920,6 +970,7 @@ const App: React.FC<AppProps> = ({
         language: outputLanguage,
         // Feature: Pass PAA questions for step 6 (FAQ generation)
         paaQuestions: logicalStepToRegen === 6 ? paaQuestions : undefined,
+        signal,
       });
       setBriefData(prev => ({ ...prev, ...result }));
 
@@ -965,6 +1016,11 @@ const App: React.FC<AppProps> = ({
     setCurrentView('content_generation');
     setIsLoading(true);
     setGeneratedArticleDbId(null);
+
+    // Create a fresh AbortController for article generation
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     // Notify parent that content generation is starting
     if (briefId && onGenerationStart) {
@@ -1034,6 +1090,7 @@ const App: React.FC<AppProps> = ({
           upcomingHeadings,
           language: outputLanguage,
           writerInstructions: writerInstructions?.trim() || undefined,
+          signal,
           globalWordTarget,
           wordsWrittenSoFar: countWords(fullContent),
           totalSections: allSections.length,
@@ -1083,6 +1140,7 @@ const App: React.FC<AppProps> = ({
               upcomingHeadings,
               language: outputLanguage,
               writerInstructions: writerInstructions?.trim() || undefined,
+              signal,
               globalWordTarget,
               wordsWrittenSoFar: countWords(fullContent) - sectionWords,
               totalSections: allSections.length,
@@ -1178,6 +1236,7 @@ const App: React.FC<AppProps> = ({
                 upcomingHeadings: [],
                 language: outputLanguage,
                 writerInstructions: writerInstructions?.trim() || undefined,
+                signal,
                 globalWordTarget,
                 wordsWrittenSoFar: countWords(fullContent),
                 totalSections: allSections.length + briefData.faqs.questions.length,

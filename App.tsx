@@ -223,9 +223,9 @@ const App: React.FC<AppProps> = ({
   useEffect(() => {
     if (!clientId || !isSupabaseMode) return;
     let cancelled = false;
-    getClientWithContext(clientId).then(profile => {
-      if (!cancelled && profile) {
-        setClientProfile(profile);
+    getClientWithContext(clientId).then(({ data }) => {
+      if (!cancelled && data) {
+        setClientProfile(data);
       }
     }).catch(err => {
       console.warn('Failed to load client profile:', err);

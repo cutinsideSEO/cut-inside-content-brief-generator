@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import Button from '../Button';
 import { AlertTriangleIcon, UploadCloudIcon, FileTextIcon } from '../Icon';
+import { Alert } from '../ui';
 import Spinner from '../Spinner';
 
 interface BriefUploadScreenProps {
@@ -47,28 +48,30 @@ const BriefUploadScreen: React.FC<BriefUploadScreenProps> = ({ onFileUpload, isL
     }
   };
 
+  const displayError = error || localError;
+
   return (
     <div className="max-w-3xl mx-auto animate-fade-in">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-heading font-bold text-gray-600">Upload Your Content Brief</h1>
-        <p className="text-lg text-gray-600/70 mt-2">Upload an existing brief in Markdown (.md) format to begin content generation.</p>
+        <h1 className="text-3xl font-heading font-bold text-foreground">Upload Your Content Brief</h1>
+        <p className="text-lg text-muted-foreground mt-2">Upload an existing brief in Markdown (.md) format to begin content generation.</p>
       </div>
 
-      <div className="bg-black/30 rounded-lg shadow-lg p-6 md:p-8 space-y-6 border border-white/10">
+      <div className="bg-card rounded-lg shadow-card p-6 md:p-8 space-y-6 border border-border">
         {!briefFile ? (
           <label
-            className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragOver ? 'border-teal bg-teal/10' : 'border-white/20 bg-black/50 hover:bg-white/5'}`}
+            className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragOver ? 'border-teal bg-teal/10' : 'border-border bg-secondary hover:bg-secondary/70'}`}
             onDrop={handleDrop}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
             onDragOver={handleDragOver}
           >
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              <UploadCloudIcon className="w-12 h-12 mb-3 text-gray-600/40" />
-              <p className="text-md text-gray-600/60">
+              <UploadCloudIcon className="w-12 h-12 mb-3 text-muted-foreground/50" />
+              <p className="text-md text-muted-foreground">
                 <span className="font-semibold text-teal">Click to upload</span> or drag and drop
               </p>
-              <p className="text-xs text-gray-600/50">Markdown (.md) files only</p>
+              <p className="text-xs text-muted-foreground/70">Markdown (.md) files only</p>
             </div>
             <input
               type="file"
@@ -78,10 +81,10 @@ const BriefUploadScreen: React.FC<BriefUploadScreenProps> = ({ onFileUpload, isL
             />
           </label>
         ) : (
-          <div className="bg-black/50 p-4 rounded-lg border border-white/10 text-center">
+          <div className="bg-secondary p-4 rounded-lg border border-border text-center">
             <FileTextIcon className="h-12 w-12 text-teal mx-auto mb-2" />
-            <p className="font-semibold text-gray-600">{briefFile.name}</p>
-            <p className="text-xs text-gray-600/60">{Math.round(briefFile.size / 1024)} KB</p>
+            <p className="font-semibold text-foreground">{briefFile.name}</p>
+            <p className="text-xs text-muted-foreground">{Math.round(briefFile.size / 1024)} KB</p>
             <Button onClick={() => setBriefFile(null)} variant="secondary" size="sm" className="mt-4 w-auto">
               Choose a different file
             </Button>
@@ -97,11 +100,13 @@ const BriefUploadScreen: React.FC<BriefUploadScreenProps> = ({ onFileUpload, isL
           </Button>
         </div>
 
-        {(error || localError) && (
-          <div className="mt-4 p-3 bg-red-900/50 border border-red-700 text-red-300 rounded-md flex items-start space-x-2">
-            <AlertTriangleIcon className="h-5 w-5 mt-0.5 flex-shrink-0" />
-            <p className="text-sm">{error || localError}</p>
-          </div>
+        {displayError && (
+          <Alert variant="error">
+            <div className="flex items-start space-x-2">
+              <AlertTriangleIcon className="h-5 w-5 mt-0.5 flex-shrink-0" />
+              <p className="text-sm">{displayError}</p>
+            </div>
+          </Alert>
         )}
       </div>
     </div>

@@ -112,5 +112,8 @@ export type { EmptyStateProps } from './EmptyState';
 export { default as StatCard } from './StatCard';
 export type { StatCardProps } from './StatCard';
 
+// ErrorBoundary
+export { default as ErrorBoundary } from './ErrorBoundary';
+
 // Sonner (Toaster)
 export { Toaster } from './primitives/sonner';

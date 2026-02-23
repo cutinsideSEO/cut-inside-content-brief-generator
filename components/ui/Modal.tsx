@@ -68,6 +68,11 @@ const Modal: React.FC<ModalProps> = ({
             <DialogPrimitive.Title className="sr-only">Dialog</DialogPrimitive.Title>
           )}
 
+          {/* Visually-hidden description for accessibility */}
+          <DialogPrimitive.Description className="sr-only">
+            {title ? `${title} dialog` : 'Dialog content'}
+          </DialogPrimitive.Description>
+
           {/* Body */}
           <div className="p-5 custom-scrollbar max-h-[70vh] overflow-y-auto">{children}</div>
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Input, Textarea, Select } from '../../ui';
 import type { BrandIdentity, IndustryVertical } from '../../../types/clientProfile';
 import { INDUSTRY_LABELS } from '../../../types/clientProfile';
+import { getClientLogoUrl } from '../../../lib/favicon';
 
 const PRESET_COLORS = [
   '#0D9488', '#2563EB', '#7C3AED', '#DB2777', '#EA580C',
@@ -128,6 +129,20 @@ const BrandIdentitySection: React.FC<BrandIdentitySectionProps> = ({
           )}
         </div>
         <p className="text-xs text-muted-foreground mt-1">Used as the client icon instead of initials</p>
+        {!data.logo_url && data.website && (() => {
+          const faviconUrl = getClientLogoUrl({ website: data.website });
+          return faviconUrl ? (
+            <div className="flex items-center gap-2 mt-2 p-2 bg-teal-50 rounded-md">
+              <img
+                src={faviconUrl}
+                alt="Auto-detected favicon"
+                className="w-6 h-6 rounded object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+              <span className="text-xs text-teal-700">Auto-detected from website. Add a manual logo URL above to override.</span>
+            </div>
+          ) : null;
+        })()}
       </div>
 
       <div>

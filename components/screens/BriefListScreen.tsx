@@ -1,9 +1,10 @@
 // Brief List Screen - View and manage briefs for a client
 import React, { useState, useEffect, useMemo } from 'react';
-import { getBriefsForClient, archiveBrief, deleteBrief } from '../../services/briefService';
-import { getArticlesForClient, deleteArticle } from '../../services/articleService';
+import { getBriefsForClient, archiveBrief, deleteBrief, updateBriefWorkflowStatus } from '../../services/briefService';
+import { getArticlesForClient, deleteArticle, getArticleCountForClient, updateArticleStatus } from '../../services/articleService';
 import { toast } from 'sonner';
-import type { BriefWithClient, ArticleWithBrief } from '../../types/database';
+import type { BriefWithClient, ArticleWithBrief, BriefStatus, ArticleStatus } from '../../types/database';
+import { isWorkflowStatus } from '../../types/database';
 import BriefListCard from '../briefs/BriefListCard';
 import ArticleListCard from '../articles/ArticleListCard';
 import Button from '../Button';
@@ -24,6 +25,7 @@ interface BriefListScreenProps {
   clientId: string;
   clientName: string;
   clientLogoUrl?: string | null;
+  clientBrandColor?: string | null;
   onBack: () => void;
   onCreateBrief: () => void;
   onContinueBrief: (briefId: string) => void;
@@ -33,14 +35,17 @@ interface BriefListScreenProps {
   generatingBriefs?: Record<string, GeneratingBrief>;
   // Article navigation
   onViewArticle: (articleId: string) => void;
+  // Callback to sync counts with parent (sidebar)
+  onCountsChange?: (counts: { draft: number; in_progress: number; complete: number; workflow: number; published: number; articles: number }) => void;
 }
 
-type FilterStatus = 'all' | 'draft' | 'in_progress' | 'complete';
+type FilterStatus = 'all' | 'draft' | 'in_progress' | 'complete' | 'workflow' | 'published';
 
 const BriefListScreen: React.FC<BriefListScreenProps> = ({
   clientId,
   clientName,
   clientLogoUrl,
+  clientBrandColor,
   onBack,
   onCreateBrief,
   onContinueBrief,
@@ -48,6 +53,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   onUseAsTemplate,
   generatingBriefs = {},
   onViewArticle,
+  onCountsChange,
 }) => {
   const [briefs, setBriefs] = useState<BriefWithClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,6 +64,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const [articles, setArticles] = useState<ArticleWithBrief[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [archiveConfirm, setArchiveConfirm] = useState<string | null>(null);
+  const [articleCount, setArticleCount] = useState(0);
 
   // Sort state
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'modified' | 'name'>('newest');
@@ -70,9 +77,10 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const [visibleCount, setVisibleCount] = useState(20);
   const BRIEF_PAGE_SIZE = 20;
 
-  // Fetch briefs on mount and when clientId changes
+  // Fetch briefs and article count on mount and when clientId changes
   useEffect(() => {
     loadBriefs();
+    getArticleCountForClient(clientId).then(setArticleCount);
   }, [clientId]);
 
   const loadBriefs = async () => {
@@ -172,12 +180,47 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     const { error: deleteError } = await deleteArticle(articleId);
     if (!deleteError) {
       setArticles(prev => prev.filter(a => a.id !== articleId));
+      setArticleCount(prev => Math.max(0, prev - 1));
+    }
+  };
+
+  // Workflow status change handler
+  const handleWorkflowStatusChange = async (briefId: string, newStatus: string, metadata?: { published_url?: string; published_at?: string }) => {
+    // Optimistic update
+    setBriefs(prev => prev.map(b => b.id === briefId ? { ...b, status: newStatus as BriefStatus, published_url: metadata?.published_url ?? b.published_url, published_at: metadata?.published_at ?? b.published_at } : b));
+
+    const { error: updateError } = await updateBriefWorkflowStatus(briefId, newStatus as BriefStatus, metadata);
+    if (updateError) {
+      toast.error('Failed to update status');
+      loadBriefs(); // Revert by reloading
+    } else {
+      toast.success(`Status updated to ${newStatus.replace(/_/g, ' ')}`);
+    }
+  };
+
+  // Article status change handler
+  const handleArticleStatusChange = async (articleId: string, newStatus: string, metadata?: { published_url?: string }) => {
+    // Optimistic update
+    setArticles(prev => prev.map(a => a.id === articleId ? { ...a, status: newStatus as ArticleStatus, published_url: metadata?.published_url ?? a.published_url } : a));
+
+    const { error: updateError } = await updateArticleStatus(articleId, newStatus as ArticleStatus, metadata?.published_url);
+    if (updateError) {
+      toast.error('Failed to update article status');
+      loadArticles(); // Revert by reloading
+    } else {
+      toast.success(`Article status updated to ${newStatus.replace(/_/g, ' ')}`);
     }
   };
 
   // Filter, search, and sort briefs
   const filteredBriefs = useMemo(() => {
     let result = briefs.filter((brief) => {
+      if (filterStatus === 'workflow') {
+        return ['sent_to_client', 'approved', 'changes_requested', 'in_writing'].includes(brief.status);
+      }
+      if (filterStatus === 'published') {
+        return brief.status === 'published';
+      }
       if (filterStatus !== 'all' && brief.status !== filterStatus) {
         return false;
       }
@@ -211,12 +254,27 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   }, [briefs, filterStatus, searchQuery, sortBy]);
 
   // Count briefs by status
+  const workflowStatuses = ['sent_to_client', 'approved', 'changes_requested', 'in_writing'];
   const counts = {
     all: briefs.length,
     draft: briefs.filter((b) => b.status === 'draft').length,
     in_progress: briefs.filter((b) => b.status === 'in_progress').length,
     complete: briefs.filter((b) => b.status === 'complete').length,
+    workflow: briefs.filter((b) => workflowStatuses.includes(b.status)).length,
+    published: briefs.filter((b) => b.status === 'published').length,
   };
+
+  // Sync counts with parent (sidebar) whenever briefs or articleCount change
+  useEffect(() => {
+    onCountsChange?.({
+      draft: counts.draft,
+      in_progress: counts.in_progress,
+      complete: counts.complete,
+      workflow: counts.workflow,
+      published: counts.published,
+      articles: articleCount,
+    });
+  }, [counts.draft, counts.in_progress, counts.complete, counts.workflow, counts.published, articleCount]);
 
   // Paginated briefs
   const paginatedBriefs = filteredBriefs.slice(0, visibleCount);
@@ -226,6 +284,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const draftBriefs = paginatedBriefs.filter((b) => b.status === 'draft');
   const inProgressBriefs = paginatedBriefs.filter((b) => b.status === 'in_progress');
   const completeBriefs = paginatedBriefs.filter((b) => b.status === 'complete');
+  const workflowBriefs = paginatedBriefs.filter((b) => workflowStatuses.includes(b.status));
+  const publishedBriefs = paginatedBriefs.filter((b) => b.status === 'published');
 
   // Tab items with counts
   const tabItems = [
@@ -233,13 +293,18 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     { id: 'draft', label: 'Draft', count: counts.draft },
     { id: 'in_progress', label: 'In Progress', count: counts.in_progress },
     { id: 'complete', label: 'Complete', count: counts.complete },
+    ...(counts.workflow > 0 ? [{ id: 'workflow', label: 'In Workflow', count: counts.workflow }] : []),
+    ...(counts.published > 0 ? [{ id: 'published', label: 'Published', count: counts.published }] : []),
   ];
 
   return (
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
+        <div
+          className={clientBrandColor ? 'pl-3 border-l-[3px]' : ''}
+          style={clientBrandColor ? { borderLeftColor: clientBrandColor } : undefined}
+        >
           <div className="flex items-center gap-3">
             {clientLogoUrl && (
               <img
@@ -271,7 +336,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         <Tabs
           items={[
             { id: 'briefs', label: 'Briefs', count: briefs.length },
-            { id: 'articles', label: 'Articles', count: articles.length },
+            { id: 'articles', label: 'Articles', count: activeTab === 'articles' ? articles.length : articleCount },
           ]}
           activeId={activeTab}
           onChange={(id) => setActiveTab(id as 'briefs' | 'articles')}
@@ -303,6 +368,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                   article={article}
                   onView={onViewArticle}
                   onDelete={handleDeleteArticle}
+                  onStatusChange={handleArticleStatusChange}
                 />
               ))}
             </div>
@@ -545,6 +611,69 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       isGenerating={!!generating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
+                      onWorkflowStatusChange={handleWorkflowStatusChange}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* In Workflow Section */}
+          {workflowBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'workflow') && (
+            <section>
+              <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4 flex items-center">
+                <span className="w-3 h-3 bg-teal-500 rounded-full mr-3" />
+                In Workflow ({workflowBriefs.length})
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {workflowBriefs.map((brief) => {
+                  const generating = generatingBriefs[brief.id];
+                  return (
+                    <BriefListCard
+                      key={brief.id}
+                      brief={brief}
+                      onContinue={onContinueBrief}
+                      onEdit={onEditBrief}
+                      onUseAsTemplate={onUseAsTemplate}
+                      onArchive={handleArchiveClick}
+                      isSelected={selectedBriefs.has(brief.id)}
+                      onToggleSelect={toggleBriefSelection}
+                      isGenerating={!!generating}
+                      generationStatus={generating?.status}
+                      generationStep={generating?.step}
+                      onWorkflowStatusChange={handleWorkflowStatusChange}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Published Section */}
+          {publishedBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'published') && (
+            <section>
+              <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4 flex items-center">
+                <span className="w-3 h-3 bg-emerald-500 rounded-full mr-3" />
+                Published ({publishedBriefs.length})
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {publishedBriefs.map((brief) => {
+                  const generating = generatingBriefs[brief.id];
+                  return (
+                    <BriefListCard
+                      key={brief.id}
+                      brief={brief}
+                      onContinue={onContinueBrief}
+                      onEdit={onEditBrief}
+                      onUseAsTemplate={onUseAsTemplate}
+                      onArchive={handleArchiveClick}
+                      isSelected={selectedBriefs.has(brief.id)}
+                      onToggleSelect={toggleBriefSelection}
+                      isGenerating={!!generating}
+                      generationStatus={generating?.status}
+                      generationStep={generating?.step}
+                      onWorkflowStatusChange={handleWorkflowStatusChange}
                     />
                   );
                 })}

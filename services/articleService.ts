@@ -5,6 +5,7 @@ import type {
   BriefArticleInsert,
   BriefArticleUpdate,
   ArticleWithBrief,
+  ArticleStatus,
   ApiResponse,
 } from '../types/database';
 import type { ModelSettings, LengthConstraints } from '../types';
@@ -137,6 +138,8 @@ export async function createArticle(
       content,
       version: newVersion,
       is_current: true,
+      status: 'draft',
+      published_url: null,
       generation_settings: settings ? {
         model_settings: settings.model_settings,
         length_constraints: settings.length_constraints,
@@ -315,6 +318,8 @@ export async function getArticlesForClient(clientId: string): Promise<ApiRespons
       content: item.content,
       version: item.version,
       is_current: item.is_current,
+      status: item.status || 'draft',
+      published_url: item.published_url || null,
       generation_settings: item.generation_settings,
       writer_instructions: item.writer_instructions,
       created_at: item.created_at,
@@ -327,6 +332,21 @@ export async function getArticlesForClient(clientId: string): Promise<ApiRespons
     const message = err instanceof Error ? err.message : 'An unknown error occurred';
     return { data: null, error: message };
   }
+}
+
+/**
+ * Update article workflow status
+ */
+export async function updateArticleStatus(
+  articleId: string,
+  status: ArticleStatus,
+  publishedUrl?: string
+): Promise<ApiResponse<BriefArticle>> {
+  const updates: BriefArticleUpdate = { status };
+  if (publishedUrl !== undefined) {
+    updates.published_url = publishedUrl;
+  }
+  return updateArticle(articleId, updates);
 }
 
 /**

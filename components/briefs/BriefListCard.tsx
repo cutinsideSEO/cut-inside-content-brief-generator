@@ -1,7 +1,10 @@
 // Brief List Card - Card component for displaying briefs in a list
-import React from 'react';
-import type { BriefWithClient } from '../../types/database';
+import React, { useState } from 'react';
+import type { BriefWithClient, BriefStatus } from '../../types/database';
+import { isWorkflowStatus } from '../../types/database';
 import BriefStatusBadge from './BriefStatusBadge';
+import WorkflowStatusSelect from './WorkflowStatusSelect';
+import PublishedUrlModal from './PublishedUrlModal';
 import Button from '../Button';
 import { Badge, Progress, Checkbox, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '../ui';
 
@@ -22,6 +25,8 @@ interface BriefListCardProps {
   generationStep?: number | null;
   // Article indicator
   articleCount?: number;
+  // Workflow status
+  onWorkflowStatusChange?: (briefId: string, newStatus: string, metadata?: { published_url?: string; published_at?: string }) => void;
 }
 
 const MoreHorizontalIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -42,6 +47,13 @@ const ArchiveIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const LinkIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+  </svg>
+);
+
 const BriefListCard: React.FC<BriefListCardProps> = ({
   brief,
   onContinue,
@@ -54,7 +66,10 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   generationStatus = 'idle',
   generationStep = null,
   articleCount,
+  onWorkflowStatusChange,
 }) => {
+  const [showPublishModal, setShowPublishModal] = useState(false);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -105,15 +120,25 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   };
 
   const primaryKeywords = getPrimaryKeywords();
+  const showWorkflowSelect = !isGenerating && onWorkflowStatusChange && (brief.status === 'complete' || isWorkflowStatus(brief.status));
+  const isWorkflow = isWorkflowStatus(brief.status);
 
   // Status color for left border
-  const statusBorderColor = isGenerating
-    ? 'border-l-amber-400'
-    : brief.status === 'complete'
-      ? 'border-l-emerald-400'
-      : brief.status === 'in_progress'
-        ? 'border-l-amber-400'
-        : 'border-l-gray-300';
+  const getStatusBorderColor = () => {
+    if (isGenerating) return 'border-l-amber-400';
+    switch (brief.status) {
+      case 'complete': return 'border-l-emerald-400';
+      case 'in_progress': return 'border-l-amber-400';
+      case 'sent_to_client': return 'border-l-teal-400';
+      case 'changes_requested': return 'border-l-teal-400';
+      case 'in_writing': return 'border-l-blue-400';
+      case 'approved': return 'border-l-emerald-400';
+      case 'published': return 'border-l-emerald-500';
+      default: return 'border-l-gray-300';
+    }
+  };
+
+  const statusBorderColor = getStatusBorderColor();
 
   return (
     <div
@@ -158,6 +183,15 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
                 {generationStatus === 'analyzing_competitors' ? 'Analyzing' :
                  generationStatus === 'generating_brief' ? 'Generating' : 'Writing'}
               </Badge>
+            ) : showWorkflowSelect ? (
+              <WorkflowStatusSelect
+                entityType="brief"
+                entityId={brief.id}
+                currentStatus={brief.status}
+                publishedUrl={brief.published_url}
+                onStatusChange={(newStatus, metadata) => onWorkflowStatusChange!(brief.id, newStatus, metadata)}
+                onPublishClick={() => setShowPublishModal(true)}
+              />
             ) : (
               <BriefStatusBadge status={brief.status} />
             )}
@@ -229,6 +263,21 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
                 <span className="text-teal font-medium">{articleCount} article{articleCount > 1 ? 's' : ''}</span>
               </>
             )}
+            {brief.published_url && (
+              <>
+                <span className="text-border">·</span>
+                <a
+                  href={brief.published_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-teal hover:underline truncate max-w-[200px]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <LinkIcon className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{brief.published_url.replace(/^https?:\/\//, '')}</span>
+                </a>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -250,12 +299,12 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
           </div>
         ) : (
           <>
-            {brief.status !== 'complete' && brief.status !== 'archived' && (
+            {brief.status !== 'complete' && brief.status !== 'archived' && !isWorkflow && (
               <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
                 Continue
               </Button>
             )}
-            {brief.status === 'complete' && (
+            {(brief.status === 'complete' || isWorkflow) && (
               <Button variant="primary" size="sm" onClick={() => onEdit(brief.id)}>
                 View / Edit
               </Button>
@@ -264,6 +313,17 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
           </>
         )}
       </div>
+
+      {/* Published URL Modal */}
+      <PublishedUrlModal
+        isOpen={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        onConfirm={(url, publishedAt) => {
+          onWorkflowStatusChange?.(brief.id, 'published', { published_url: url, published_at: publishedAt });
+          setShowPublishModal(false);
+        }}
+        existingUrl={brief.published_url}
+      />
     </div>
   );
 };

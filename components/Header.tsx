@@ -7,6 +7,8 @@ import type { SaveStatus } from '../types/appState';
 interface HeaderProps {
   isSupabaseMode?: boolean;
   clientName?: string | null;
+  clientLogoUrl?: string | null;
+  clientBrandColor?: string | null;
   onBackToBriefList?: () => void;
   saveStatus?: SaveStatus;
   lastSavedAt?: Date | null;
@@ -15,6 +17,8 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({
   isSupabaseMode,
   clientName,
+  clientLogoUrl,
+  clientBrandColor,
   onBackToBriefList,
   saveStatus = 'saved',
   lastSavedAt,
@@ -37,16 +41,31 @@ const Header: React.FC<HeaderProps> = ({
               {isSupabaseMode && clientName && (
                 <>
                   <ChevronRightIcon className="h-3.5 w-3.5 text-gray-400" />
-                  {onBackToBriefList ? (
-                    <button
-                      onClick={onBackToBriefList}
-                      className="text-sm text-gray-400 hover:text-teal transition-colors font-heading"
-                    >
-                      {clientName}
-                    </button>
-                  ) : (
-                    <span className="text-sm text-gray-400 font-heading">{clientName}</span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {clientLogoUrl && (
+                      <img
+                        src={clientLogoUrl}
+                        alt=""
+                        className="h-5 w-5 rounded object-contain"
+                      />
+                    )}
+                    {onBackToBriefList ? (
+                      <button
+                        onClick={onBackToBriefList}
+                        className="text-sm text-gray-400 hover:text-teal transition-colors font-heading"
+                        style={clientBrandColor ? { borderBottom: `2px solid ${clientBrandColor}`, paddingBottom: '1px' } : undefined}
+                      >
+                        {clientName}
+                      </button>
+                    ) : (
+                      <span
+                        className="text-sm text-gray-400 font-heading"
+                        style={clientBrandColor ? { borderBottom: `2px solid ${clientBrandColor}`, paddingBottom: '1px' } : undefined}
+                      >
+                        {clientName}
+                      </span>
+                    )}
+                  </div>
                 </>
               )}
             </div>

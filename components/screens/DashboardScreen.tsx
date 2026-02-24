@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import type { ContentBrief, CompetitorPage, BriefValidation, EEATSignals, OutlineItem } from '../../types';
 import type { SaveStatus } from '../../types/appState';
+import type { BriefStatus } from '../../types/database';
+import { isWorkflowStatus } from '../../types/database';
+import WorkflowStatusSelect from '../briefs/WorkflowStatusSelect';
+import PublishedUrlModal from '../briefs/PublishedUrlModal';
 import { exportBriefToMarkdown } from '../../services/markdownService';
 import { validateBrief, generateEEATSignals } from '../../services/geminiService';
 import Button from '../Button';
@@ -47,6 +51,10 @@ interface DashboardScreenProps {
   // Lifted sidebar state
   selectedSection?: number | null;
   onSelectSection?: (section: number | null) => void;
+  // Workflow status
+  briefId?: string | null;
+  briefStatus?: BriefStatus;
+  onWorkflowStatusChange?: (newStatus: string, metadata?: { published_url?: string; published_at?: string }) => void;
 }
 
 // Brief Validation Display Component
@@ -156,8 +164,8 @@ const EEATSignalsDisplay: React.FC<{ signals: EEATSignals }> = ({ signals }) => 
 };
 
 // A new component for the "home" state of the dashboard
-const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'isUploadedBrief' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'isSupabaseMode'>> = ({
-    briefData, setBriefData, staleSteps, isUploadedBrief, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, isSupabaseMode,
+const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'isUploadedBrief' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'isSupabaseMode' | 'briefId' | 'briefStatus' | 'onWorkflowStatusChange'>> = ({
+    briefData, setBriefData, staleSteps, isUploadedBrief, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, isSupabaseMode, briefId, briefStatus, onWorkflowStatusChange,
 }) => {
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingEEAT, setIsGeneratingEEAT] = useState(false);
@@ -165,6 +173,8 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
     const [eeatError, setEeatError] = useState<string | null>(null);
     const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
     const [showNewBriefConfirm, setShowNewBriefConfirm] = useState(false);
+    const [showPublishModal, setShowPublishModal] = useState(false);
+    const showWorkflowSelect = briefId && briefStatus && onWorkflowStatusChange && (briefStatus === 'complete' || isWorkflowStatus(briefStatus));
 
     const handleExport = (isConcise: boolean) => {
         exportBriefToMarkdown(briefData, competitorData, keywordVolumeMap, isConcise);
@@ -267,6 +277,18 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                                 <>
                                     <Separator orientation="vertical" className="h-3.5" />
                                     <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt ?? null} />
+                                </>
+                            )}
+                            {showWorkflowSelect && (
+                                <>
+                                    <Separator orientation="vertical" className="h-3.5" />
+                                    <WorkflowStatusSelect
+                                        entityType="brief"
+                                        entityId={briefId!}
+                                        currentStatus={briefStatus!}
+                                        onStatusChange={(newStatus, metadata) => onWorkflowStatusChange!(newStatus, metadata)}
+                                        onPublishClick={() => setShowPublishModal(true)}
+                                    />
                                 </>
                             )}
                         </div>
@@ -514,6 +536,18 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
             >
                 <p className="text-gray-600">Starting a new brief will clear your current work. Make sure you have exported or saved your brief before continuing.</p>
             </Modal>
+
+            {/* Published URL Modal */}
+            {showWorkflowSelect && (
+                <PublishedUrlModal
+                    isOpen={showPublishModal}
+                    onClose={() => setShowPublishModal(false)}
+                    onConfirm={(url, publishedAt) => {
+                        onWorkflowStatusChange!('published', { published_url: url, published_at: publishedAt });
+                        setShowPublishModal(false);
+                    }}
+                />
+            )}
         </div>
     )
 }

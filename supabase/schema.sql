@@ -51,7 +51,7 @@ CREATE TABLE briefs (
 
   -- Metadata
   name TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'in_progress', 'complete', 'archived')),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'in_progress', 'complete', 'sent_to_client', 'approved', 'changes_requested', 'in_writing', 'published', 'archived')),
   current_view TEXT DEFAULT 'initial_input',
   current_step INTEGER DEFAULT 1,
 
@@ -76,6 +76,10 @@ CREATE TABLE briefs (
   stale_steps INTEGER[] DEFAULT '{}',
   user_feedbacks JSONB DEFAULT '{}',
   paa_questions TEXT[] DEFAULT '{}',
+
+  -- Workflow
+  published_url TEXT,
+  published_at TIMESTAMPTZ,
 
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -155,6 +159,8 @@ CREATE TABLE brief_articles (
   content TEXT NOT NULL,
   version INTEGER DEFAULT 1,
   is_current BOOLEAN DEFAULT TRUE,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'sent_to_client', 'approved', 'published')),
+  published_url TEXT,
   generation_settings JSONB,
   writer_instructions TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()

@@ -11,6 +11,7 @@ import { getClientWithContext } from './services/clientService';
 import { buildBrandContext, mergeBrandContext, formatForBriefGeneration, formatForArticleGeneration } from './services/brandContextBuilder';
 import type { ClientWithContext } from './types/database';
 import { BrainCircuitIcon } from './components/Icon';
+import { getClientLogoUrl } from './lib/favicon';
 
 // Import the new screen components
 import InitialInputScreen from './components/screens/InitialInputScreen';
@@ -27,11 +28,12 @@ import SaveStatusIndicator from './components/SaveStatusIndicator';
 import Sidebar from './components/Sidebar';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
-import { saveBriefState, updateBriefProgress, updateBriefStatus, updateBrief } from './services/briefService';
+import { saveBriefState, updateBriefProgress, updateBriefStatus, updateBrief, updateBriefWorkflowStatus } from './services/briefService';
 import { saveCompetitors } from './services/competitorService';
 import { createArticle } from './services/articleService';
 import { uploadContextFile, addContextUrl as addContextUrlToDb, deleteContextFile, deleteContextUrl } from './services/contextService';
 import type { SaveStatus } from './types/appState';
+import type { BriefStatus } from './types/database';
 
 type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'article_view' | 'brief_upload';
 type ToastMessage = { id: number; title: string; message: string };
@@ -198,6 +200,7 @@ const App: React.FC<AppProps> = ({
   const [userFeedbacks, setUserFeedbacks] = useState<{ [key: number]: string }>({});
   const [loadingStep, setLoadingStep] = useState<number | null>(null);
   const [isUploadedBrief, setIsUploadedBrief] = useState<boolean>(false);
+  const [briefStatus, setBriefStatus] = useState<BriefStatus>('draft');
   const [writerInstructions, setWriterInstructions] = useState<string>('');
   const [dashboardSection, setDashboardSection] = useState<number | null>(null);
 
@@ -306,6 +309,7 @@ const App: React.FC<AppProps> = ({
     {
       briefId: briefId || null,
       enabled: isSupabaseMode && Boolean(briefId),
+      currentDbStatus: briefStatus,
       debounceMs: 500, // Reduced to minimize data loss
       onSaveStart: () => {
         setInternalSaveStatus('saving');
@@ -361,6 +365,7 @@ const App: React.FC<AppProps> = ({
         setExtractedTemplate(loadedState.extractedTemplate);
         setLengthConstraints(loadedState.lengthConstraints);
         setModelSettingsState(loadedState.modelSettings);
+        setBriefStatus(loadedState.briefStatus);
 
         // Build keyword volume map from loaded keywords
         if (loadedState.keywords && loadedState.keywords.length > 0) {
@@ -788,6 +793,16 @@ const App: React.FC<AppProps> = ({
   }, []);
 
 
+  // Derive client branding from profile for Header + Sidebar
+  const clientLogoUrl = React.useMemo(
+    () => getClientLogoUrl(clientProfile?.brand_identity),
+    [clientProfile?.brand_identity]
+  );
+  const clientBrandColor = React.useMemo(
+    () => clientProfile?.brand_identity?.brand_color || null,
+    [clientProfile?.brand_identity?.brand_color]
+  );
+
   // Build merged brand context from client profile + brief-level brandInfo
   const mergedBrandInfoForBrief = React.useMemo(() => {
     if (!clientProfile) return brandInfo;
@@ -1065,6 +1080,17 @@ const App: React.FC<AppProps> = ({
     setUserFeedbacks(prev => ({ ...prev, [step]: value }));
   };
   
+  const handleWorkflowStatusChange = useCallback(async (newStatus: string, metadata?: { published_url?: string; published_at?: string }) => {
+    if (!briefId) return;
+    const prev = briefStatus;
+    setBriefStatus(newStatus as BriefStatus);
+    const { error } = await updateBriefWorkflowStatus(briefId, newStatus as BriefStatus, metadata);
+    if (error) {
+      console.error('Failed to update workflow status:', error);
+      setBriefStatus(prev);
+    }
+  }, [briefId, briefStatus]);
+
   const handleStartContentGeneration = async () => {
     if (!briefData.article_structure) {
       setError("Cannot generate content without an article structure in the brief.");
@@ -1658,6 +1684,10 @@ const App: React.FC<AppProps> = ({
                   // Lifted sidebar state
                   selectedSection={dashboardSection}
                   onSelectSection={setDashboardSection}
+                  // Workflow status
+                  briefId={briefId || undefined}
+                  briefStatus={briefStatus}
+                  onWorkflowStatusChange={handleWorkflowStatusChange}
                 />;
       case 'article_view':
           if (!generatedArticle) return null;
@@ -1703,6 +1733,8 @@ const App: React.FC<AppProps> = ({
         <Header
           isSupabaseMode={isSupabaseMode}
           clientName={clientName}
+          clientLogoUrl={clientLogoUrl}
+          clientBrandColor={clientBrandColor}
           onBackToBriefList={onBackToBriefList}
           saveStatus={saveStatus}
           lastSavedAt={lastSavedAt}
@@ -1716,6 +1748,9 @@ const App: React.FC<AppProps> = ({
               onGoToStep={handleGoToStep}
               staleSteps={staleSteps}
               isUploadedBrief={isUploadedBrief}
+              clientLogoUrl={clientLogoUrl}
+              clientBrandColor={clientBrandColor}
+              clientName={clientName || undefined}
             />
             <main className="flex-1 overflow-y-auto">
               <div className="p-6 lg:p-8">

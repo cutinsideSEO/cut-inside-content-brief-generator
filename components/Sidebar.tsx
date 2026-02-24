@@ -33,11 +33,44 @@ interface SidebarProps {
   staleSteps?: Set<number>;
   isUploadedBrief?: boolean;
   clientName?: string;
+  clientLogoUrl?: string | null;
+  clientBrandColor?: string | null;
   onBackToClients?: () => void;
-  briefCounts?: { draft: number; in_progress: number; complete: number };
+  briefCounts?: { draft: number; in_progress: number; complete: number; workflow?: number; published?: number };
   articleCount?: number;
   onOpenClientSettings?: () => void;
 }
+
+const ClientIdentityBlock: React.FC<{
+  clientName?: string;
+  clientLogoUrl?: string | null;
+  clientBrandColor?: string | null;
+}> = ({ clientName, clientLogoUrl, clientBrandColor }) => {
+  if (!clientName) return null;
+  const initials = clientName.slice(0, 2).toUpperCase();
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      {clientLogoUrl ? (
+        <img
+          src={clientLogoUrl}
+          alt=""
+          className="w-8 h-8 rounded-lg object-contain border border-gray-100"
+        />
+      ) : (
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
+          style={clientBrandColor
+            ? { backgroundColor: clientBrandColor, color: '#fff' }
+            : { backgroundColor: '#f0fdfa', color: '#0d9488' }
+          }
+        >
+          {initials}
+        </div>
+      )}
+      <span className="text-sm font-heading font-semibold text-foreground truncate">{clientName}</span>
+    </div>
+  );
+};
 
 const Sidebar: React.FC<SidebarProps> = ({
   currentView,
@@ -48,6 +81,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   staleSteps = new Set(),
   isUploadedBrief = false,
   clientName,
+  clientLogoUrl,
+  clientBrandColor,
   onBackToClients,
   briefCounts,
   articleCount,
@@ -68,12 +103,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           <div className="mb-6">
-            <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center mb-3">
-              <svg className="w-5 h-5 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-heading font-semibold text-foreground">{clientName || 'Client'}</h3>
+            <ClientIdentityBlock clientName={clientName || 'Client'} clientLogoUrl={clientLogoUrl} clientBrandColor={clientBrandColor} />
           </div>
 
           <h4 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-3">Overview</h4>
@@ -99,6 +129,24 @@ const Sidebar: React.FC<SidebarProps> = ({
               </span>
               <span className="text-gray-400">{briefCounts?.complete || 0}</span>
             </div>
+            {(briefCounts?.workflow || 0) > 0 && (
+              <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-teal-500" />
+                  In Workflow
+                </span>
+                <span className="text-gray-400">{briefCounts.workflow}</span>
+              </div>
+            )}
+            {(briefCounts?.published || 0) > 0 && (
+              <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  Published
+                </span>
+                <span className="text-gray-400">{briefCounts.published}</span>
+              </div>
+            )}
           </nav>
 
           <div className="mt-4 pt-4 border-t border-gray-200">
@@ -137,6 +185,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     return (
       <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
+          <ClientIdentityBlock clientName={clientName} clientLogoUrl={clientLogoUrl} clientBrandColor={clientBrandColor} />
           <h3 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-4">Brief Progress</h3>
           <nav aria-label="Progress">
             <ol role="list" className="space-y-1">
@@ -206,6 +255,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     return (
       <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
+          <ClientIdentityBlock clientName={clientName} clientLogoUrl={clientLogoUrl} clientBrandColor={clientBrandColor} />
           <h3 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider">Dashboard</h3>
           <nav className="mt-2 space-y-1">
             <a
@@ -269,6 +319,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     return (
       <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
+          <ClientIdentityBlock clientName={clientName} clientLogoUrl={clientLogoUrl} clientBrandColor={clientBrandColor} />
           <h3 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-4">Getting Started</h3>
           <nav>
             <ol className="space-y-1">
@@ -310,6 +361,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     return (
       <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
+          <ClientIdentityBlock clientName={clientName} clientLogoUrl={clientLogoUrl} clientBrandColor={clientBrandColor} />
           <h3 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-4">Article Generation</h3>
           <p className="text-sm text-gray-500">Writing your article section by section...</p>
         </div>

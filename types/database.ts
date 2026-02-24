@@ -48,7 +48,16 @@ export type ClientUpdate = Partial<Omit<Client, 'id' | 'created_at' | 'updated_a
 // ============================================
 // Briefs
 // ============================================
-export type BriefStatus = 'draft' | 'in_progress' | 'complete' | 'archived';
+export type BriefStatus = 'draft' | 'in_progress' | 'complete' | 'sent_to_client' | 'approved' | 'changes_requested' | 'in_writing' | 'published' | 'archived';
+export type ArticleStatus = 'draft' | 'sent_to_client' | 'approved' | 'published';
+
+/** Statuses that represent the manual post-generation workflow */
+export const WORKFLOW_STATUSES: BriefStatus[] = ['sent_to_client', 'approved', 'changes_requested', 'in_writing', 'published'];
+
+/** Check if a brief status is a manual workflow status (not auto-computed) */
+export function isWorkflowStatus(status: BriefStatus): boolean {
+  return (WORKFLOW_STATUSES as string[]).includes(status);
+}
 export type AppView = 'login' | 'client_select' | 'brief_list' | 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_upload';
 
 export interface KeywordInput {
@@ -88,6 +97,10 @@ export interface Brief {
   stale_steps: number[];
   user_feedbacks: { [key: number]: string };
   paa_questions: string[];
+
+  // Workflow
+  published_url: string | null;
+  published_at: string | null;
 
   // Timestamps
   created_at: string;
@@ -168,6 +181,8 @@ export interface BriefArticle {
   content: string;
   version: number;
   is_current: boolean;
+  status: ArticleStatus;
+  published_url: string | null;
   generation_settings: {
     model_settings?: ModelSettings;
     length_constraints?: LengthConstraints;

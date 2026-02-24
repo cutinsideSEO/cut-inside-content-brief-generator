@@ -5,6 +5,7 @@ import { INDUSTRY_LABELS } from '../../types/clientProfile';
 import type { IndustryVertical } from '../../types/clientProfile';
 import { Card, Badge } from '../ui';
 import { getClientColor } from '../../lib/clientColors';
+import { getClientLogoUrl } from '../../lib/favicon';
 
 interface ClientCardProps {
   client: ClientWithBriefCount;
@@ -34,7 +35,7 @@ const ClientCard: React.FC<ClientCardProps> = ({
 }) => {
   const clientColor = getClientColor(colorIndex);
   const brandColor = client.brand_identity?.brand_color;
-  const logoUrl = client.brand_identity?.logo_url;
+  const logoUrl = getClientLogoUrl(client.brand_identity);
   const industry = client.brand_identity?.industry as IndustryVertical | undefined;
 
   const formatDate = (dateString: string) => {

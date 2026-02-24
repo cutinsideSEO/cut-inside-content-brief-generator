@@ -2,9 +2,12 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { isSupabaseConfigured } from './services/supabaseClient';
-import { createBrief, getBrief, getBriefsForClient, updateBriefProgress, updateBriefStatus } from './services/briefService';
+import { createBrief, getBrief, getBriefsForClient, updateBriefProgress, updateBriefStatus, updateBriefWorkflowStatus } from './services/briefService';
+import { isWorkflowStatus } from './types/database';
 import { saveCompetitors, getCompetitorsForBrief, toCompetitorPages } from './services/competitorService';
 import { createArticle, getArticleCountForClient } from './services/articleService';
+import { getAccessibleClients, getClientWithContext } from './services/clientService';
+import { getClientLogoUrl } from './lib/favicon';
 import { toast } from 'sonner';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -49,6 +52,7 @@ interface WrapperState {
   selectedClientId: string | null;
   selectedClientName: string | null;
   selectedClientLogoUrl: string | null;
+  selectedClientBrandColor: string | null;
   currentBriefId: string | null;
 
   // Save status for auto-save
@@ -75,6 +79,7 @@ const AppWrapperInner: React.FC = () => {
     selectedClientId: null,
     selectedClientName: null,
     selectedClientLogoUrl: null,
+    selectedClientBrandColor: null,
     currentBriefId: null,
     saveStatus: 'saved',
     lastSavedAt: null,
@@ -89,23 +94,25 @@ const AppWrapperInner: React.FC = () => {
   const [articleCount, setArticleCount] = useState(0);
 
   // Brief counts for sidebar
-  const [briefCounts, setBriefCounts] = useState<{ draft: number; in_progress: number; complete: number }>({ draft: 0, in_progress: 0, complete: 0 });
+  const [briefCounts, setBriefCounts] = useState<{ draft: number; in_progress: number; complete: number; workflow?: number; published?: number }>({ draft: 0, in_progress: 0, complete: 0 });
 
-  // Fetch article count and brief counts when in brief_list mode
+  // All clients for client switcher dropdown
+  const [allClients, setAllClients] = useState<import('./types/database').ClientWithBriefCount[]>([]);
+
+  // Fetch all clients when authenticated and in brief_list or client_profile mode
   useEffect(() => {
-    if (state.mode === 'brief_list' && state.selectedClientId) {
-      getArticleCountForClient(state.selectedClientId).then(setArticleCount);
-      getBriefsForClient(state.selectedClientId).then(({ data }) => {
-        if (data) {
-          setBriefCounts({
-            draft: data.filter(b => b.status === 'draft').length,
-            in_progress: data.filter(b => b.status === 'in_progress').length,
-            complete: data.filter(b => b.status === 'complete').length,
-          });
-        }
+    if (isAuthenticated && (state.mode === 'brief_list' || state.mode === 'client_profile')) {
+      getAccessibleClients().then(({ data }) => {
+        if (data) setAllClients(data);
       });
     }
-  }, [state.mode, state.selectedClientId]);
+  }, [isAuthenticated, state.mode]);
+
+  // Callback for BriefListScreen to sync counts with sidebar
+  const handleCountsChange = useCallback((counts: { draft: number; in_progress: number; complete: number; workflow: number; published: number; articles: number }) => {
+    setBriefCounts({ draft: counts.draft, in_progress: counts.in_progress, complete: counts.complete, workflow: counts.workflow, published: counts.published });
+    setArticleCount(counts.articles);
+  }, []);
 
   // Determine initial mode based on auth and config
   useEffect(() => {
@@ -137,6 +144,7 @@ const AppWrapperInner: React.FC = () => {
       selectedClientId: null,
       selectedClientName: null,
       selectedClientLogoUrl: null,
+      selectedClientBrandColor: null,
       currentBriefId: null,
       saveStatus: 'saved',
       lastSavedAt: null,
@@ -169,8 +177,12 @@ const AppWrapperInner: React.FC = () => {
         },
       },
     }));
-    // Update brief status in Supabase
-    updateBriefStatus(briefId, 'in_progress');
+    // Update brief status in Supabase — but only if not already in a workflow status
+    getBrief(briefId).then(({ data }) => {
+      if (data && !isWorkflowStatus(data.status)) {
+        updateBriefStatus(briefId, 'in_progress');
+      }
+    });
   }, []);
 
   // Handle generation progress (step updates) - now takes briefId
@@ -193,9 +205,13 @@ const AppWrapperInner: React.FC = () => {
 
   // Handle generation complete - delays removal to allow final save to complete
   const handleGenerationComplete = useCallback((briefId: string, success: boolean) => {
-    // Update brief status in Supabase immediately
+    // Update brief status in Supabase — but only if not already in a workflow status
     if (success) {
-      updateBriefStatus(briefId, 'complete');
+      getBrief(briefId).then(({ data }) => {
+        if (data && !isWorkflowStatus(data.status)) {
+          updateBriefStatus(briefId, 'complete');
+        }
+      });
     }
     // Mark generation as complete but keep mounted for 3 seconds to let final save flush
     setState((prev) => {
@@ -222,13 +238,28 @@ const AppWrapperInner: React.FC = () => {
   }, []);
 
   // Handle client selection
-  const handleSelectClient = useCallback((clientId: string, clientName: string, logoUrl?: string) => {
+  const handleSelectClient = useCallback((clientId: string, clientName: string, logoUrl?: string, brandColor?: string) => {
     setState((prev) => ({
       ...prev,
       mode: 'brief_list',
       selectedClientId: clientId,
       selectedClientName: clientName,
       selectedClientLogoUrl: logoUrl || null,
+      selectedClientBrandColor: brandColor || null,
+    }));
+  }, []);
+
+  // Handle switching client from dropdown (stays in brief_list mode)
+  const handleSwitchClient = useCallback((clientId: string, clientName: string, logoUrl?: string, brandColor?: string) => {
+    setState((prev) => ({
+      ...prev,
+      mode: 'brief_list',
+      selectedClientId: clientId,
+      selectedClientName: clientName,
+      selectedClientLogoUrl: logoUrl || null,
+      selectedClientBrandColor: brandColor || null,
+      currentBriefId: null,
+      selectedArticleId: null,
     }));
   }, []);
 
@@ -241,6 +272,7 @@ const AppWrapperInner: React.FC = () => {
       selectedClientId: null,
       selectedClientName: null,
       selectedClientLogoUrl: null,
+      selectedClientBrandColor: null,
       currentBriefId: null,
       selectedArticleId: null,
     }));
@@ -321,13 +353,29 @@ const AppWrapperInner: React.FC = () => {
     }));
   }, []);
 
-  // Handle back from client profile
-  const handleBackFromProfile = useCallback(() => {
+  // Handle back from client profile — re-fetch client data to pick up website/logo changes
+  const handleBackFromProfile = useCallback(async () => {
+    const clientId = state.selectedClientId;
+    if (clientId) {
+      const { data } = await getClientWithContext(clientId);
+      if (data) {
+        const logoUrl = getClientLogoUrl(data.brand_identity) || null;
+        const brandColor = data.brand_identity?.brand_color || null;
+        setState(prev => ({
+          ...prev,
+          mode: 'brief_list',
+          selectedClientName: data.name,
+          selectedClientLogoUrl: logoUrl,
+          selectedClientBrandColor: brandColor,
+        }));
+        return;
+      }
+    }
     setState(prev => ({
       ...prev,
       mode: prev.selectedClientId ? 'brief_list' : 'client_select',
     }));
-  }, []);
+  }, [state.selectedClientId]);
 
   // Handle save status changes from the brief editor (foreground)
   const handleSaveStatusChange = useCallback((status: SaveStatus, savedAt?: Date) => {
@@ -353,10 +401,13 @@ const AppWrapperInner: React.FC = () => {
     });
   }, []);
 
-  // Handle brief completion
+  // Handle brief completion — preserve workflow statuses
   const handleBriefComplete = useCallback(async () => {
     if (state.currentBriefId) {
-      await updateBriefStatus(state.currentBriefId, 'complete');
+      const { data } = await getBrief(state.currentBriefId);
+      if (data && !isWorkflowStatus(data.status)) {
+        await updateBriefStatus(state.currentBriefId, 'complete');
+      }
     }
   }, [state.currentBriefId]);
 
@@ -462,11 +513,16 @@ const AppWrapperInner: React.FC = () => {
               onClientClick={handleBackToClients}
               onLogout={handleLogout}
               userName={userName}
+              clients={allClients}
+              onSwitchClient={handleSwitchClient}
+              selectedClientId={state.selectedClientId}
             />
             <div className="flex-1 flex overflow-hidden">
               <Sidebar
                 currentView="brief_list"
                 clientName={state.selectedClientName || undefined}
+                clientLogoUrl={state.selectedClientLogoUrl}
+                clientBrandColor={state.selectedClientBrandColor}
                 onBackToClients={handleBackToClients}
                 briefCounts={briefCounts}
                 articleCount={articleCount}
@@ -488,6 +544,7 @@ const AppWrapperInner: React.FC = () => {
                       clientId={state.selectedClientId!}
                       clientName={state.selectedClientName!}
                       clientLogoUrl={state.selectedClientLogoUrl}
+                      clientBrandColor={state.selectedClientBrandColor}
                       onBack={handleBackToClients}
                       onCreateBrief={handleCreateBrief}
                       onContinueBrief={handleContinueBrief}
@@ -495,6 +552,7 @@ const AppWrapperInner: React.FC = () => {
                       onUseAsTemplate={handleUseAsTemplate}
                       generatingBriefs={state.generatingBriefs}
                       onViewArticle={handleViewArticle}
+                      onCountsChange={handleCountsChange}
                     />
                   )}
                 </div>
@@ -539,6 +597,9 @@ const AppWrapperInner: React.FC = () => {
             onClientClick={handleBackToClients}
             onLogout={handleLogout}
             userName={userName}
+            clients={allClients}
+            onSwitchClient={handleSwitchClient}
+            selectedClientId={state.selectedClientId}
           />
           <div className="flex-1 flex overflow-hidden">
             <ClientProfileScreen

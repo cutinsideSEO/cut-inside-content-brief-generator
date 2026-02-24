@@ -59,6 +59,8 @@ interface UseAutoSaveOptions {
   briefId: string | null;
   enabled: boolean;
   debounceMs?: number;
+  /** Current DB status — used to prevent auto-save from overwriting workflow statuses */
+  currentDbStatus?: import('../types/database').BriefStatus;
   onSaveStart?: () => void;
   onSaveSuccess?: (savedAt: Date) => void;
   onSaveError?: (error: string) => void;
@@ -105,6 +107,7 @@ export function useAutoSave(
     briefId,
     enabled,
     debounceMs = 500, // Reduced from 2000ms to minimize data loss on navigation
+    currentDbStatus,
     onSaveStart,
     onSaveSuccess,
     onSaveError,
@@ -185,8 +188,8 @@ export function useAutoSave(
       try {
         const saveData = buildSaveData();
 
-        // Save brief state
-        const { error } = await saveBriefState(briefId, saveData);
+        // Save brief state (pass currentDbStatus to prevent overwriting workflow statuses)
+        const { error } = await saveBriefState(briefId, saveData, currentDbStatus);
 
         if (error) {
           throw new Error(error);
@@ -225,6 +228,7 @@ export function useAutoSave(
     buildSaveData,
     hasDataChanged,
     state.competitorData,
+    currentDbStatus,
     onSaveStart,
     onSaveSuccess,
     onSaveError,

@@ -12,6 +12,7 @@ import type {
   KeywordInput,
   ApiResponse,
 } from '../types/database';
+import { isWorkflowStatus } from '../types/database';
 import type { ContentBrief, ModelSettings, LengthConstraints, ExtractedTemplate } from '../types';
 
 /**
@@ -210,17 +211,23 @@ export async function updateBriefStatus(
 
 /**
  * Update brief view and step (for resume functionality)
+ * Preserves workflow statuses — won't regress to 'in_progress' if already in workflow
  */
 export async function updateBriefProgress(
   briefId: string,
   currentView: AppView,
-  currentStep: number
+  currentStep: number,
+  currentStatus?: BriefStatus
 ): Promise<ApiResponse<Brief>> {
-  return updateBrief(briefId, {
+  const updates: BriefUpdate = {
     current_view: currentView,
     current_step: currentStep,
-    status: 'in_progress',
-  });
+  };
+  // Only set status to in_progress if not already in a workflow status
+  if (!currentStatus || !isWorkflowStatus(currentStatus)) {
+    updates.status = 'in_progress';
+  }
+  return updateBrief(briefId, updates);
 }
 
 /**
@@ -269,6 +276,7 @@ function computeBriefStatus(
 
 /**
  * Save complete brief state (for auto-save)
+ * If the brief is already in a workflow status, preserve it instead of overwriting.
  */
 export async function saveBriefState(
   briefId: string,
@@ -289,8 +297,17 @@ export async function saveBriefState(
     serp_country?: string;
     model_settings?: ModelSettings | null;
     length_constraints?: LengthConstraints | null;
-  }
+  },
+  currentDbStatus?: BriefStatus
 ): Promise<ApiResponse<Brief>> {
+  // If the brief is in a workflow status, preserve it
+  if (currentDbStatus && isWorkflowStatus(currentDbStatus)) {
+    return updateBrief(briefId, {
+      ...state,
+      // Don't overwrite the workflow status
+    });
+  }
+
   // Compute the status from state to ensure consistency
   const computedStatus = computeBriefStatus(state.current_view, state.brief_data);
 
@@ -298,6 +315,24 @@ export async function saveBriefState(
     ...state,
     status: computedStatus,
   });
+}
+
+/**
+ * Update brief workflow status (manual status changes)
+ */
+export async function updateBriefWorkflowStatus(
+  briefId: string,
+  newStatus: BriefStatus,
+  metadata?: { published_url?: string; published_at?: string }
+): Promise<ApiResponse<Brief>> {
+  const updates: BriefUpdate = { status: newStatus };
+  if (metadata?.published_url !== undefined) {
+    updates.published_url = metadata.published_url;
+  }
+  if (metadata?.published_at !== undefined) {
+    updates.published_at = metadata.published_at;
+  }
+  return updateBrief(briefId, updates);
 }
 
 /**

@@ -22,6 +22,26 @@ const statusConfig: Record<BriefStatus, { label: string; variant: BadgeProps['va
     label: 'Complete',
     variant: 'success',
   },
+  sent_to_client: {
+    label: 'Sent to Client',
+    variant: 'teal',
+  },
+  approved: {
+    label: 'Approved',
+    variant: 'success',
+  },
+  changes_requested: {
+    label: 'Changes Requested',
+    variant: 'warning',
+  },
+  in_writing: {
+    label: 'In Writing',
+    variant: 'outline',
+  },
+  published: {
+    label: 'Published',
+    variant: 'success',
+  },
   archived: {
     label: 'Archived',
     variant: 'error',

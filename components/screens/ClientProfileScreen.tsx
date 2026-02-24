@@ -15,6 +15,7 @@ import type {
   ClientContextUrl,
 } from '../../types/clientProfile';
 import type { SaveStatus } from '../../types/appState';
+import { getClientLogoUrl } from '../../lib/favicon';
 
 // Section components
 import BrandIdentitySection from '../clients/profile/BrandIdentitySection';
@@ -220,10 +221,10 @@ const ClientProfileScreen: React.FC<ClientProfileScreenProps> = ({
 
           {/* Client identity */}
           <div className="mb-6 flex items-center gap-3">
-            {brandIdentity.logo_url ? (
+            {getClientLogoUrl(brandIdentity) ? (
               <div className="w-10 h-10 rounded-lg overflow-hidden border border-gray-100">
                 <img
-                  src={brandIdentity.logo_url}
+                  src={getClientLogoUrl(brandIdentity)!}
                   alt={clientName}
                   className="w-full h-full object-contain"
                 />

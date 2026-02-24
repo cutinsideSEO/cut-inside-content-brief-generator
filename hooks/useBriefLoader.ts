@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { getBriefWithRelations } from '../services/briefService';
 import { toCompetitorPages } from '../services/competitorService';
-import type { BriefWithRelations, AppView } from '../types/database';
+import type { BriefWithRelations, BriefStatus, AppView } from '../types/database';
 import type { AppState } from '../types/appState';
 import type { ContentBrief, CompetitorPage } from '../types';
 
@@ -15,6 +15,7 @@ interface UseBriefLoaderReturn {
 interface LoadedBriefState {
   briefId: string;
   clientId: string;
+  briefStatus: BriefStatus;
   currentView: AppView;
   briefingStep: number;
   briefData: Partial<ContentBrief>;
@@ -111,6 +112,7 @@ export function useBriefLoader(): UseBriefLoaderReturn {
       const loadedState: LoadedBriefState = {
         briefId: brief.id,
         clientId: brief.client_id,
+        briefStatus: brief.status as BriefStatus,
         currentView: brief.current_view as AppView,
         briefingStep: brief.current_step,
         briefData: brief.brief_data || {},

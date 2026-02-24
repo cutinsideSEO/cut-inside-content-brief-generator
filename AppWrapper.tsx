@@ -531,6 +531,9 @@ const AppWrapperInner: React.FC = () => {
                     handleOpenClientProfile(state.selectedClientId, state.selectedClientName);
                   }
                 }}
+                clients={allClients}
+                onSwitchClient={handleSwitchClient}
+                selectedClientId={state.selectedClientId}
               />
               <main className="flex-1 overflow-y-auto">
                 <div className="px-6 lg:px-8 py-8">

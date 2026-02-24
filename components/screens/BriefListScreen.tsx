@@ -1,5 +1,5 @@
 // Brief List Screen - View and manage briefs for a client
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getBriefsForClient, archiveBrief, deleteBrief, updateBriefWorkflowStatus } from '../../services/briefService';
 import { getArticlesForClient, deleteArticle, getArticleCountForClient, updateArticleStatus } from '../../services/articleService';
 import { toast } from 'sonner';
@@ -82,6 +82,20 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     loadBriefs();
     getArticleCountForClient(clientId).then(setArticleCount);
   }, [clientId]);
+
+  // Reload briefs when a background generation finishes (brief removed from generatingBriefs)
+  const prevGeneratingIdsRef = useRef<Set<string>>(new Set(Object.keys(generatingBriefs)));
+  useEffect(() => {
+    const currentIds = new Set(Object.keys(generatingBriefs));
+    const prevIds = prevGeneratingIdsRef.current;
+    // Check if any brief was removed (generation completed + cleanup)
+    const anyRemoved = [...prevIds].some(id => !currentIds.has(id));
+    if (anyRemoved) {
+      loadBriefs();
+      getArticleCountForClient(clientId).then(setArticleCount);
+    }
+    prevGeneratingIdsRef.current = currentIds;
+  }, [generatingBriefs, clientId]);
 
   const loadBriefs = async () => {
     setIsLoading(true);

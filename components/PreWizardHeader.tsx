@@ -82,8 +82,8 @@ function getInitials(name: string): string {
   return name.substring(0, 2).toUpperCase();
 }
 
-/** Client Switcher Dropdown */
-const ClientSwitcherDropdown: React.FC<{
+/** Client Switcher Dropdown — exported for reuse in Sidebar */
+export const ClientSwitcherDropdown: React.FC<{
   clients: ClientWithBriefCount[];
   selectedClientId?: string | null;
   onSwitchClient: (clientId: string, clientName: string, logoUrl?: string, brandColor?: string) => void;

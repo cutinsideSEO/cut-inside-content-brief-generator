@@ -1,6 +1,8 @@
 import React from 'react';
 import { FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircleIcon, FileCodeIcon, CheckIcon, HomeIcon, AlertTriangleIcon } from './Icon';
+import { ClientSwitcherDropdown } from './PreWizardHeader';
 import type { ContentBrief } from '../types';
+import type { ClientWithBriefCount } from '../types/database';
 
 type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_upload' | 'brief_list';
 
@@ -39,6 +41,10 @@ interface SidebarProps {
   briefCounts?: { draft: number; in_progress: number; complete: number; workflow?: number; published?: number };
   articleCount?: number;
   onOpenClientSettings?: () => void;
+  // Client switcher props
+  clients?: ClientWithBriefCount[];
+  onSwitchClient?: (clientId: string, clientName: string, logoUrl?: string, brandColor?: string) => void;
+  selectedClientId?: string | null;
 }
 
 const ClientIdentityBlock: React.FC<{
@@ -87,6 +93,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   briefCounts,
   articleCount,
   onOpenClientSettings,
+  clients,
+  onSwitchClient,
+  selectedClientId,
 }) => {
   // Brief list sidebar
   if (currentView === 'brief_list') {
@@ -103,7 +112,32 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           <div className="mb-6">
-            <ClientIdentityBlock clientName={clientName || 'Client'} clientLogoUrl={clientLogoUrl} clientBrandColor={clientBrandColor} />
+            {clients && clients.length > 0 && onSwitchClient ? (
+              <ClientSwitcherDropdown
+                clients={clients}
+                selectedClientId={selectedClientId}
+                onSwitchClient={onSwitchClient}
+                onViewAllClients={onBackToClients}
+                trigger={
+                  <button className="flex items-center gap-3 w-full group text-left">
+                    {clientLogoUrl ? (
+                      <img src={clientLogoUrl} alt="" className="w-8 h-8 rounded-lg object-contain border border-gray-100" />
+                    ) : (
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
+                        style={clientBrandColor ? { backgroundColor: clientBrandColor, color: '#fff' } : { backgroundColor: '#f0fdfa', color: '#0d9488' }}
+                      >
+                        {(clientName || 'CL').slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-sm font-heading font-semibold text-foreground truncate flex-1">{clientName || 'Client'}</span>
+                    <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-teal transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                  </button>
+                }
+              />
+            ) : (
+              <ClientIdentityBlock clientName={clientName || 'Client'} clientLogoUrl={clientLogoUrl} clientBrandColor={clientBrandColor} />
+            )}
           </div>
 
           <h4 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-3">Overview</h4>

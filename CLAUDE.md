@@ -125,8 +125,9 @@ components/
 │   ├── *.tsx          # Custom components (Card, Badge, Input, Modal, etc.)
 │   ├── primitives/    # Radix UI wrappers (accordion, popover, tooltip, etc.)
 │   └── index.ts       # Barrel export — import everything from '../ui'
-├── briefs/      # Brief list cards, status badges
-└── clients/     # Client selection cards
+├── briefs/      # Brief list cards, status badges, workflow select, publish modal
+├── articles/    # Article list cards, article status badges
+└── clients/     # Client selection cards, client profile sections
 ```
 
 ### State Management
@@ -139,7 +140,7 @@ components/
 - `competitorData: CompetitorPage[]` — SERP analysis results
 - `staleSteps: Set<number>` — Steps needing regeneration after edits
 
-Auto-save: `useAutoSave` hook debounces state changes (500ms) and persists to Supabase.
+Auto-save: `useAutoSave` hook debounces state changes (500ms) and persists to Supabase. Accepts `currentDbStatus` option to guard against overwriting workflow statuses.
 
 ### Parallel Background Generation
 
@@ -155,7 +156,25 @@ Auto-save: `useAutoSave` hook debounces state changes (500ms) and persists to Su
 - `brief_competitors` — Competitor analysis data per brief
 - `brief_context_files` — Uploaded file metadata (files in Supabase Storage)
 - `brief_context_urls` — Scraped URL content
-- `brief_articles` — Generated article versions with `is_current` flag
+- `brief_articles` — Generated article versions with `is_current` flag and workflow status
+
+### Workflow Status System
+
+Briefs and articles have a two-phase status lifecycle:
+
+**Phase 1 — Generation (auto-computed):** `draft → in_progress → complete`
+**Phase 2 — Workflow (manual):** `complete → sent_to_client → approved → in_writing → published` (briefs can also go through `changes_requested`)
+
+Key types in `types/database.ts`:
+- `BriefStatus` — 9 values covering both phases + `archived`
+- `ArticleStatus` — 4 values: `draft | sent_to_client | approved | published`
+- `WORKFLOW_STATUSES` array and `isWorkflowStatus()` helper distinguish manual from auto-computed statuses
+
+**Critical: Auto-save guard.** The auto-save system (`useAutoSave.ts`) and background generation (`AppWrapper.tsx`) must NOT overwrite manual workflow statuses with computed ones. Both use `isWorkflowStatus()` checks before setting status. When modifying anything related to brief status writes, always check whether the current status is a workflow status first.
+
+Transition rules are defined in `WorkflowStatusSelect.tsx` (`BRIEF_TRANSITIONS` and `ARTICLE_TRANSITIONS` maps). The `PublishedUrlModal` handles URL input when setting status to "Published".
+
+**Important:** `briefData` (type `Partial<ContentBrief>`) does NOT have workflow fields like `published_url`. Those live on the DB `Brief` type. Don't try to access `briefData.published_url` — use the DB brief object or a separate state variable.
 
 ### Authentication
 
@@ -190,6 +209,8 @@ Tailwind v4 uses the `@tailwindcss/vite` plugin (not CDN). All design tokens are
 - **`EditableText`:** Click-to-edit text display. Replaces scroll-box Textareas for brief content.
 - **`PreWizardHeader`:** Shared header for pre-wizard screens (Login, ClientSelect, BriefList).
 - **`Sidebar`:** Has two view modes — brief editor mode and `brief_list` mode (with `clientName`, `onBackToClients`, `briefCounts` props).
+- **`WorkflowStatusSelect`:** Reusable dropdown for changing brief/article workflow status. Uses `entityType` prop (`'brief'` or `'article'`) to select the correct transition map.
+- **`PublishedUrlModal`:** Modal for entering a published URL when setting status to "Published". Used in BriefListCard, ArticleListCard, and DashboardScreen.
 
 ### Path Alias
 
@@ -200,7 +221,11 @@ The `@/` alias maps to project root: `import { Card } from '@/components/ui'`
 - **Variable ordering in components:** `const` declarations used in `useCallback`/`useMemo` dependency arrays must be declared BEFORE the hooks that reference them. The dependency array is evaluated eagerly — referencing a later `const` causes a TDZ (Temporal Dead Zone) crash in production builds that is invisible in dev mode.
 - **`SaveStatus` type:** `'saved' | 'saving' | 'unsaved' | 'error'` — there is no `'idle'` state.
 - **App.tsx prop renaming:** When `App` receives `saveStatus` and `lastSavedAt` as props, they're renamed internally: `saveStatus: externalSaveStatus`, `lastSavedAt: externalLastSavedAt`.
-- **Build warning:** Production build produces a single ~980KB chunk. This is expected — the chunk size warning is pre-existing and not a regression.
+- **Build warning:** Production build produces a single ~1,064KB chunk. This is expected — the chunk size warning is pre-existing and not a regression.
+- **`ContentBrief` vs `Brief` types:** `Partial<ContentBrief>` (from `types.ts`) is the in-memory brief data for the 7-step pipeline. `Brief` (from `types/database.ts`) is the DB row with metadata like `status`, `published_url`, `published_at`. Don't confuse them — DB-only fields are NOT on `ContentBrief`.
+- **Auto-save status regression:** If you add any code path that writes `status` to the `briefs` table (e.g., setting `'in_progress'` or `'complete'`), you MUST guard it with `isWorkflowStatus()` to avoid overwriting manually-set workflow statuses. This applies to `saveBriefState()`, `updateBriefProgress()`, and all generation callbacks in `AppWrapper.tsx`.
+- **Supabase migration DDL:** When adding columns with `ADD COLUMN IF NOT EXISTS` combined with inline `CHECK` constraints, PostgreSQL may not support the inline syntax. Separate the `ADD COLUMN` and `ADD CONSTRAINT` into distinct statements (use a `DO $$ ... $$` block to conditionally add the constraint).
+- **Color consistency across views:** When a status appears in multiple places (card borders, section headings, sidebar counts), keep the indicator color consistent. For example, "Published" uses emerald (`bg-emerald-500`, `border-l-emerald-500`) everywhere — not blue in some places and emerald in others.
 
 ## Deployment
 

@@ -13,7 +13,7 @@ AI-powered SEO Content Strategist that generates comprehensive, data-driven cont
 | Frontend         | React 19.1.1 + TypeScript                        |
 | Build            | Vite 6.4.1                                       |
 | Styling          | Tailwind CSS v4 (`@tailwindcss/vite` plugin)     |
-| AI               | Google Gemini via Supabase Edge Function proxy    |
+| AI               | Google Gemini via Supabase Edge Functions          |
 | Database         | Supabase (PostgreSQL + RLS)                      |
 | SEO Data         | DataForSEO API                                   |
 | UI Primitives    | Radix UI (Popover, Collapsible, Accordion, etc.) |
@@ -103,15 +103,23 @@ Each step is a screen in `components/stages/Stage{1-7}*.tsx` and a Gemini prompt
 6. **FAQ Generation** — Questions from People Also Ask data
 7. **On-Page SEO** — Title tag, meta description, H1, slug, OG tags
 
-### Gemini AI Integration
+### Gemini AI Integration (Dual Mode)
 
-All AI calls route through `services/geminiService.ts` → Supabase Edge Function `gemini-proxy`:
+The app supports two generation paths: **frontend** (legacy, still used in standalone mode) and **backend** (Supabase mode, actively being migrated to):
 
-- `callGemini()` — Non-streaming, returns full response
-- `callGeminiStream()` — SSE streaming via fetch, yields chunks
-- `generateBriefStep()` — Brief pipeline (steps 1-7), uses structured JSON output with schemas
-- `generateArticleSection()` — Article content generation with streaming
-- System prompts and JSON schemas live in `constants.ts` (`getSystemPrompt()`, `getContentGenerationPrompt()`, etc.)
+**Frontend path** (`services/geminiService.ts` → `gemini-proxy` Edge Function):
+- `callGemini()` / `callGeminiStream()` — Proxied Gemini API calls
+- `generateBriefStep()` — Brief steps 1-7 with structured JSON output
+- `generateArticleSection()` — Article content with streaming
+- System prompts and JSON schemas in `constants.ts`
+
+**Backend path** (job queue → Edge Functions → direct Gemini REST API):
+- `create-generation-job` Edge Function — Creates jobs, snapshots brief config
+- `process-generation-queue` Edge Function — Worker processing pending jobs via pg_cron
+- `_shared/` modules — Server-side ports of generation logic (types, prompts, schemas, gemini-client, step-executor, article-generator, brief-context, generation-config)
+- Frontend subscribes via Supabase Realtime for live progress updates
+
+**In Supabase mode**, the backend handles `full_brief`, `brief_step`, `regenerate`, and `article` job types. The frontend delegates via `services/generationJobService.ts` → `createGenerationJob()`.
 
 ### Key Component Layers
 
@@ -146,17 +154,56 @@ Auto-save: `useAutoSave` hook debounces state changes (500ms) and persists to Su
 
 `AppWrapper.tsx` tracks multiple simultaneous brief generations via `generatingBriefs: Record<string, GeneratingBrief>`. Hidden `<App>` instances render off-screen to maintain React state while the user navigates elsewhere. A floating panel shows progress with "View" buttons.
 
+### Backend Generation Architecture (Job Queue)
+
+Server-side generation uses a job queue pattern with Supabase Edge Functions:
+
+```
+Frontend POST → create-generation-job → generation_jobs table (pending)
+                                              ↓
+pg_cron (every 10-30s) → process-generation-queue Edge Function
+                                              ↓
+                         Claims job → Calls Gemini API directly → Saves results to DB
+                                              ↓
+                         Supabase Realtime → Frontend updates live
+```
+
+**Edge Functions** (in `supabase/functions/`):
+- `create-generation-job/index.ts` — Validates input, snapshots config, inserts job (verify_jwt: true)
+- `process-generation-queue/index.ts` — Worker processing pending jobs (verify_jwt: false, called by pg_cron)
+
+**Shared modules** (`supabase/functions/_shared/`):
+- `types.ts` — Server-side type definitions (ContentBrief, CompetitorPage, StepExecutionParams, etc.)
+- `gemini-client.ts` — Direct Gemini REST API client (`callGeminiDirect()`, `retryOperation()` with exponential backoff + jitter)
+- `prompts.ts` — All system prompts for steps 1-7 and article generation
+- `schemas.ts` — JSON response schemas for Gemini structured output
+- `step-executor.ts` — Main step execution logic including 3-phase Step 5 (skeleton → enrichment → resources)
+- `article-generator.ts` — Full article generation with word count enforcement (expand/trim cycles)
+- `brief-context.ts` — Brand context building, token budget management, competitor text truncation
+- `generation-config.ts` — Thinking budgets, model config builders
+
+**Frontend hooks for backend generation:**
+- `hooks/useGenerationSubscription.ts` — Realtime subscription to `generation_jobs` table changes
+- `hooks/useBriefRealtimeSync.ts` — Realtime subscription to `briefs` table for step completion updates
+- `services/generationJobService.ts` — CRUD for generation jobs (create, cancel, get active)
+
+**Job types:** `brief_step` | `full_brief` | `regenerate` | `article` | `competitors` (competitors not yet implemented)
+
+**Deployment:** Use `mcp__supabase__deploy_edge_function` MCP tool. Import paths in deployed bundles must use `./_shared/` (not `../_shared/`). All `_shared/*.ts` files must be included in the deployment `files` array. Project ID: `iwzaikvwiwrgyliykqah`.
+
 ### Database Schema (Supabase)
 
-7 tables with RLS enabled (schema in `supabase/schema.sql`):
+10 tables with RLS enabled (base schema in `supabase/schema.sql`, generation tables in `supabase/migrations/003_add_generation_jobs.sql`):
 
 - `access_codes` — Custom auth (not Supabase Auth), codes validated against this table
 - `clients` — Folders/workspaces for organizing briefs
-- `briefs` — Main entity, brief data stored as JSONB
+- `briefs` — Main entity, brief data stored as JSONB, `active_job_id` links to running generation
 - `brief_competitors` — Competitor analysis data per brief
 - `brief_context_files` — Uploaded file metadata (files in Supabase Storage)
 - `brief_context_urls` — Scraped URL content
 - `brief_articles` — Generated article versions with `is_current` flag and workflow status
+- `generation_jobs` — Job queue for server-side generation (brief steps, full briefs, articles, regeneration)
+- `generation_batches` — Groups related jobs for bulk generation operations
 
 ### Workflow Status System
 
@@ -226,6 +273,12 @@ The `@/` alias maps to project root: `import { Card } from '@/components/ui'`
 - **Auto-save status regression:** If you add any code path that writes `status` to the `briefs` table (e.g., setting `'in_progress'` or `'complete'`), you MUST guard it with `isWorkflowStatus()` to avoid overwriting manually-set workflow statuses. This applies to `saveBriefState()`, `updateBriefProgress()`, and all generation callbacks in `AppWrapper.tsx`.
 - **Supabase migration DDL:** When adding columns with `ADD COLUMN IF NOT EXISTS` combined with inline `CHECK` constraints, PostgreSQL may not support the inline syntax. Separate the `ADD COLUMN` and `ADD CONSTRAINT` into distinct statements (use a `DO $$ ... $$` block to conditionally add the constraint).
 - **Color consistency across views:** When a status appears in multiple places (card borders, section headings, sidebar counts), keep the indicator color consistent. For example, "Published" uses emerald (`bg-emerald-500`, `border-l-emerald-500`) everywhere — not blue in some places and emerald in others.
+- **Edge Function deployment:** When deploying via MCP `deploy_edge_function`, ALL `_shared/*.ts` files must be included in the `files` array (10 files total). Import paths must be `./_shared/` not `../_shared/`. Missing even one file causes "Module not found" errors. The `process-generation-queue` uses `verify_jwt: false` (called by pg_cron); `create-generation-job` uses `verify_jwt: true`.
+- **`LengthConstraints` type:** Uses `globalTarget` (not `totalWordCount`). The property `briefData.article_structure?.word_count_target` is the fallback when `globalTarget` is null.
+- **`GenerationJobProgress` type sync:** The `GenerationJobProgress` interface in `types/database.ts` must match the JSONB shape written by edge functions. Backend writes `total_sections`, `percentage`, `word_count` — keep the interface in sync when adding new progress fields.
+- **Article thinking budget:** `buildArticleGenerationConfig()` uses a fixed `ARTICLE_THINKING_BUDGET` (8192) regardless of user's thinking level preference. This is intentional — do not wire `thinkingLevel` through for articles.
+- **`cancelGenerationJob()` clears `active_job_id`:** After cancelling a job, the service also clears `briefs.active_job_id` to prevent stale pointers. This is best-effort (warns on failure, doesn't throw).
+- **Regenerate Realtime race:** When a regenerate job completes, `App.tsx` does a one-time `getBrief()` fetch to catch brief data that may have been dropped by the Realtime subscription guard. This is necessary because the job status event can arrive before the brief data event.
 
 ## Deployment
 

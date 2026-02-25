@@ -102,6 +102,9 @@ export interface Brief {
   published_url: string | null;
   published_at: string | null;
 
+  // Generation
+  active_job_id: string | null;
+
   // Timestamps
   created_at: string;
   updated_at: string;
@@ -110,6 +113,58 @@ export interface Brief {
 
 export type BriefInsert = Omit<Brief, 'id' | 'created_at' | 'updated_at' | 'last_accessed_at'>;
 export type BriefUpdate = Partial<Omit<Brief, 'id' | 'created_at' | 'client_id' | 'created_by'>>;
+
+// ============================================
+// Generation Jobs
+// ============================================
+
+export type GenerationJobType = 'competitors' | 'brief_step' | 'full_brief' | 'article' | 'regenerate';
+export type GenerationJobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type GenerationBatchStatus = 'running' | 'completed' | 'partially_failed' | 'cancelled';
+
+export interface GenerationJobProgress {
+  current_step?: number;
+  total_steps?: number;
+  step_name?: string;
+  current_section?: string;
+  current_index?: number;
+  total_sections?: number;
+  percentage?: number;
+  word_count?: number;
+}
+
+export interface GenerationJob {
+  id: string;
+  brief_id: string;
+  client_id: string;
+  created_by: string;
+  job_type: GenerationJobType;
+  step_number: number | null;
+  config: Record<string, unknown>;
+  status: GenerationJobStatus;
+  progress: GenerationJobProgress;
+  error_message: string | null;
+  retry_count: number;
+  max_retries: number;
+  batch_id: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export interface GenerationBatch {
+  id: string;
+  client_id: string;
+  created_by: string;
+  name: string | null;
+  total_jobs: number;
+  completed_jobs: number;
+  failed_jobs: number;
+  status: GenerationBatchStatus;
+  created_at: string;
+  completed_at: string | null;
+}
 
 // ============================================
 // Brief Competitors

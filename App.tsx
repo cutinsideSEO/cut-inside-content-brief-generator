@@ -28,10 +28,13 @@ import SaveStatusIndicator from './components/SaveStatusIndicator';
 import Sidebar from './components/Sidebar';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
-import { saveBriefState, updateBriefProgress, updateBriefStatus, updateBrief, updateBriefWorkflowStatus } from './services/briefService';
+import { saveBriefState, updateBriefProgress, updateBriefStatus, updateBrief, updateBriefWorkflowStatus, getBrief } from './services/briefService';
 import { saveCompetitors } from './services/competitorService';
-import { createArticle } from './services/articleService';
+import { createArticle, getCurrentArticle } from './services/articleService';
 import { uploadContextFile, addContextUrl as addContextUrlToDb, deleteContextFile, deleteContextUrl } from './services/contextService';
+import { createGenerationJob, cancelGenerationJob } from './services/generationJobService';
+import { useGenerationSubscription } from './hooks/useGenerationSubscription';
+import { useBriefRealtimeSync } from './hooks/useBriefRealtimeSync';
 import type { SaveStatus } from './types/appState';
 import type { BriefStatus } from './types/database';
 
@@ -339,6 +342,183 @@ const App: React.FC<AppProps> = ({
       }
     };
   }, [onSaveNowRef, saveNow]);
+
+  // ============================================
+  // Backend Generation (Supabase Edge Functions)
+  // ============================================
+
+  // Subscribe to real-time generation job updates for this brief
+  const {
+    activeJob,
+    isGenerating: isBackendGenerating,
+    progress: backendProgress,
+    error: backendError,
+    refreshJob,
+  } = useGenerationSubscription(isSupabaseMode ? briefId || null : null);
+
+  // Subscribe to real-time brief data updates (when backend saves step results)
+  useBriefRealtimeSync(isSupabaseMode ? briefId || null : null, {
+    onBriefDataUpdated: useCallback((newBriefData: Partial<ContentBrief>) => {
+      // Only sync from backend when a backend job is active
+      if (activeJob && (activeJob.status === 'pending' || activeJob.status === 'running')) {
+        setBriefData(newBriefData);
+      }
+    }, [activeJob]),
+    onStaleStepsUpdated: useCallback((newStaleSteps: number[]) => {
+      setStaleSteps(new Set(newStaleSteps));
+    }, []),
+    onStatusUpdated: useCallback((newStatus: string) => {
+      setBriefStatus(newStatus as BriefStatus);
+    }, []),
+    onStepUpdated: useCallback((newStep: number) => {
+      // Update briefing step to show the latest completed step
+      if (newStep > 0) setBriefingStep(newStep);
+    }, []),
+  });
+
+  // Derive effective loading state: either local or backend
+  const isBackendJobActive = isBackendGenerating;
+  const backendStepName = backendProgress?.step_name || null;
+  const backendCurrentStep = backendProgress?.current_step || null;
+
+  // Start a full brief generation via backend
+  const handleBackendFullBrief = useCallback(async () => {
+    if (!briefId) return;
+    try {
+      // Save current state first so the job snapshot is up to date
+      await saveNow();
+      const { jobId } = await createGenerationJob(briefId, 'full_brief');
+      console.log('Started backend full_brief job:', jobId);
+      await refreshJob();
+      // Notify parent
+      if (onGenerationStart) onGenerationStart('brief', briefId);
+    } catch (err) {
+      console.error('Failed to start backend generation:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start backend generation');
+    }
+  }, [briefId, saveNow, refreshJob, onGenerationStart]);
+
+  // Regenerate a single step via backend
+  const handleBackendRegenerate = useCallback(async (logicalStep: number, feedback?: string) => {
+    if (!briefId) return;
+    try {
+      await saveNow();
+      const { jobId } = await createGenerationJob(briefId, 'regenerate', {
+        stepNumber: logicalStep,
+        userFeedback: feedback || userFeedbacks[logicalStep] || undefined,
+      });
+      console.log('Started backend regenerate job:', jobId);
+      await refreshJob();
+    } catch (err) {
+      console.error('Failed to start backend regeneration:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start backend regeneration');
+    }
+  }, [briefId, saveNow, refreshJob, userFeedbacks]);
+
+  // Start article generation via backend
+  const handleBackendArticleGeneration = useCallback(async () => {
+    if (!briefId) return;
+    try {
+      await saveNow();
+      const { jobId } = await createGenerationJob(briefId, 'article', {
+        writerInstructions: writerInstructions?.trim() || undefined,
+      });
+      console.log('Started backend article job:', jobId);
+      await refreshJob();
+      if (onGenerationStart) onGenerationStart('content', briefId);
+    } catch (err) {
+      console.error('Failed to start backend article generation:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start backend article generation');
+      setIsLoading(false);
+    }
+  }, [briefId, saveNow, refreshJob, onGenerationStart, writerInstructions]);
+
+  // Cancel an active backend generation
+  const handleCancelGeneration = useCallback(async () => {
+    if (!activeJob) return;
+    try {
+      await cancelGenerationJob(activeJob.id);
+      await refreshJob();
+    } catch (err) {
+      console.error('Failed to cancel generation:', err);
+    }
+  }, [activeJob, refreshJob]);
+
+  // When backend job completes, notify parent and clear loading state
+  useEffect(() => {
+    if (activeJob?.status === 'completed') {
+      setLoadingStep(null);
+      if (activeJob.job_type === 'full_brief') {
+        // Full brief finished — navigate to dashboard
+        setCurrentView('dashboard');
+      } else if (activeJob.job_type === 'regenerate') {
+        // Regenerate finished — fetch the latest brief data from DB to catch any
+        // Realtime events that were dropped due to the job completing before the
+        // brief data update arrived (race condition between the two channels).
+        if (briefId) {
+          getBrief(briefId).then(({ data: brief }) => {
+            if (brief?.brief_data) {
+              setBriefData(brief.brief_data as Partial<ContentBrief>);
+            }
+            if (brief?.stale_steps) {
+              setStaleSteps(new Set(brief.stale_steps));
+            }
+          }).catch(err => {
+            console.error('Failed to refresh brief data after regenerate:', err);
+          });
+        }
+      } else if (activeJob.job_type === 'article') {
+        // Article generation finished — fetch the saved article and navigate
+        setIsLoading(false);
+        setGenerationProgress(null);
+        if (briefId) {
+          getCurrentArticle(briefId).then(({ data: article }) => {
+            if (article) {
+              setGeneratedArticle({ title: article.title, content: article.content });
+              setGeneratedArticleDbId(article.id);
+              setCurrentView('article_view');
+            }
+          }).catch(err => {
+            console.error('Failed to fetch generated article:', err);
+          });
+        }
+      }
+      if (briefId && onGenerationComplete) {
+        onGenerationComplete(briefId, true);
+      }
+    } else if (activeJob?.status === 'failed') {
+      setLoadingStep(null);
+      setIsLoading(false);
+      setGenerationProgress(null);
+      setError(activeJob.error_message || 'Backend generation failed');
+      if (briefId && onGenerationComplete) {
+        onGenerationComplete(briefId, false);
+      }
+    }
+  }, [activeJob?.status, activeJob?.job_type, activeJob?.error_message, briefId, onGenerationComplete]);
+
+  // Propagate backend progress to parent
+  useEffect(() => {
+    if (isBackendGenerating && backendCurrentStep && onGenerationProgress) {
+      onGenerationProgress(backendCurrentStep);
+    }
+  }, [isBackendGenerating, backendCurrentStep, onGenerationProgress]);
+
+  // Map backend article progress to generationProgress for ContentGenerationScreen
+  useEffect(() => {
+    if (isBackendGenerating && activeJob?.job_type === 'article' && backendProgress) {
+      const section = backendProgress.current_section;
+      const index = backendProgress.current_index;
+      const total = backendProgress.total_sections;
+      if (section && index != null && total != null) {
+        setGenerationProgress({
+          currentSection: section,
+          currentIndex: index,
+          total: total,
+        });
+      }
+    }
+  }, [isBackendGenerating, activeJob?.job_type, backendProgress]);
 
   // Load brief data when briefId is provided (Supabase mode)
   useEffect(() => {
@@ -958,13 +1138,19 @@ const App: React.FC<AppProps> = ({
   }, [competitorData, subjectInfo, mergedBrandInfoForBrief, fileContents, urlContents, outputLanguage, lengthConstraints]);
   
   const handleFeelingLucky = useCallback(() => {
+    // In Supabase mode, use backend generation for the full brief
+    if (isSupabaseMode && briefId) {
+      setCurrentView('briefing');
+      handleBackendFullBrief();
+      return;
+    }
+    // Standalone mode: use browser-side generation
     setIsFeelingLuckyFlow(true);
-    // Notify parent that brief generation is starting
     if (briefId && onGenerationStart) {
       onGenerationStart('brief', briefId);
     }
     handleProceedToBriefing();
-  }, [handleProceedToBriefing, briefId, onGenerationStart]);
+  }, [isSupabaseMode, briefId, handleBackendFullBrief, handleProceedToBriefing, onGenerationStart]);
 
   // Auto-start generation for background mode: once brief loads from DB and
   // competitor data is available, kick off the briefing pipeline automatically.
@@ -1012,6 +1198,13 @@ const App: React.FC<AppProps> = ({
   const handleRegenerateStep = useCallback(async (logicalStepToRegen: number, feedback?: string) => {
     setError(null);
     if (logicalStepToRegen < 1 || logicalStepToRegen > 7) return;
+
+    // In Supabase mode, use backend regeneration
+    if (isSupabaseMode && briefId) {
+      setLoadingStep(logicalStepToRegen);
+      await handleBackendRegenerate(logicalStepToRegen, feedback);
+      return;
+    }
 
     setIsLoading(true);
     setLoadingStep(logicalStepToRegen);
@@ -1096,6 +1289,18 @@ const App: React.FC<AppProps> = ({
       setError("Cannot generate content without an article structure in the brief.");
       return;
     }
+
+    // In Supabase mode, delegate to backend article generation
+    if (isSupabaseMode && briefId) {
+      setError(null);
+      setCurrentView('content_generation');
+      setIsLoading(true);
+      setGeneratedArticleDbId(null);
+      setGeneratedArticle(null);
+      await handleBackendArticleGeneration();
+      return;
+    }
+
     setError(null);
     setCurrentView('content_generation');
     setIsLoading(true);
@@ -1643,8 +1848,8 @@ const App: React.FC<AppProps> = ({
       case 'briefing':
         return <BriefingScreen
                   currentStep={briefingStep}
-                  isLoading={isLoading}
-                  error={error}
+                  isLoading={isLoading || isBackendJobActive}
+                  error={error || backendError}
                   briefData={briefData}
                   setBriefData={setBriefData}
                   onNextStep={handleNextStep}
@@ -1664,8 +1869,8 @@ const App: React.FC<AppProps> = ({
                   onFeedbackChange={handleUserFeedbackChange}
                   onRegenerate={handleRegenerateStep}
                   onRestart={handleRestart}
-                  isLoading={isLoading}
-                  loadingStep={loadingStep}
+                  isLoading={isLoading || isBackendJobActive}
+                  loadingStep={loadingStep || (isBackendJobActive ? backendCurrentStep : null)}
                   competitorData={competitorData}
                   keywordVolumeMap={keywordVolumeMap}
                   onStartContentGeneration={handleStartContentGeneration}

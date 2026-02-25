@@ -1,17 +1,15 @@
 // AppWrapper - Integrates Supabase auth and brief management with the existing App
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { isSupabaseConfigured } from './services/supabaseClient';
-import { createBrief, getBrief, getBriefsForClient, updateBriefProgress, updateBriefStatus, updateBriefWorkflowStatus } from './services/briefService';
+import { isSupabaseConfigured, supabase } from './services/supabaseClient';
+import { createBrief, getBrief, updateBriefStatus } from './services/briefService';
 import { isWorkflowStatus } from './types/database';
-import { saveCompetitors, getCompetitorsForBrief, toCompetitorPages } from './services/competitorService';
-import { createArticle, getArticleCountForClient } from './services/articleService';
 import { getAccessibleClients, getClientWithContext } from './services/clientService';
+import { createGenerationJob } from './services/generationJobService';
 import { getClientLogoUrl } from './lib/favicon';
 import { toast } from 'sonner';
 import { useBriefLoader } from './hooks/useBriefLoader';
-import { useAutoSave } from './hooks/useAutoSave';
-import type { Brief, AppView as DatabaseAppView } from './types/database';
+import type { Brief, AppView as DatabaseAppView, GenerationJob, GenerationJobProgress } from './types/database';
 import type { SaveStatus } from './types/appState';
 
 // Import screens
@@ -41,6 +39,10 @@ interface GeneratingBrief {
   status: GenerationStatus;
   step: number | null;
   saveStatus?: SaveStatus;
+  // Backend job tracking
+  jobId?: string;
+  jobProgress?: GenerationJobProgress;
+  isBackend?: boolean;
 }
 
 // Types for the wrapper state
@@ -87,9 +89,6 @@ const AppWrapperInner: React.FC = () => {
     selectedArticleId: null,
   });
 
-  // Brief data for auto-save (will be populated when loading a brief)
-  const [briefDataForSave, setBriefDataForSave] = useState<any>(null);
-
   // Article count for sidebar
   const [articleCount, setArticleCount] = useState(0);
 
@@ -113,6 +112,90 @@ const AppWrapperInner: React.FC = () => {
     setBriefCounts({ draft: counts.draft, in_progress: counts.in_progress, complete: counts.complete, workflow: counts.workflow, published: counts.published });
     setArticleCount(counts.articles);
   }, []);
+
+  // Subscribe to generation_jobs changes for all briefs belonging to the current client
+  // This replaces the hidden <App> instances for background generation tracking
+  useEffect(() => {
+    if (!isAuthenticated || !state.selectedClientId) return;
+
+    const channel = supabase
+      .channel(`gen-jobs-client:${state.selectedClientId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'generation_jobs',
+        filter: `client_id=eq.${state.selectedClientId}`,
+      }, (payload) => {
+        const job = payload.new as GenerationJob;
+        if (!job || !job.brief_id) return;
+        const progress = (job.progress || {}) as GenerationJobProgress;
+
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          setState(prev => {
+            if (job.status === 'pending' || job.status === 'running') {
+              // Track this generating brief
+              const statusMap: Record<string, GenerationStatus> = {
+                'full_brief': 'generating_brief',
+                'brief_step': 'generating_brief',
+                'regenerate': 'generating_brief',
+                'article': 'generating_content',
+                'competitors': 'analyzing_competitors',
+              };
+              return {
+                ...prev,
+                generatingBriefs: {
+                  ...prev.generatingBriefs,
+                  [job.brief_id]: {
+                    clientId: job.client_id,
+                    clientName: prev.selectedClientName || '',
+                    status: statusMap[job.job_type] || 'generating_brief',
+                    step: progress.current_step || null,
+                    isBackend: true,
+                    jobId: job.id,
+                    jobProgress: progress,
+                  },
+                },
+              };
+            } else if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+              // Remove from generating briefs after a short delay
+              const { [job.brief_id]: _removed, ...remaining } = prev.generatingBriefs;
+              // Mark as idle briefly, then remove
+              return {
+                ...prev,
+                generatingBriefs: {
+                  ...remaining,
+                  [job.brief_id]: {
+                    ...prev.generatingBriefs[job.brief_id],
+                    clientId: job.client_id,
+                    clientName: prev.selectedClientName || '',
+                    status: 'idle',
+                    step: null,
+                    isBackend: true,
+                    jobId: job.id,
+                  },
+                },
+              };
+            }
+            return prev;
+          });
+
+          // Clean up completed jobs from the map after delay
+          if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+            setTimeout(() => {
+              setState(prev => {
+                const { [job.brief_id]: removed, ...remaining } = prev.generatingBriefs;
+                return { ...prev, generatingBriefs: remaining };
+              });
+            }, 3000);
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [isAuthenticated, state.selectedClientId, state.selectedClientName]);
 
   // Determine initial mode based on auth and config
   useEffect(() => {
@@ -386,20 +469,8 @@ const AppWrapperInner: React.FC = () => {
     }));
   }, []);
 
-  // Handle save status changes for background-generating briefs (per-brief)
-  const handleBriefSaveStatusChange = useCallback((briefId: string, status: SaveStatus) => {
-    setState((prev) => {
-      const brief = prev.generatingBriefs[briefId];
-      if (!brief) return prev;
-      return {
-        ...prev,
-        generatingBriefs: {
-          ...prev.generatingBriefs,
-          [briefId]: { ...brief, saveStatus: status },
-        },
-      };
-    });
-  }, []);
+  // Note: Background generation save status is now tracked via Realtime
+  // subscriptions to generation_jobs table — no per-brief save status callback needed.
 
   // Handle brief completion — preserve workflow statuses
   const handleBriefComplete = useCallback(async () => {
@@ -443,152 +514,91 @@ const AppWrapperInner: React.FC = () => {
           </div>
         );
       }
-      const generatingBriefIds = Object.keys(state.generatingBriefs);
-      const hasGeneratingBriefs = generatingBriefIds.length > 0;
       return (
-        <>
-          <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
-            <PreWizardHeader onLogout={handleLogout} userName={userName} />
-            <main className="flex-1 overflow-y-auto">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <ClientSelectScreen
-                  onSelectClient={handleSelectClient}
-                  onOpenClientProfile={handleOpenClientProfile}
-                  generatingBriefs={state.generatingBriefs}
-                  onViewGeneratingBrief={(briefId) => {
-                    const brief = state.generatingBriefs[briefId];
-                    if (brief) {
-                      setState((prev) => ({
-                        ...prev,
-                        mode: 'brief_editor',
-                        currentBriefId: briefId,
-                        selectedClientId: brief.clientId,
-                        selectedClientName: brief.clientName,
-                      }));
-                    }
-                  }}
-                />
-              </div>
-            </main>
-          </div>
-          {/* Keep App components mounted but hidden during background generation */}
-          {hasGeneratingBriefs && (
-            <div className="hidden">
-              {generatingBriefIds.map((briefId) => {
-                const brief = state.generatingBriefs[briefId];
-                return (
-                  <OriginalApp
-                    key={briefId}
-                    briefId={briefId}
-                    clientId={brief.clientId}
-                    clientName={brief.clientName}
-                    onBackToBriefList={() => {}}
-                    onSaveStatusChange={(status) => handleBriefSaveStatusChange(briefId, status)}
-                    saveStatus={brief.saveStatus || 'saved'}
-                    lastSavedAt={null}
-                    isSupabaseMode={true}
-                    onGenerationStart={(type, id) => handleGenerationStart(type, id, brief.clientId, brief.clientName)}
-                    onGenerationProgress={(step) => handleGenerationProgress(briefId, step)}
-                    onGenerationComplete={handleGenerationComplete}
-                    isBackgroundMode={true}
-                    shouldAutoGenerate={true}
-                  />
-                );
-              })}
+        <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
+          <PreWizardHeader onLogout={handleLogout} userName={userName} />
+          <main className="flex-1 overflow-y-auto">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <ClientSelectScreen
+                onSelectClient={handleSelectClient}
+                onOpenClientProfile={handleOpenClientProfile}
+                generatingBriefs={state.generatingBriefs}
+                onViewGeneratingBrief={(briefId) => {
+                  const brief = state.generatingBriefs[briefId];
+                  if (brief) {
+                    setState((prev) => ({
+                      ...prev,
+                      mode: 'brief_editor',
+                      currentBriefId: briefId,
+                      selectedClientId: brief.clientId,
+                      selectedClientName: brief.clientName,
+                    }));
+                  }
+                }}
+              />
             </div>
-          )}
-        </>
+          </main>
+        </div>
       );
 
     case 'brief_list':
-      // Get all generating briefs (could be multiple in parallel)
-      const generatingBriefIdsInList = Object.keys(state.generatingBriefs);
-      const hasGeneratingBriefsInList = generatingBriefIdsInList.length > 0;
       return (
-        <>
-          <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
-            <PreWizardHeader
-              clientName={state.selectedClientName}
+        <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
+          <PreWizardHeader
+            clientName={state.selectedClientName}
+            clientLogoUrl={state.selectedClientLogoUrl}
+            onClientClick={handleBackToClients}
+            onLogout={handleLogout}
+            userName={userName}
+            clients={allClients}
+            onSwitchClient={handleSwitchClient}
+            selectedClientId={state.selectedClientId}
+          />
+          <div className="flex-1 flex overflow-hidden">
+            <Sidebar
+              currentView="brief_list"
+              clientName={state.selectedClientName || undefined}
               clientLogoUrl={state.selectedClientLogoUrl}
-              onClientClick={handleBackToClients}
-              onLogout={handleLogout}
-              userName={userName}
+              clientBrandColor={state.selectedClientBrandColor}
+              onBackToClients={handleBackToClients}
+              briefCounts={briefCounts}
+              articleCount={articleCount}
+              onOpenClientSettings={() => {
+                if (state.selectedClientId && state.selectedClientName) {
+                  handleOpenClientProfile(state.selectedClientId, state.selectedClientName);
+                }
+              }}
               clients={allClients}
               onSwitchClient={handleSwitchClient}
               selectedClientId={state.selectedClientId}
             />
-            <div className="flex-1 flex overflow-hidden">
-              <Sidebar
-                currentView="brief_list"
-                clientName={state.selectedClientName || undefined}
-                clientLogoUrl={state.selectedClientLogoUrl}
-                clientBrandColor={state.selectedClientBrandColor}
-                onBackToClients={handleBackToClients}
-                briefCounts={briefCounts}
-                articleCount={articleCount}
-                onOpenClientSettings={() => {
-                  if (state.selectedClientId && state.selectedClientName) {
-                    handleOpenClientProfile(state.selectedClientId, state.selectedClientName);
-                  }
-                }}
-                clients={allClients}
-                onSwitchClient={handleSwitchClient}
-                selectedClientId={state.selectedClientId}
-              />
-              <main className="flex-1 overflow-y-auto">
-                <div className="px-6 lg:px-8 py-8">
-                  {state.selectedArticleId ? (
-                    <ArticleScreen
-                      articleId={state.selectedArticleId}
-                      onBack={handleBackFromArticle}
-                    />
-                  ) : (
-                    <BriefListScreen
-                      clientId={state.selectedClientId!}
-                      clientName={state.selectedClientName!}
-                      clientLogoUrl={state.selectedClientLogoUrl}
-                      clientBrandColor={state.selectedClientBrandColor}
-                      onBack={handleBackToClients}
-                      onCreateBrief={handleCreateBrief}
-                      onContinueBrief={handleContinueBrief}
-                      onEditBrief={handleEditBrief}
-                      onUseAsTemplate={handleUseAsTemplate}
-                      generatingBriefs={state.generatingBriefs}
-                      onViewArticle={handleViewArticle}
-                      onCountsChange={handleCountsChange}
-                    />
-                  )}
-                </div>
-              </main>
-            </div>
-          </div>
-          {/* Keep App components mounted but hidden during background generation */}
-          {hasGeneratingBriefsInList && (
-            <div className="hidden">
-              {generatingBriefIdsInList.map((briefId) => {
-                const brief = state.generatingBriefs[briefId];
-                return (
-                  <OriginalApp
-                    key={briefId}
-                    briefId={briefId}
-                    clientId={brief.clientId}
-                    clientName={brief.clientName}
-                    onBackToBriefList={() => {}} // No-op since we're in background
-                    onSaveStatusChange={(status) => handleBriefSaveStatusChange(briefId, status)}
-                    saveStatus={brief.saveStatus || 'saved'}
-                    lastSavedAt={null}
-                    isSupabaseMode={true}
-                    onGenerationStart={(type, id) => handleGenerationStart(type, id, brief.clientId, brief.clientName)}
-                    onGenerationProgress={(step) => handleGenerationProgress(briefId, step)}
-                    onGenerationComplete={handleGenerationComplete}
-                    isBackgroundMode={true}
-                    shouldAutoGenerate={true}
+            <main className="flex-1 overflow-y-auto">
+              <div className="px-6 lg:px-8 py-8">
+                {state.selectedArticleId ? (
+                  <ArticleScreen
+                    articleId={state.selectedArticleId}
+                    onBack={handleBackFromArticle}
                   />
-                );
-              })}
-            </div>
-          )}
-        </>
+                ) : (
+                  <BriefListScreen
+                    clientId={state.selectedClientId!}
+                    clientName={state.selectedClientName!}
+                    clientLogoUrl={state.selectedClientLogoUrl}
+                    clientBrandColor={state.selectedClientBrandColor}
+                    onBack={handleBackToClients}
+                    onCreateBrief={handleCreateBrief}
+                    onContinueBrief={handleContinueBrief}
+                    onEditBrief={handleEditBrief}
+                    onUseAsTemplate={handleUseAsTemplate}
+                    generatingBriefs={state.generatingBriefs}
+                    onViewArticle={handleViewArticle}
+                    onCountsChange={handleCountsChange}
+                  />
+                )}
+              </div>
+            </main>
+          </div>
+        </div>
       );
 
     case 'client_profile':

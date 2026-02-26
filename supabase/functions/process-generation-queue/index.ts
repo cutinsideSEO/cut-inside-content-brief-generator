@@ -13,7 +13,7 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 import { corsHeaders } from '../_shared/cors.ts'
 import { executeBriefStep } from '../_shared/step-executor.ts'
 import { generateFullArticle } from '../_shared/article-generator.ts'
-import type { ArticleJobConfig } from '../_shared/article-generator.ts'
+import type { ArticleJobConfig, ArticleResumeState } from '../_shared/article-generator.ts'
 import type {
   ContentBrief,
   CompetitorPage,
@@ -41,8 +41,9 @@ import { getSerpUrls, getOnPageElements } from '../_shared/dataforseo-client.ts'
 
 const MAX_JOBS_PER_INVOCATION = 3;
 
-/** Jobs stuck in 'running' for longer than this are considered stale and reset to pending */
-const STALE_JOB_TIMEOUT_MINUTES = 10;
+/** Jobs stuck in 'running' for longer than this are considered stale and reset to pending.
+ *  Set to 4min (above 150s EF timeout) to allow quick article resume cycles. */
+const STALE_JOB_TIMEOUT_MINUTES = 4;
 
 /** Workflow statuses that must not be overwritten by auto-computed statuses */
 const WORKFLOW_STATUSES = [
@@ -806,24 +807,60 @@ async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<vo
     strictMode,
   };
 
+  // Extract resume state from previous partial run (if any)
+  const existingProgress = job.progress as Record<string, unknown>;
+  const resumeState: ArticleResumeState | undefined =
+    (existingProgress?.partial_content && existingProgress?.completed_section_index != null)
+      ? {
+          partial_content: existingProgress.partial_content as string[],
+          completed_section_index: existingProgress.completed_section_index as number,
+        }
+      : undefined;
+
+  if (resumeState) {
+    console.log(`Resuming article generation from section index ${resumeState.completed_section_index}`);
+  }
+
   // Progress callback — updates generation_jobs.progress for Realtime
+  // Track last checkpoint so non-checkpoint progress calls don't wipe it out
+  // (updateJobProgress replaces the entire JSONB, so we must always carry forward)
+  let lastCheckpointContent: string[] | undefined = resumeState?.partial_content;
+  let lastCheckpointIndex: number | undefined = resumeState?.completed_section_index;
+
   const onProgress = async (progress: {
     currentSection: string;
     currentIndex: number;
     total: number;
     contentSoFar?: string;
+    completedSectionIndex?: number;
+    contentPartsSnapshot?: string[];
   }) => {
-    await updateJobProgress(supabase, job.id, {
+    // Update checkpoint state if this is a checkpoint call
+    if (progress.completedSectionIndex != null && progress.contentPartsSnapshot) {
+      lastCheckpointContent = progress.contentPartsSnapshot;
+      lastCheckpointIndex = progress.completedSectionIndex;
+    }
+
+    // deno-lint-ignore no-explicit-any
+    const progressData: Record<string, any> = {
       current_section: progress.currentSection,
       current_index: progress.currentIndex,
       total_sections: progress.total,
       percentage: Math.round((progress.currentIndex / progress.total) * 100),
       word_count: progress.contentSoFar ? progress.contentSoFar.split(/\s+/).length : 0,
-    });
+    };
+
+    // Always include last checkpoint for resume (survives non-checkpoint overwrites)
+    if (lastCheckpointContent && lastCheckpointIndex != null) {
+      progressData.partial_content = lastCheckpointContent;
+      progressData.completed_section_index = lastCheckpointIndex;
+    }
+
+    await updateJobProgress(supabase, job.id, progressData);
   };
 
-  // Generate the full article
-  const result = await generateFullArticle(articleConfig, onProgress);
+  // Generate the full article (with resume support)
+  const result = await generateFullArticle(articleConfig, onProgress, resumeState);
 
   // Save to brief_articles table (mirroring frontend createArticle logic)
   // Get the latest version number

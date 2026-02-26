@@ -42,6 +42,10 @@ export type ArticleProgressCallback = (progress: {
   total: number;
   /** Partial article content so far */
   contentSoFar?: string;
+  /** Set after a section is committed — triggers checkpoint write */
+  completedSectionIndex?: number;
+  /** Snapshot of contentParts array for resume */
+  contentPartsSnapshot?: string[];
 }) => Promise<void>;
 
 /** Configuration for article generation job */
@@ -61,6 +65,12 @@ export interface ArticleResult {
   title: string;
   content: string;
   wordCount: number;
+}
+
+/** Resume state for continuing article generation after EF timeout */
+export interface ArticleResumeState {
+  partial_content: string[];
+  completed_section_index: number;
 }
 
 // ============================================
@@ -363,6 +373,7 @@ Condensed version (approximately ${targetWords} words):`;
 export async function generateFullArticle(
   config: ArticleJobConfig,
   onProgress?: ArticleProgressCallback,
+  resumeState?: ArticleResumeState,
 ): Promise<ArticleResult> {
   const {
     brief,
@@ -379,13 +390,21 @@ export async function generateFullArticle(
   }
 
   const allSections = flattenOutline(brief.article_structure.outline);
-  const contentParts: string[] = [];
 
   // Initialize with H1
   const initialTitle = brief.on_page_seo?.h1?.value
     || brief.keyword_strategy?.primary_keywords?.[0]?.keyword
     || 'Untitled Article';
-  contentParts.push(`# ${initialTitle}\n\n`);
+
+  // Resume support: restore contentParts from previous partial run
+  const contentParts: string[] = resumeState?.partial_content
+    ? [...resumeState.partial_content]
+    : [`# ${initialTitle}\n\n`];
+  const resumeFromIndex = resumeState?.completed_section_index ?? -1;
+
+  if (resumeState) {
+    console.log(`Resuming article generation from section index ${resumeFromIndex} (${contentParts.length} content parts saved)`);
+  }
 
   const totalSectionsWithFaqs = allSections.length + (brief.faqs?.questions?.length || 0);
 
@@ -393,6 +412,9 @@ export async function generateFullArticle(
   // PHASE 1: Generate main sections
   // ==========================================
   for (let i = 0; i < allSections.length; i++) {
+    // Skip sections already completed in a previous invocation
+    if (i <= resumeFromIndex) continue;
+
     const section = allSections[i];
     const fullContent = contentParts.join('');
 
@@ -494,6 +516,18 @@ export async function generateFullArticle(
 
     contentParts.push(heading + sectionBody);
     contentParts.push('\n\n');
+
+    // Checkpoint: save partial state for resume after EF timeout
+    if (onProgress) {
+      await onProgress({
+        currentSection: section.heading,
+        currentIndex: i + 1,
+        total: totalSectionsWithFaqs,
+        contentSoFar: contentParts.join(''),
+        completedSectionIndex: i,
+        contentPartsSnapshot: [...contentParts],
+      });
+    }
   }
 
   // ==========================================
@@ -501,7 +535,10 @@ export async function generateFullArticle(
   // ==========================================
   if (brief.faqs?.questions?.length && brief.faqs.questions.length > 0) {
     const faqHeading = `## Frequently Asked Questions\n\n`;
-    contentParts.push(faqHeading);
+    // Only push FAQ heading if we haven't already (on resume, it's in partial_content)
+    if (resumeFromIndex < allSections.length) {
+      contentParts.push(faqHeading);
+    }
 
     const fullContentBeforeFaqs = contentParts.join('');
     const wordsBeforeFaqs = countWords(fullContentBeforeFaqs);
@@ -510,6 +547,10 @@ export async function generateFullArticle(
     const perFaqBudget = faqBudget > 0 ? Math.round(faqBudget / faqCount) : 80;
 
     for (let i = 0; i < brief.faqs.questions.length; i++) {
+      // Skip FAQs already completed in a previous invocation
+      const flatIndex = allSections.length + i;
+      if (flatIndex <= resumeFromIndex) continue;
+
       const faq = brief.faqs.questions[i];
       const fullContent = contentParts.join('');
 
@@ -572,6 +613,18 @@ export async function generateFullArticle(
 
       contentParts.push(faqHeadingText + faqBody);
       contentParts.push('\n\n');
+
+      // Checkpoint: save partial state for resume after EF timeout
+      if (onProgress) {
+        await onProgress({
+          currentSection: `FAQ: ${faq.question}`,
+          currentIndex: allSections.length + 1 + i,
+          total: totalSectionsWithFaqs,
+          contentSoFar: contentParts.join(''),
+          completedSectionIndex: flatIndex,
+          contentPartsSnapshot: [...contentParts],
+        });
+      }
     }
   }
 

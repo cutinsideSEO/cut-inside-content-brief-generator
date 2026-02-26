@@ -138,6 +138,9 @@ export interface GenerationJobProgress {
   completed_urls?: number;
   total_urls?: number;
   current_domain?: string;     // e.g. "example.com" being scraped
+  // Article resume state (written by edge function, not used by frontend UI)
+  partial_content?: string[];
+  completed_section_index?: number;
 }
 
 export interface GenerationJob {

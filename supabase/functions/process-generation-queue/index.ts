@@ -368,7 +368,20 @@ async function updateBatchCounters(
   outcome: 'completed' | 'failed'
 ): Promise<void> {
   try {
-    // Read the current batch state
+    // Atomically increment the counter using the RPC function (avoids race conditions)
+    const column = outcome === 'completed' ? 'completed_jobs' : 'failed_jobs';
+    const { error: rpcError } = await supabase.rpc('increment_batch_counter', {
+      p_batch_id: batchId,
+      p_column: column,
+      p_increment: 1,
+    });
+
+    if (rpcError) {
+      console.warn(`Failed to increment batch ${batchId} counter:`, rpcError.message);
+      return;
+    }
+
+    // Now read the updated batch to check if it's complete
     const { data: batch, error: readError } = await supabase
       .from('generation_batches')
       .select('total_jobs, completed_jobs, failed_jobs, status')
@@ -376,7 +389,7 @@ async function updateBatchCounters(
       .single();
 
     if (readError || !batch) {
-      console.warn(`Failed to read batch ${batchId} for counter update:`, readError?.message);
+      console.warn(`Failed to read batch ${batchId} after counter update:`, readError?.message);
       return;
     }
 
@@ -385,38 +398,30 @@ async function updateBatchCounters(
       return;
     }
 
-    const newCompleted = outcome === 'completed'
-      ? batch.completed_jobs + 1
-      : batch.completed_jobs;
-    const newFailed = outcome === 'failed'
-      ? batch.failed_jobs + 1
-      : batch.failed_jobs;
-    const totalDone = newCompleted + newFailed;
-
-    const updates: Record<string, unknown> = {
-      completed_jobs: newCompleted,
-      failed_jobs: newFailed,
-    };
+    const totalDone = batch.completed_jobs + batch.failed_jobs;
 
     // Determine if batch is complete
     if (totalDone >= batch.total_jobs) {
-      if (newFailed === 0) {
+      const updates: Record<string, unknown> = {
+        completed_at: new Date().toISOString(),
+      };
+
+      if (batch.failed_jobs === 0) {
         updates.status = 'completed';
-      } else if (newCompleted === 0) {
+      } else if (batch.completed_jobs === 0) {
         updates.status = 'cancelled'; // All failed
       } else {
         updates.status = 'partially_failed';
       }
-      updates.completed_at = new Date().toISOString();
-    }
 
-    const { error: updateError } = await supabase
-      .from('generation_batches')
-      .update(updates)
-      .eq('id', batchId);
+      const { error: updateError } = await supabase
+        .from('generation_batches')
+        .update(updates)
+        .eq('id', batchId);
 
-    if (updateError) {
-      console.warn(`Failed to update batch ${batchId} counters:`, updateError.message);
+      if (updateError) {
+        console.warn(`Failed to update batch ${batchId} status:`, updateError.message);
+      }
     }
   } catch (err) {
     // Best-effort — don't fail the job because of batch counter issues

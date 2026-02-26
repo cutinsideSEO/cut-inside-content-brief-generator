@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import type { BriefWithClient, ArticleWithBrief, BriefStatus, ArticleStatus } from '../../types/database';
 import { isWorkflowStatus } from '../../types/database';
 import { useBatchSubscription } from '../../hooks/useBatchSubscription';
+import { useAuth } from '../../contexts/AuthContext';
 import BriefListCard from '../briefs/BriefListCard';
 import ArticleListCard from '../articles/ArticleListCard';
 import BulkGenerationModal from '../briefs/BulkGenerationModal';
@@ -76,6 +77,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   // Bulk selection state
   const [selectedBriefs, setSelectedBriefs] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+  // Auth
+  const { userId } = useAuth();
 
   // Bulk generation state
   const [showBulkModal, setShowBulkModal] = useState<'keywords' | 'existing' | null>(null);
@@ -808,6 +812,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         initialTab={showBulkModal || 'keywords'}
         selectedBriefIds={[...selectedBriefs]}
         clientId={clientId}
+        userId={userId || ''}
         onBatchCreated={() => { loadBriefs(); setSelectedBriefs(new Set()); }}
       />
 

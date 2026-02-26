@@ -22,6 +22,7 @@ interface BulkGenerationModalProps {
   initialTab: 'keywords' | 'existing';
   selectedBriefIds: string[];
   clientId: string;
+  userId: string;
   onBatchCreated: () => void;
 }
 
@@ -69,6 +70,7 @@ const BulkGenerationModal: React.FC<BulkGenerationModalProps> = ({
   initialTab,
   selectedBriefIds,
   clientId,
+  userId,
   onBatchCreated,
 }) => {
   // Tab state
@@ -125,6 +127,7 @@ const BulkGenerationModal: React.FC<BulkGenerationModalProps> = ({
       if (activeTab === 'keywords') {
         const result = await createGenerationBatch({
           clientId,
+          userId,
           generationType: 'full_pipeline',
           briefEntries: parsedGroups,
           country,
@@ -135,6 +138,7 @@ const BulkGenerationModal: React.FC<BulkGenerationModalProps> = ({
       } else {
         const result = await createGenerationBatch({
           clientId,
+          userId,
           generationType: existingAction,
           briefIds: selectedBriefIds,
           writerInstructions: existingAction === 'article' ? writerInstructions || undefined : undefined,
@@ -153,7 +157,7 @@ const BulkGenerationModal: React.FC<BulkGenerationModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, isValid, clientId, parsedGroups, country, serpLanguage, outputLanguage, existingAction, selectedBriefIds, writerInstructions, onBatchCreated, onClose]);
+  }, [activeTab, isValid, clientId, userId, parsedGroups, country, serpLanguage, outputLanguage, existingAction, selectedBriefIds, writerInstructions, onBatchCreated, onClose]);
 
   // Reset tab when modal opens
   React.useEffect(() => {

@@ -15,7 +15,7 @@ Deno.serve(async (req: Request) => {
     )
 
     // Parse request
-    const { brief_id, job_type, step_number, user_feedback, writer_instructions } = await req.json()
+    const { brief_id, job_type, step_number, batch_id, user_feedback, writer_instructions, keywords, keyword_volumes, country, serp_language, output_language } = await req.json()
 
     // Validate required fields
     if (!brief_id || !job_type) {
@@ -26,7 +26,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Validate job_type
-    const validJobTypes = ['brief_step', 'full_brief', 'regenerate', 'article']
+    const validJobTypes = ['competitors', 'brief_step', 'full_brief', 'regenerate', 'article']
     if (!validJobTypes.includes(job_type)) {
       return new Response(
         JSON.stringify({ error: `Invalid job_type: ${job_type}` }),
@@ -136,6 +136,23 @@ Deno.serve(async (req: Request) => {
       writer_instructions: writer_instructions || null,
     }
 
+    // For competitors jobs, override the config with competitor-specific fields
+    if (job_type === 'competitors') {
+      config.keywords = keywords || (brief.keywords as Array<{ kw: string; volume: number }> || []).map((k: { kw: string }) => k.kw);
+      config.keyword_volumes = keyword_volumes || {};
+      // If keyword_volumes not provided, build from brief.keywords
+      if (!keyword_volumes && brief.keywords) {
+        const volumes: Record<string, number> = {};
+        for (const k of (brief.keywords as Array<{ kw: string; volume: number }>)) {
+          volumes[k.kw] = k.volume;
+        }
+        config.keyword_volumes = volumes;
+      }
+      config.country = country || brief.serp_country || 'United States';
+      config.serp_language = serp_language || brief.serp_language || 'English';
+      config.output_language = output_language || brief.output_language || 'English';
+    }
+
     // Determine initial step_number
     let initialStep = step_number || null
     if (job_type === 'full_brief' && !initialStep) {
@@ -149,11 +166,14 @@ Deno.serve(async (req: Request) => {
         brief_id,
         client_id: brief.client_id,
         created_by: brief.created_by,
+        batch_id: batch_id || null,
         job_type,
         step_number: initialStep,
         config,
         status: 'pending',
-        progress: job_type === 'full_brief'
+        progress: job_type === 'competitors'
+          ? { phase: 'serp', completed_keywords: 0, total_keywords: (config.keywords as string[] || []).length, completed_urls: 0, total_urls: 0, percentage: 0 }
+          : job_type === 'full_brief'
           ? { current_step: initialStep, total_steps: 7, step_name: 'Queued' }
           : job_type === 'article'
           ? { current_section: 'Queued', current_index: 0, total_sections: 0, percentage: 0 }

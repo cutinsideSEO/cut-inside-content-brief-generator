@@ -325,22 +325,26 @@ Key Logic That Moves from Frontend to Edge Functions
 
 ---
 
-  Phase 4: Competitor Analysis (NOT STARTED)
+  Phase 4: Competitor Analysis ✅ COMPLETE
 
-- Move DataForSEO calls to Edge Function
-- Store credentials as Edge Function secrets
-- Remove DataForSEO credentials from frontend
-- Implement competitors job type
-- Milestone: Full generation pipeline runs server-side, no browser dependency
+- ✅ Move DataForSEO calls to Edge Function (`_shared/dataforseo-client.ts` — getSerpUrls, getOnPageElements)
+- ✅ Store credentials as Edge Function secrets (DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD)
+- ✅ Remove DataForSEO credentials from frontend env vars
+- ✅ Implement competitors job type in process-generation-queue
+- ✅ Frontend delegates in Supabase mode, standalone mode preserved (`services/dataforseoService.ts`)
+- Milestone achieved: Full generation pipeline runs server-side, no browser dependency
 
-  Phase 5: Bulk Generation + Polish (NOT STARTED)
+  Phase 5: Bulk Generation + Polish ✅ COMPLETE
 
-- Create generation_batches table
-- Implement batch creation UI (keyword list → bulk briefs)
-- Concurrency limiter for Gemini API
-- Batch progress panel in UI
-- Error handling, retry UI, job cancellation
-- Milestone: Bulk generation of 10-50 briefs simultaneously
+- ✅ Database migration 004: Realtime enabled for generation_batches, `increment_batch_counter()` RPC for atomic counter updates, composite indexes for batch queries
+- ✅ New Edge Function: `create-generation-batch` (verify_jwt: true) — creates batch row + N brief rows + N chained jobs (competitors → full_brief for full_pipeline, or direct full_brief/article for existing briefs)
+- ✅ Updated `process-generation-queue` with batch counter updates after job completion/failure, automatic full_brief chaining after competitors jobs, and batch status resolution (completed/partially_failed/cancelled)
+- ✅ Frontend service: `services/batchService.ts` — createGenerationBatch, cancelBatch, getBatchesForClient, getJobsForBatch
+- ✅ Frontend hook: `hooks/useBatchSubscription.ts` — Realtime subscription to generation_batches for live batch progress
+- ✅ New component: `components/briefs/BulkGenerationModal.tsx` — Modal with two tabs: "From Keywords" (keyword groups → new briefs) and "Existing Briefs" (bulk full_brief or article generation)
+- ✅ New component: `components/briefs/BatchProgressPanel.tsx` — Floating panel showing active batch progress with per-batch counters, progress bars, and cancel buttons
+- ✅ Updated BriefListScreen with "Bulk Generate" button, bulk action "Generate" button for selected briefs, and BatchProgressPanel integration
+- Milestone achieved: Bulk generation of 10-50 briefs simultaneously with live progress tracking
 
   Phase 6: Cleanup + Security (NOT STARTED)
 
@@ -400,22 +404,24 @@ Cost Analysis
   Architecture: Supabase Queues + Edge Functions + pg_cron — zero new vendors, zero extra cost.
   How it works: User clicks "Generate" → job row inserted → pg_cron triggers Edge Function every 10-30s → Edge Function processes one step at a time → saves results to DB → Supabase Realtime pushes updates to browser (if open).
 
-  Progress (as of Feb 25, 2026):
+  Progress (as of Feb 26, 2026):
   ✅ Phase 1: Foundation — COMPLETE
   ✅ Phase 2: Full Brief Pipeline — COMPLETE
   ✅ Phase 3: Article Generation — COMPLETE
-  ⬜ Phase 4: Competitor Analysis — NOT STARTED
-  ⬜ Phase 5: Bulk Generation — NOT STARTED
+  ✅ Phase 4: Competitor Analysis — COMPLETE
+  ✅ Phase 5: Bulk Generation — COMPLETE
   ⬜ Phase 6: Cleanup + Security — NOT STARTED
 
   Key wins achieved so far:
-  - Users can close browser mid-generation (briefs + articles)
+  - Users can close browser mid-generation (briefs + articles + competitor analysis)
   - All Gemini calls route server-side (no client-side API key exposure)
+  - All DataForSEO calls route server-side (no client-side credential exposure)
   - Realtime progress updates via Supabase subscriptions
+  - Full generation pipeline runs server-side — no browser dependency
+  - Bulk generation of 10-50 briefs simultaneously with live progress tracking
+  - Batch progress panel with per-batch counters and cancel support
   - $0 additional monthly cost
 
   Remaining:
-  - DataForSEO credentials still exposed in browser (Phase 4)
-  - Bulk generation not yet supported (Phase 5)
   - Dead frontend generation code not yet removed (Phase 6)
   - RLS policies still wide open (Phase 6)

@@ -43,9 +43,8 @@ Tests are in `tests/services/` (39 tests across 3 files). Test environment is `n
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-# DataForSEO (optional — auto-fills credentials in UI)
-VITE_DATAFORSEO_LOGIN=your-dataforseo-login
-VITE_DATAFORSEO_PASSWORD=your-dataforseo-password
+# DataForSEO credentials are stored as Supabase Edge Function secrets
+# (DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD) — not exposed to the frontend
 ```
 
 When Supabase env vars are not set, app runs in standalone mode without persistence.
@@ -119,7 +118,9 @@ The app supports two generation paths: **frontend** (legacy, still used in stand
 - `_shared/` modules — Server-side ports of generation logic (types, prompts, schemas, gemini-client, step-executor, article-generator, brief-context, generation-config)
 - Frontend subscribes via Supabase Realtime for live progress updates
 
-**In Supabase mode**, the backend handles `full_brief`, `brief_step`, `regenerate`, and `article` job types. The frontend delegates via `services/generationJobService.ts` → `createGenerationJob()`.
+**In Supabase mode**, the backend handles all job types (`competitors`, `brief_step`, `full_brief`, `regenerate`, `article`). The frontend delegates via `services/generationJobService.ts` → `createGenerationJob()`.
+
+**DataForSEO dual mode:** `services/dataforseoService.ts` is kept for standalone mode (no Supabase). In Supabase mode, competitor analysis runs server-side via the `competitors` job type using `_shared/dataforseo-client.ts`.
 
 ### Key Component Layers
 
@@ -133,7 +134,9 @@ components/
 │   ├── *.tsx          # Custom components (Card, Badge, Input, Modal, etc.)
 │   ├── primitives/    # Radix UI wrappers (accordion, popover, tooltip, etc.)
 │   └── index.ts       # Barrel export — import everything from '../ui'
-├── briefs/      # Brief list cards, status badges, workflow select, publish modal
+├── briefs/      # Brief list cards, status badges, workflow select, publish modal,
+│                #   BulkGenerationModal (keyword/existing-brief batch creation),
+│                #   BatchProgressPanel (floating panel for active batch progress)
 ├── articles/    # Article list cards, article status badges
 └── clients/     # Client selection cards, client profile sections
 ```
@@ -170,7 +173,8 @@ pg_cron (every 10-30s) → process-generation-queue Edge Function
 
 **Edge Functions** (in `supabase/functions/`):
 - `create-generation-job/index.ts` — Validates input, snapshots config, inserts job (verify_jwt: true)
-- `process-generation-queue/index.ts` — Worker processing pending jobs (verify_jwt: false, called by pg_cron)
+- `create-generation-batch/index.ts` — Creates bulk generation batches with N briefs + chained jobs (verify_jwt: true)
+- `process-generation-queue/index.ts` — Worker processing pending jobs, updates batch counters, chains full_brief after competitors (verify_jwt: false, called by pg_cron)
 
 **Shared modules** (`supabase/functions/_shared/`):
 - `types.ts` — Server-side type definitions (ContentBrief, CompetitorPage, StepExecutionParams, etc.)
@@ -181,19 +185,29 @@ pg_cron (every 10-30s) → process-generation-queue Edge Function
 - `article-generator.ts` — Full article generation with word count enforcement (expand/trim cycles)
 - `brief-context.ts` — Brand context building, token budget management, competitor text truncation
 - `generation-config.ts` — Thinking budgets, model config builders
+- `dataforseo-client.ts` — Direct DataForSEO REST API client (SERP analysis + on-page content parsing)
+- `cors.ts` — CORS headers configuration for Edge Functions
+
+**Batch generation flow** (`create-generation-batch` → `process-generation-queue`):
+- User provides keyword groups (each group = one brief with multiple keywords) or selects existing briefs
+- `create-generation-batch` creates a `generation_batches` row + N brief rows + N competitor jobs (for `full_pipeline`) or N full_brief/article jobs
+- `process-generation-queue` processes jobs, updates batch counters atomically via `increment_batch_counter()` RPC, and chains `full_brief` jobs after `competitors` jobs complete
+- `generation_batches` table has Realtime enabled for live progress updates to `BatchProgressPanel`
 
 **Frontend hooks for backend generation:**
 - `hooks/useGenerationSubscription.ts` — Realtime subscription to `generation_jobs` table changes
 - `hooks/useBriefRealtimeSync.ts` — Realtime subscription to `briefs` table for step completion updates
+- `hooks/useBatchSubscription.ts` — Realtime subscription to `generation_batches` table for batch progress
 - `services/generationJobService.ts` — CRUD for generation jobs (create, cancel, get active)
+- `services/batchService.ts` — Batch operations (createGenerationBatch, cancelBatch, getBatchesForClient, getJobsForBatch)
 
-**Job types:** `brief_step` | `full_brief` | `regenerate` | `article` | `competitors` (competitors not yet implemented)
+**All job types implemented:** `competitors`, `brief_step`, `full_brief`, `regenerate`, `article`
 
-**Deployment:** Use `mcp__supabase__deploy_edge_function` MCP tool. Import paths in deployed bundles must use `./_shared/` (not `../_shared/`). All `_shared/*.ts` files must be included in the deployment `files` array. Project ID: `iwzaikvwiwrgyliykqah`.
+**Deployment:** Use `mcp__supabase__deploy_edge_function` MCP tool. Import paths in deployed bundles must use `./_shared/` (not `../_shared/`). All `_shared/*.ts` files must be included in the deployment `files` array. Project ID: `iwzaikvwiwrgyliykqah`. Three Edge Functions to deploy: `create-generation-job` (verify_jwt: true), `create-generation-batch` (verify_jwt: true), `process-generation-queue` (verify_jwt: false).
 
 ### Database Schema (Supabase)
 
-10 tables with RLS enabled (base schema in `supabase/schema.sql`, generation tables in `supabase/migrations/003_add_generation_jobs.sql`):
+10 tables with RLS enabled (base schema in `supabase/schema.sql`, generation tables in `supabase/migrations/003_add_generation_jobs.sql`, batch infrastructure in `supabase/migrations/004_batch_generation.sql`):
 
 - `access_codes` — Custom auth (not Supabase Auth), codes validated against this table
 - `clients` — Folders/workspaces for organizing briefs
@@ -203,7 +217,7 @@ pg_cron (every 10-30s) → process-generation-queue Edge Function
 - `brief_context_urls` — Scraped URL content
 - `brief_articles` — Generated article versions with `is_current` flag and workflow status
 - `generation_jobs` — Job queue for server-side generation (brief steps, full briefs, articles, regeneration)
-- `generation_batches` — Groups related jobs for bulk generation operations
+- `generation_batches` — Groups related jobs for bulk generation operations (Realtime enabled, `increment_batch_counter()` RPC for atomic updates)
 
 ### Workflow Status System
 
@@ -273,7 +287,7 @@ The `@/` alias maps to project root: `import { Card } from '@/components/ui'`
 - **Auto-save status regression:** If you add any code path that writes `status` to the `briefs` table (e.g., setting `'in_progress'` or `'complete'`), you MUST guard it with `isWorkflowStatus()` to avoid overwriting manually-set workflow statuses. This applies to `saveBriefState()`, `updateBriefProgress()`, and all generation callbacks in `AppWrapper.tsx`.
 - **Supabase migration DDL:** When adding columns with `ADD COLUMN IF NOT EXISTS` combined with inline `CHECK` constraints, PostgreSQL may not support the inline syntax. Separate the `ADD COLUMN` and `ADD CONSTRAINT` into distinct statements (use a `DO $$ ... $$` block to conditionally add the constraint).
 - **Color consistency across views:** When a status appears in multiple places (card borders, section headings, sidebar counts), keep the indicator color consistent. For example, "Published" uses emerald (`bg-emerald-500`, `border-l-emerald-500`) everywhere — not blue in some places and emerald in others.
-- **Edge Function deployment:** When deploying via MCP `deploy_edge_function`, ALL `_shared/*.ts` files must be included in the `files` array (10 files total). Import paths must be `./_shared/` not `../_shared/`. Missing even one file causes "Module not found" errors. The `process-generation-queue` uses `verify_jwt: false` (called by pg_cron); `create-generation-job` uses `verify_jwt: true`.
+- **Edge Function deployment:** When deploying via MCP `deploy_edge_function`, ALL `_shared/*.ts` files must be included in the `files` array (10 files total). Import paths must be `./_shared/` not `../_shared/`. Missing even one file causes "Module not found" errors. The `process-generation-queue` uses `verify_jwt: false` (called by pg_cron); `create-generation-job` and `create-generation-batch` use `verify_jwt: true`.
 - **`LengthConstraints` type:** Uses `globalTarget` (not `totalWordCount`). The property `briefData.article_structure?.word_count_target` is the fallback when `globalTarget` is null.
 - **`GenerationJobProgress` type sync:** The `GenerationJobProgress` interface in `types/database.ts` must match the JSONB shape written by edge functions. Backend writes `total_sections`, `percentage`, `word_count` — keep the interface in sync when adding new progress fields.
 - **Article thinking budget:** `buildArticleGenerationConfig()` uses a fixed `ARTICLE_THINKING_BUDGET` (8192) regardless of user's thinking level preference. This is intentional — do not wire `thinkingLevel` through for articles.

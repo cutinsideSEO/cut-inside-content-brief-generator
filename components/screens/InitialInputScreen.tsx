@@ -6,6 +6,7 @@ import LengthSettings from '../LengthSettings';
 import KeywordTableInput from '../KeywordTableInput';
 import { Card, Input, Textarea, Alert, Badge, Tabs, Select, Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui';
 import type { ModelSettings, LengthConstraints, ExtractedTemplate } from '../../types';
+import { isSupabaseConfigured } from '../../services/supabaseClient';
 
 interface KeywordRow {
   id: string;
@@ -162,7 +163,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
 
   const handleSubmit = async () => {
     setLocalError('');
-    if (!login || !password) {
+    if (!isSupabaseConfigured() && !login && !password) {
         setLocalError("Please enter your DataForSEO credentials.");
         return;
     }
@@ -274,8 +275,9 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
     return manualKeywordRows.some(row => row.keyword.trim() !== '' && row.volume.trim() !== '');
   };
 
-  // Validation for step 2: credentials must exist
+  // Validation for step 2: credentials must exist (not needed in Supabase mode)
   const isStep2Valid = (): boolean => {
+    if (isSupabaseConfigured()) return true; // Backend handles credentials
     return Boolean(login && password);
   };
 
@@ -439,7 +441,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
           </div>
         </Card>
 
-        {!hasDfsEnvCredentials && (
+        {!hasDfsEnvCredentials && !isSupabaseConfigured() && (
           <Card variant="default" padding="lg">
             <div className="mb-4">
               <h3 className="font-heading font-semibold text-foreground">DataForSEO Credentials</h3>

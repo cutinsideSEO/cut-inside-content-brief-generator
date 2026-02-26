@@ -32,6 +32,8 @@ import {
   formatForBriefGeneration,
   stripCompetitorFullText,
 } from '../_shared/brief-context.ts'
+import { retryOperation } from '../_shared/gemini-client.ts'
+import { getSerpUrls, getOnPageElements } from '../_shared/dataforseo-client.ts'
 
 // ============================================
 // Constants
@@ -87,6 +89,11 @@ const STEPS_NEEDING_FULL_TEXT = [3, 4, 5];
 
 /** Steps that need ground truth text from top competitors */
 const STEPS_NEEDING_GROUND_TRUTH = [1, 3, 4, 5];
+
+/** Position-based weights for competitor URL scoring */
+const RANK_WEIGHTS: Record<number, number> = {
+  1: 10, 2: 9, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1
+};
 
 // ============================================
 // Helper Types
@@ -348,6 +355,219 @@ async function mergeAndSaveBriefData(
 }
 
 // ============================================
+// Batch Helpers
+// ============================================
+
+/**
+ * Update batch counters after a job completes or fails.
+ * If all jobs in the batch are done, mark the batch as completed/partially_failed/cancelled.
+ */
+async function updateBatchCounters(
+  supabase: SupabaseClient,
+  batchId: string,
+  outcome: 'completed' | 'failed'
+): Promise<void> {
+  try {
+    // Read the current batch state
+    const { data: batch, error: readError } = await supabase
+      .from('generation_batches')
+      .select('total_jobs, completed_jobs, failed_jobs, status')
+      .eq('id', batchId)
+      .single();
+
+    if (readError || !batch) {
+      console.warn(`Failed to read batch ${batchId} for counter update:`, readError?.message);
+      return;
+    }
+
+    // Don't update already-completed or cancelled batches
+    if (batch.status !== 'running') {
+      return;
+    }
+
+    const newCompleted = outcome === 'completed'
+      ? batch.completed_jobs + 1
+      : batch.completed_jobs;
+    const newFailed = outcome === 'failed'
+      ? batch.failed_jobs + 1
+      : batch.failed_jobs;
+    const totalDone = newCompleted + newFailed;
+
+    const updates: Record<string, unknown> = {
+      completed_jobs: newCompleted,
+      failed_jobs: newFailed,
+    };
+
+    // Determine if batch is complete
+    if (totalDone >= batch.total_jobs) {
+      if (newFailed === 0) {
+        updates.status = 'completed';
+      } else if (newCompleted === 0) {
+        updates.status = 'cancelled'; // All failed
+      } else {
+        updates.status = 'partially_failed';
+      }
+      updates.completed_at = new Date().toISOString();
+    }
+
+    const { error: updateError } = await supabase
+      .from('generation_batches')
+      .update(updates)
+      .eq('id', batchId);
+
+    if (updateError) {
+      console.warn(`Failed to update batch ${batchId} counters:`, updateError.message);
+    }
+  } catch (err) {
+    // Best-effort — don't fail the job because of batch counter issues
+    console.warn(`Error updating batch counters for ${batchId}:`, (err as Error).message);
+  }
+}
+
+/**
+ * Chain a full_brief job after competitors completes for a batch pipeline.
+ * Creates a new pending full_brief job for the same brief, linked to the same batch.
+ * Snapshots the brief's current state (including freshly-saved competitor data) into the config.
+ */
+async function chainFullBriefJob(
+  supabase: SupabaseClient,
+  job: JobRow,
+  briefId: string
+): Promise<void> {
+  try {
+    // Fetch the brief with all related data for config snapshotting
+    // (same pattern as create-generation-job)
+    const { data: brief, error: briefError } = await supabase
+      .from('briefs')
+      .select('*, clients(*)')
+      .eq('id', briefId)
+      .single();
+
+    if (briefError || !brief) {
+      console.error(`Failed to read brief ${briefId} for chaining:`, briefError?.message);
+      return;
+    }
+
+    // Fetch the freshly-saved competitors
+    const { data: competitors } = await supabase
+      .from('brief_competitors')
+      .select('*')
+      .eq('brief_id', briefId)
+      .order('weighted_score', { ascending: false });
+
+    // Fetch context files (parsed content)
+    const { data: contextFiles } = await supabase
+      .from('brief_context_files')
+      .select('file_name, parsed_content')
+      .eq('brief_id', briefId)
+      .eq('parse_status', 'done');
+
+    // Fetch context URLs (scraped content)
+    const { data: contextUrls } = await supabase
+      .from('brief_context_urls')
+      .select('url, scraped_content')
+      .eq('brief_id', briefId)
+      .eq('scrape_status', 'done');
+
+    // Fetch client context files and URLs for brand context
+    const { data: clientContextFiles } = await supabase
+      .from('client_context_files')
+      .select('file_name, parsed_content, category')
+      .eq('client_id', brief.client_id)
+      .eq('parse_status', 'done');
+
+    const { data: clientContextUrls } = await supabase
+      .from('client_context_urls')
+      .select('url, scraped_content, label')
+      .eq('client_id', brief.client_id)
+      .eq('scrape_status', 'done');
+
+    // Build the full_brief config snapshot
+    const nextConfig: Record<string, unknown> = {
+      // Brief data
+      subject_info: brief.subject_info,
+      brand_info: brief.brand_info,
+      brief_data: brief.brief_data || {},
+      keywords: brief.keywords || [],
+      paa_questions: brief.paa_questions || [],
+      stale_steps: brief.stale_steps || [],
+      output_language: brief.output_language || 'English',
+      serp_language: brief.serp_language || 'English',
+      serp_country: brief.serp_country || 'United States',
+      model_settings: brief.model_settings || { model: 'gemini-2.5-pro', thinkingLevel: 'high' },
+      length_constraints: brief.length_constraints,
+      extracted_template: brief.extracted_template,
+      user_feedbacks: brief.user_feedbacks || {},
+
+      // Related data — use freshly saved competitors
+      competitors: competitors || [],
+      context_files: (contextFiles || []).map((f: { file_name: string; parsed_content: string }) => ({
+        name: f.file_name, content: f.parsed_content
+      })),
+      context_urls: (contextUrls || []).map((u: { url: string; scraped_content: string }) => ({
+        url: u.url, content: u.scraped_content
+      })),
+
+      // Client brand context
+      client: brief.clients ? {
+        name: brief.clients.name,
+        brand_identity: brief.clients.brand_identity,
+        brand_voice: brief.clients.brand_voice,
+        target_audience: brief.clients.target_audience,
+        content_strategy: brief.clients.content_strategy,
+      } : null,
+      client_context_files: (clientContextFiles || []).map((f: { file_name: string; parsed_content: string; category: string }) => ({
+        name: f.file_name, content: f.parsed_content, category: f.category
+      })),
+      client_context_urls: (clientContextUrls || []).map((u: { url: string; scraped_content: string; label: string }) => ({
+        url: u.url, content: u.scraped_content, label: u.label
+      })),
+
+      // Job-specific
+      user_feedback: null,
+      writer_instructions: null,
+    };
+
+    // Create the chained full_brief job
+    const { data: nextJob, error: nextJobError } = await supabase
+      .from('generation_jobs')
+      .insert({
+        brief_id: briefId,
+        client_id: job.client_id,
+        created_by: job.created_by,
+        job_type: 'full_brief',
+        step_number: 1,
+        batch_id: job.batch_id,
+        config: nextConfig,
+        status: 'pending',
+        progress: {
+          current_step: 1,
+          total_steps: 7,
+          step_name: 'Queued',
+          percentage: 0,
+        },
+      })
+      .select('id')
+      .single();
+
+    if (nextJobError || !nextJob) {
+      console.error(`Failed to create chained full_brief job for brief ${briefId}:`, nextJobError?.message);
+      return;
+    }
+
+    // Update the brief's active_job_id to point to the new full_brief job
+    await supabase
+      .from('briefs')
+      .update({ active_job_id: nextJob.id })
+      .eq('id', briefId);
+
+    console.log(`Chained full_brief job ${nextJob.id} for brief ${briefId} in batch ${job.batch_id}`);
+  } catch (err) {
+    console.error(`Error chaining full_brief for brief ${briefId}:`, (err as Error).message);
+  }
+}
+
+// ============================================
 // Job Handlers
 // ============================================
 
@@ -444,6 +664,7 @@ async function processFullBrief(supabase: SupabaseClient, job: JobRow): Promise<
         brief_id: briefId,
         client_id: job.client_id,
         created_by: job.created_by,
+        batch_id: job.batch_id || null,
         job_type: 'full_brief',
         step_number: nextStep,
         config: nextStepConfig,
@@ -652,6 +873,214 @@ async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<vo
   await markJobCompleted(supabase, job.id, briefId, true);
 }
 
+/**
+ * Process a competitors analysis job.
+ * Fetches SERP results for each keyword, scrapes on-page data for top URLs,
+ * and saves competitor data + PAA questions to the database.
+ */
+async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promise<void> {
+  const config = job.config as Record<string, unknown>;
+  const briefId = job.brief_id as string;
+
+  const keywords = (config.keywords as string[]) || [];
+  const keywordVolumes = (config.keyword_volumes as Record<string, number>) || {};
+  const country = (config.country as string) || 'United States';
+  const serpLanguage = (config.serp_language as string) || 'English';
+
+  if (keywords.length === 0) {
+    throw new Error('No keywords provided for competitor analysis');
+  }
+
+  // ---- SERP PHASE ----
+  // Collect SERP results across all keywords, aggregating URL scores
+  const urlDataMap = new Map<string, { rankings: Array<{ keyword: string; rank: number; volume: number }>; score: number }>();
+  const collectedPaaQuestions: string[] = [];
+
+  for (let i = 0; i < keywords.length; i++) {
+    const keyword = keywords[i];
+    const volume = keywordVolumes[keyword] || 0;
+
+    await updateJobProgress(supabase, job.id, {
+      phase: 'serp',
+      completed_keywords: i,
+      total_keywords: keywords.length,
+      completed_urls: 0,
+      total_urls: 0,
+      percentage: Math.round((i / keywords.length) * 40), // SERP = 0-40%
+    });
+
+    const serpResponse = await retryOperation(
+      () => getSerpUrls(keyword, country, serpLanguage),
+      3, 2000, 30000
+    );
+
+    // Collect PAA questions (deduplicated)
+    for (const q of serpResponse.paaQuestions) {
+      if (!collectedPaaQuestions.includes(q)) {
+        collectedPaaQuestions.push(q);
+      }
+    }
+
+    // Aggregate URLs by weighted score
+    for (const result of serpResponse.urls) {
+      if (!result.url) continue;
+      if (!urlDataMap.has(result.url)) {
+        urlDataMap.set(result.url, { rankings: [], score: 0 });
+      }
+      const data = urlDataMap.get(result.url)!;
+      data.rankings.push({ keyword, rank: result.rank, volume });
+      const rankWeight = RANK_WEIGHTS[result.rank] || Math.max(0, 11 - result.rank);
+      data.score += volume * rankWeight;
+    }
+
+    // Rate limiting between keywords
+    if (i < keywords.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  // Sort by weighted score, take top 10
+  const sortedUrls = Array.from(urlDataMap.entries())
+    .sort(([, a], [, b]) => b.score - a.score)
+    .slice(0, 10);
+
+  // ---- ON-PAGE PHASE ----
+  // Scrape headings, word count, and full text from each top URL
+  const competitors: Array<{
+    url: string;
+    weighted_score: number;
+    rankings: Array<{ keyword: string; rank: number; volume: number }>;
+    h1s: string[];
+    h2s: string[];
+    h3s: string[];
+    word_count: number;
+    full_text: string;
+  }> = [];
+
+  for (let i = 0; i < sortedUrls.length; i++) {
+    const [url, data] = sortedUrls[i];
+
+    await updateJobProgress(supabase, job.id, {
+      phase: 'onpage',
+      completed_keywords: keywords.length,
+      total_keywords: keywords.length,
+      completed_urls: i,
+      total_urls: sortedUrls.length,
+      current_domain: new URL(url).hostname,
+      percentage: 40 + Math.round((i / sortedUrls.length) * 50), // OnPage = 40-90%
+    });
+
+    try {
+      const onPageData = await retryOperation(
+        () => getOnPageElements(url),
+        3, 2000, 30000
+      );
+
+      competitors.push({
+        url,
+        weighted_score: Math.round(data.score),
+        rankings: data.rankings,
+        h1s: onPageData.H1s,
+        h2s: onPageData.H2s,
+        h3s: onPageData.H3s,
+        word_count: onPageData.Word_Count,
+        full_text: onPageData.Full_Text,
+      });
+    } catch (err) {
+      console.warn(`Failed to scrape ${url}:`, (err as Error).message);
+      // Continue with remaining URLs — don't fail the whole job
+    }
+
+    // Rate limiting between URLs
+    if (i < sortedUrls.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  // ---- SAVE PHASE ----
+  await updateJobProgress(supabase, job.id, {
+    phase: 'saving',
+    completed_keywords: keywords.length,
+    total_keywords: keywords.length,
+    completed_urls: sortedUrls.length,
+    total_urls: sortedUrls.length,
+    percentage: 90,
+  });
+
+  // Upsert competitors to brief_competitors table
+  if (competitors.length > 0) {
+    const competitorInserts = competitors.map(c => ({
+      brief_id: briefId,
+      url: c.url,
+      weighted_score: c.weighted_score,
+      rankings: c.rankings,
+      h1s: c.h1s,
+      h2s: c.h2s,
+      h3s: c.h3s,
+      word_count: c.word_count,
+      full_text: c.full_text,
+      is_starred: false,
+    }));
+
+    const { error: upsertError } = await supabase
+      .from('brief_competitors')
+      .upsert(competitorInserts, {
+        onConflict: 'brief_id,url',
+        ignoreDuplicates: false,
+      });
+
+    if (upsertError) {
+      console.warn('Upsert failed, falling back to delete + insert:', upsertError.message);
+      await supabase.from('brief_competitors').delete().eq('brief_id', briefId);
+      await supabase.from('brief_competitors').insert(competitorInserts);
+    }
+
+    // Cleanup old competitors not in the new list
+    const newUrls = new Set(competitors.map(c => c.url));
+    const { data: existing } = await supabase
+      .from('brief_competitors')
+      .select('id, url')
+      .eq('brief_id', briefId);
+
+    if (existing) {
+      const idsToDelete = existing
+        .filter((row: { id: string; url: string }) => !newUrls.has(row.url))
+        .map((row: { id: string; url: string }) => row.id);
+
+      if (idsToDelete.length > 0) {
+        await supabase.from('brief_competitors').delete().in('id', idsToDelete);
+      }
+    }
+  }
+
+  // Save PAA questions to brief
+  if (collectedPaaQuestions.length > 0) {
+    await supabase
+      .from('briefs')
+      .update({ paa_questions: collectedPaaQuestions })
+      .eq('id', briefId);
+  }
+
+  // Mark job completed
+  await updateJobProgress(supabase, job.id, {
+    phase: 'complete',
+    completed_keywords: keywords.length,
+    total_keywords: keywords.length,
+    completed_urls: sortedUrls.length,
+    total_urls: sortedUrls.length,
+    percentage: 100,
+  });
+
+  // If this is a batched full_pipeline job, chain a full_brief job next.
+  // Don't clear active_job_id — chainFullBriefJob will set it to the new job.
+  if (job.batch_id) {
+    await markJobCompleted(supabase, job.id, briefId, false);
+    await chainFullBriefJob(supabase, job, briefId);
+  } else {
+    await markJobCompleted(supabase, job.id, briefId, true);
+  }
+}
+
 // ============================================
 // Main Handler
 // ============================================
@@ -716,6 +1145,9 @@ Deno.serve(async (req: Request) => {
       try {
         // Route to the appropriate handler
         switch (job.job_type) {
+          case 'competitors':
+            await processCompetitors(supabase, job);
+            break;
           case 'brief_step':
             await processBriefStep(supabase, job);
             break;
@@ -730,6 +1162,20 @@ Deno.serve(async (req: Request) => {
             break;
           default:
             throw new Error(`Unsupported job type: ${job.job_type}`);
+        }
+
+        // Update batch counters if this job belongs to a batch.
+        // For full_brief jobs, only count the final step (step 7) since intermediate
+        // steps chain to the next step and shouldn't each count as a separate batch job.
+        if (job.batch_id) {
+          const isFullBrief = job.job_type === 'full_brief';
+          const currentStep = job.step_number as number;
+          const lastStep = EXECUTION_ORDER[EXECUTION_ORDER.length - 1];
+          const isIntermediateStep = isFullBrief && currentStep !== lastStep;
+
+          if (!isIntermediateStep) {
+            await updateBatchCounters(supabase, job.batch_id, 'completed');
+          }
         }
 
         results.push({ job_id: job.id, status: 'completed' });
@@ -769,6 +1215,11 @@ Deno.serve(async (req: Request) => {
             .from('briefs')
             .update({ active_job_id: null })
             .eq('id', job.brief_id);
+
+          // Update batch counters for permanently failed job
+          if (job.batch_id) {
+            await updateBatchCounters(supabase, job.batch_id, 'failed');
+          }
         }
 
         results.push({ job_id: job.id, status: 'error', error: error.message });

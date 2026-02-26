@@ -25,6 +25,18 @@ interface ContextInputScreenProps {
   inheritedBrandContext?: string;
   /** Client name for display */
   clientName?: string;
+  /** Backend generation progress for competitor analysis */
+  generationProgress?: {
+    phase?: string;
+    completed_keywords?: number;
+    total_keywords?: number;
+    completed_urls?: number;
+    total_urls?: number;
+    current_domain?: string;
+    percentage?: number;
+  };
+  /** Whether a backend generation is active */
+  isBackendGenerating?: boolean;
 }
 
 const ThemedLoader: React.FC<{ header: string }> = ({ header }) => {
@@ -73,6 +85,8 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
   onRemoveUrl,
   inheritedBrandContext,
   clientName,
+  generationProgress,
+  isBackendGenerating,
 }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -134,6 +148,31 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
         )}
 
         <div className="space-y-6">
+            {/* Backend Competitor Analysis Progress */}
+            {isBackendGenerating && generationProgress && (
+              <Card variant="default" padding="lg" className="mb-6">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-heading font-semibold text-foreground">
+                      {generationProgress.phase === 'serp' && 'Analyzing Keywords...'}
+                      {generationProgress.phase === 'onpage' && 'Scraping Competitor Pages...'}
+                      {generationProgress.phase === 'saving' && 'Saving Results...'}
+                      {generationProgress.phase === 'complete' && 'Analysis Complete!'}
+                      {!generationProgress.phase && 'Starting Analysis...'}
+                    </h3>
+                    <Badge variant="secondary">{generationProgress.percentage || 0}%</Badge>
+                  </div>
+                  <Progress value={generationProgress.percentage || 0} />
+                  <p className="text-xs text-muted-foreground">
+                    {generationProgress.phase === 'serp' &&
+                      `Keywords: ${generationProgress.completed_keywords || 0}/${generationProgress.total_keywords || 0}`}
+                    {generationProgress.phase === 'onpage' &&
+                      `Pages: ${generationProgress.completed_urls || 0}/${generationProgress.total_urls || 0}${generationProgress.current_domain ? ` — ${generationProgress.current_domain}` : ''}`}
+                  </p>
+                </div>
+              </Card>
+            )}
+
             {/* Collapsible Analysis Log */}
             {analysisLogs.length > 0 && (
                 <div>

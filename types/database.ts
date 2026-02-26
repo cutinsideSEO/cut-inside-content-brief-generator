@@ -131,6 +131,13 @@ export interface GenerationJobProgress {
   total_sections?: number;
   percentage?: number;
   word_count?: number;
+  // Competitor analysis progress
+  phase?: string;              // 'serp' | 'onpage' | 'saving' | 'complete'
+  completed_keywords?: number;
+  total_keywords?: number;
+  completed_urls?: number;
+  total_urls?: number;
+  current_domain?: string;     // e.g. "example.com" being scraped
 }
 
 export interface GenerationJob {

@@ -13,6 +13,12 @@ export async function createGenerationJob(
     stepNumber?: number;
     userFeedback?: string;
     writerInstructions?: string;
+    // Competitor analysis options
+    keywords?: string[];
+    keywordVolumes?: Record<string, number>;
+    country?: string;
+    serpLanguage?: string;
+    outputLanguage?: string;
   }
 ): Promise<{ jobId: string }> {
   const { data, error } = await supabase.functions.invoke('create-generation-job', {
@@ -22,6 +28,12 @@ export async function createGenerationJob(
       step_number: options?.stepNumber,
       user_feedback: options?.userFeedback,
       writer_instructions: options?.writerInstructions,
+      // Competitor analysis fields
+      keywords: options?.keywords,
+      keyword_volumes: options?.keywordVolumes,
+      country: options?.country,
+      serp_language: options?.serpLanguage,
+      output_language: options?.outputLanguage,
     },
   });
 

@@ -29,7 +29,7 @@ import Sidebar from './components/Sidebar';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
 import { saveBriefState, updateBriefProgress, updateBriefStatus, updateBrief, updateBriefWorkflowStatus, getBrief } from './services/briefService';
-import { saveCompetitors } from './services/competitorService';
+import { saveCompetitors, getCompetitorsForBrief, toCompetitorPages } from './services/competitorService';
 import { createArticle, getCurrentArticle } from './services/articleService';
 import { uploadContextFile, addContextUrl as addContextUrlToDb, deleteContextFile, deleteContextUrl } from './services/contextService';
 import { createGenerationJob, cancelGenerationJob } from './services/generationJobService';
@@ -482,6 +482,26 @@ const App: React.FC<AppProps> = ({
             console.error('Failed to fetch generated article:', err);
           });
         }
+      } else if (activeJob.job_type === 'competitors') {
+        // Competitor analysis finished — reload competitors from DB
+        setIsLoading(false);
+        if (briefId) {
+          getCompetitorsForBrief(briefId).then(({ data: dbCompetitors }) => {
+            if (dbCompetitors) {
+              setCompetitorData(toCompetitorPages(dbCompetitors));
+            }
+          }).catch(err => {
+            console.error('Failed to load competitors after backend analysis:', err);
+          });
+          // Load PAA questions from brief
+          getBrief(briefId).then(({ data: brief }) => {
+            if (brief?.paa_questions) {
+              setPaaQuestions(brief.paa_questions);
+            }
+          }).catch(err => {
+            console.error('Failed to load PAA questions:', err);
+          });
+        }
       }
       if (briefId && onGenerationComplete) {
         onGenerationComplete(briefId, true);
@@ -685,7 +705,7 @@ const App: React.FC<AppProps> = ({
         throw new Error("No keywords provided or parsed. Please check your input.");
       }
 
-      // Feature 1: Extract template from URL if provided
+      // Feature 1: Extract template from URL if provided (both modes)
       if (templateUrl) {
         addLog(`Extracting template structure from ${templateUrl}...`);
         try {
@@ -701,72 +721,98 @@ const App: React.FC<AppProps> = ({
       keywords.forEach(k => newVolumeMap.set(k.kw.toLowerCase(), k.volume));
       setKeywordVolumeMap(newVolumeMap);
       setTopKeywordsForViz([...keywords].sort((a, b) => b.volume - a.volume).slice(0, 5));
-      addLog(`Found ${keywords.length} keywords. Starting SERP analysis for ${country} in ${serpLanguage}.`);
 
-      const urlDataMap = new Map<string, { rankings: CompetitorRanking[], score: number }>();
-      const collectedPaaQuestions: string[] = [];
+      if (isSupabaseMode && briefId) {
+        // ====== BACKEND MODE: Delegate to Edge Function ======
+        addLog(`Starting backend competitor analysis for ${keywords.length} keywords...`);
 
-      for (let i = 0; i < keywords.length; i++) {
-        const { kw, volume } = keywords[i];
-        addLog(`Fetching SERP for "${kw}" (${i + 1}/${keywords.length})...`);
-        const serpResponse = await dataforseoService.getSerpUrls(kw, login, password, country, serpLanguage);
+        // Save current state first so the job snapshot is up to date
+        await saveNow();
 
-        // Collect PAA questions (deduplicated)
-        for (const paaQuestion of serpResponse.paaQuestions) {
-          if (!collectedPaaQuestions.includes(paaQuestion)) {
-            collectedPaaQuestions.push(paaQuestion);
-          }
+        // Build keyword volumes map
+        const keywordVolumes: Record<string, number> = {};
+        for (const k of keywords) {
+          keywordVolumes[k.kw] = k.volume;
         }
 
-        serpResponse.urls.forEach(result => {
-          if (!result.url) return;
-          if (!urlDataMap.has(result.url)) {
-            urlDataMap.set(result.url, { rankings: [], score: 0 });
+        const { jobId } = await createGenerationJob(briefId, 'competitors', {
+          keywords: keywords.map(k => k.kw),
+          keywordVolumes,
+          country,
+          serpLanguage,
+          outputLanguage,
+        });
+        console.log('Started backend competitor analysis job:', jobId);
+        await refreshJob();
+        setIsLoading(false); // Backend handles the work, no need for frontend loading
+      } else {
+        // ====== STANDALONE MODE: Keep existing frontend DataForSEO calls ======
+        addLog(`Found ${keywords.length} keywords. Starting SERP analysis for ${country} in ${serpLanguage}.`);
+
+        const urlDataMap = new Map<string, { rankings: CompetitorRanking[], score: number }>();
+        const collectedPaaQuestions: string[] = [];
+
+        for (let i = 0; i < keywords.length; i++) {
+          const { kw, volume } = keywords[i];
+          addLog(`Fetching SERP for "${kw}" (${i + 1}/${keywords.length})...`);
+          const serpResponse = await dataforseoService.getSerpUrls(kw, login, password, country, serpLanguage);
+
+          // Collect PAA questions (deduplicated)
+          for (const paaQuestion of serpResponse.paaQuestions) {
+            if (!collectedPaaQuestions.includes(paaQuestion)) {
+              collectedPaaQuestions.push(paaQuestion);
+            }
           }
-          const data = urlDataMap.get(result.url)!;
-          data.rankings.push({ keyword: kw, rank: result.rank, volume });
-          const rankWeight = Math.max(0, 11 - result.rank);
-          data.score += volume * rankWeight;
-        });
-        await sleep(1000);
+
+          serpResponse.urls.forEach(result => {
+            if (!result.url) return;
+            if (!urlDataMap.has(result.url)) {
+              urlDataMap.set(result.url, { rankings: [], score: 0 });
+            }
+            const data = urlDataMap.get(result.url)!;
+            data.rankings.push({ keyword: kw, rank: result.rank, volume });
+            const rankWeight = Math.max(0, 11 - result.rank);
+            data.score += volume * rankWeight;
+          });
+          await sleep(1000);
+        }
+
+        // Store collected PAA questions
+        if (collectedPaaQuestions.length > 0) {
+          setPaaQuestions(collectedPaaQuestions);
+          addLog(`Collected ${collectedPaaQuestions.length} "People Also Ask" questions from SERPs.`);
+        }
+        addLog('All SERP data fetched.');
+        addLog("Calculating competitor strength scores...");
+
+        const sortedUrls = Array.from(urlDataMap.entries())
+          .sort(([, dataA], [, dataB]) => dataB.score - dataA.score)
+          .slice(0, 10);
+        addLog(`Identified top ${sortedUrls.length} competitors. Starting on-page analysis.`);
+
+        const finalCompetitorData: CompetitorPage[] = [];
+        for (let i = 0; i < sortedUrls.length; i++) {
+          const [url, data] = sortedUrls[i];
+          addLog(`Analyzing ${url.substring(0, 50)}... (${i + 1}/${sortedUrls.length})`);
+          const onpageData = await dataforseoService.getDetailedOnpageElements(url, login, password);
+          finalCompetitorData.push({
+            URL: url,
+            Weighted_Score: Math.round(data.score),
+            rankings: data.rankings,
+            ...onpageData,
+            is_starred: false,
+          });
+          await sleep(1000);
+        }
+
+        addLog("Analysis complete! You may now add context below or proceed.");
+        setCompetitorData(finalCompetitorData);
+
+        // Notify parent that competitor analysis completed successfully
+        if (briefId && onGenerationComplete) {
+          onGenerationComplete(briefId, true);
+        }
       }
-
-      // Store collected PAA questions
-      if (collectedPaaQuestions.length > 0) {
-        setPaaQuestions(collectedPaaQuestions);
-        addLog(`Collected ${collectedPaaQuestions.length} "People Also Ask" questions from SERPs.`);
-      }
-      addLog('All SERP data fetched.');
-      addLog("Calculating competitor strength scores...");
-
-      const sortedUrls = Array.from(urlDataMap.entries())
-        .sort(([, dataA], [, dataB]) => dataB.score - dataA.score)
-        .slice(0, 10);
-      addLog(`Identified top ${sortedUrls.length} competitors. Starting on-page analysis.`);
-
-      const finalCompetitorData: CompetitorPage[] = [];
-      for (let i = 0; i < sortedUrls.length; i++) {
-        const [url, data] = sortedUrls[i];
-        addLog(`Analyzing ${url.substring(0, 50)}... (${i + 1}/${sortedUrls.length})`);
-        const onpageData = await dataforseoService.getDetailedOnpageElements(url, login, password);
-        finalCompetitorData.push({
-          URL: url,
-          Weighted_Score: Math.round(data.score),
-          rankings: data.rankings,
-          ...onpageData,
-          is_starred: false,
-        });
-        await sleep(1000);
-      }
-      
-      addLog("Analysis complete! You may now add context below or proceed.");
-      setCompetitorData(finalCompetitorData);
-
-      // Notify parent that competitor analysis completed successfully
-      if (briefId && onGenerationComplete) {
-        onGenerationComplete(briefId, true);
-      }
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown analysis error occurred.';
       setError(errorMessage);
@@ -780,7 +826,7 @@ const App: React.FC<AppProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [hasCompletedFirstBrief, addToast, briefId, onGenerationStart, onGenerationComplete]);
+  }, [hasCompletedFirstBrief, addToast, briefId, onGenerationStart, onGenerationComplete, isSupabaseMode, saveNow, refreshJob]);
 
   const handleBriefUpload = useCallback(async (briefFile: File) => {
     setError(null);
@@ -1836,6 +1882,8 @@ const App: React.FC<AppProps> = ({
                   onRemoveUrl={removeContextUrl}
                   inheritedBrandContext={clientProfile ? buildBrandContext(clientProfile, clientProfile.context_files, clientProfile.context_urls) : undefined}
                   clientName={clientName || undefined}
+                  generationProgress={backendProgress || undefined}
+                  isBackendGenerating={isBackendGenerating && activeJob?.job_type === 'competitors'}
                  />;
       case 'visualization':
         return <CompetitionVizScreen 

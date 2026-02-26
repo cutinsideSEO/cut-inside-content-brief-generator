@@ -1,12 +1,16 @@
 // Brief List Screen - View and manage briefs for a client
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { getBriefsForClient, archiveBrief, deleteBrief, updateBriefWorkflowStatus } from '../../services/briefService';
 import { getArticlesForClient, deleteArticle, getArticleCountForClient, updateArticleStatus } from '../../services/articleService';
+import { cancelBatch } from '../../services/batchService';
 import { toast } from 'sonner';
 import type { BriefWithClient, ArticleWithBrief, BriefStatus, ArticleStatus } from '../../types/database';
 import { isWorkflowStatus } from '../../types/database';
+import { useBatchSubscription } from '../../hooks/useBatchSubscription';
 import BriefListCard from '../briefs/BriefListCard';
 import ArticleListCard from '../articles/ArticleListCard';
+import BulkGenerationModal from '../briefs/BulkGenerationModal';
+import BatchProgressPanel from '../briefs/BatchProgressPanel';
 import Button from '../Button';
 import { Card, Input, Alert, Tabs, Skeleton, Modal } from '../ui';
 
@@ -72,6 +76,10 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   // Bulk selection state
   const [selectedBriefs, setSelectedBriefs] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+  // Bulk generation state
+  const [showBulkModal, setShowBulkModal] = useState<'keywords' | 'existing' | null>(null);
+  const { activeBatches } = useBatchSubscription(clientId);
 
   // Load-more pagination
   const [visibleCount, setVisibleCount] = useState(20);
@@ -173,6 +181,30 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     clearSelection();
     setShowBulkDeleteConfirm(false);
   };
+
+  // Handle batch cancellation
+  const handleCancelBatch = useCallback(async (batchId: string) => {
+    try {
+      await cancelBatch(batchId);
+      toast.success('Batch cancelled');
+    } catch {
+      toast.error('Failed to cancel batch');
+    }
+  }, []);
+
+  // Refresh brief list when batches complete
+  const prevBatchIdsRef = useRef<Set<string>>(new Set(activeBatches.map(b => b.id)));
+  useEffect(() => {
+    const currentIds = new Set(activeBatches.map(b => b.id));
+    const prevIds = prevBatchIdsRef.current;
+    // If a batch was removed (completed + auto-dismissed), refresh the brief list
+    const anyRemoved = [...prevIds].some(id => !currentIds.has(id));
+    if (anyRemoved) {
+      loadBriefs();
+      getArticleCountForClient(clientId).then(setArticleCount);
+    }
+    prevBatchIdsRef.current = currentIds;
+  }, [activeBatches, clientId]);
 
   // Load articles when articles tab is active
   useEffect(() => {
@@ -331,17 +363,30 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           </div>
           <p className="text-gray-600 mt-0.5">{briefs.length} {briefs.length === 1 ? 'brief' : 'briefs'}</p>
         </div>
-        <Button
-          variant="primary"
-          onClick={onCreateBrief}
-          icon={
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          }
-        >
-          New Brief
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowBulkModal('keywords')}
+            icon={
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            }
+          >
+            Bulk Generate
+          </Button>
+          <Button
+            variant="primary"
+            onClick={onCreateBrief}
+            icon={
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            }
+          >
+            New Brief
+          </Button>
+        </div>
       </div>
 
 
@@ -437,6 +482,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
             {selectedBriefs.size} selected
           </span>
           <div className="flex-1" />
+          <Button variant="outline" size="sm" onClick={() => setShowBulkModal('existing')}>
+            Generate ({selectedBriefs.size})
+          </Button>
           <Button variant="secondary" size="sm" onClick={handleBulkArchive}>
             Archive
           </Button>
@@ -752,6 +800,22 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           Are you sure you want to permanently delete {selectedBriefs.size} selected brief{selectedBriefs.size !== 1 ? 's' : ''}? This action cannot be undone.
         </p>
       </Modal>
+
+      {/* Bulk Generation Modal */}
+      <BulkGenerationModal
+        isOpen={showBulkModal !== null}
+        onClose={() => setShowBulkModal(null)}
+        initialTab={showBulkModal || 'keywords'}
+        selectedBriefIds={[...selectedBriefs]}
+        clientId={clientId}
+        onBatchCreated={() => { loadBriefs(); setSelectedBriefs(new Set()); }}
+      />
+
+      {/* Batch Progress Panel (fixed position, auto-hides when empty) */}
+      <BatchProgressPanel
+        batches={activeBatches}
+        onCancel={handleCancelBatch}
+      />
     </div>
   );
 };

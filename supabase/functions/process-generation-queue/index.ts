@@ -41,6 +41,9 @@ import { getSerpUrls, getOnPageElements } from '../_shared/dataforseo-client.ts'
 
 const MAX_JOBS_PER_INVOCATION = 3;
 
+/** Jobs stuck in 'running' for longer than this are considered stale and reset to pending */
+const STALE_JOB_TIMEOUT_MINUTES = 10;
+
 /** Workflow statuses that must not be overwritten by auto-computed statuses */
 const WORKFLOW_STATUSES = [
   'sent_to_client',
@@ -1087,6 +1090,75 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
 }
 
 // ============================================
+// Stale Job Recovery
+// ============================================
+
+/**
+ * Reset jobs stuck in 'running' state for longer than STALE_JOB_TIMEOUT_MINUTES.
+ * This handles Edge Function timeouts where the job was claimed but never completed.
+ * Jobs under max_retries are returned to 'pending'; exhausted jobs are marked 'failed'.
+ */
+async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
+  const cutoff = new Date(Date.now() - STALE_JOB_TIMEOUT_MINUTES * 60 * 1000).toISOString();
+
+  const { data: staleJobs, error } = await supabase
+    .from('generation_jobs')
+    .select('id, brief_id, batch_id, retry_count, max_retries, job_type, step_number')
+    .eq('status', 'running')
+    .lt('started_at', cutoff);
+
+  if (error || !staleJobs || staleJobs.length === 0) return 0;
+
+  let resetCount = 0;
+  for (const job of staleJobs) {
+    const retryCount = ((job.retry_count as number) || 0) + 1;
+    const maxRetries = (job.max_retries as number) || 3;
+
+    if (retryCount < maxRetries) {
+      // Return to pending for retry
+      await supabase
+        .from('generation_jobs')
+        .update({
+          status: 'pending',
+          retry_count: retryCount,
+          error_message: `Auto-reset: stuck in running for >${STALE_JOB_TIMEOUT_MINUTES}min (likely timeout)`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+      console.log(`Reset stale job ${job.id} (type=${job.job_type}, step=${job.step_number}) to pending (retry ${retryCount}/${maxRetries})`);
+    } else {
+      // Max retries exhausted — mark as failed
+      await supabase
+        .from('generation_jobs')
+        .update({
+          status: 'failed',
+          retry_count: retryCount,
+          error_message: `Failed: stuck in running >${STALE_JOB_TIMEOUT_MINUTES}min, max retries exhausted`,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+
+      // Clear brief's active_job_id so user can retry manually
+      await supabase
+        .from('briefs')
+        .update({ active_job_id: null })
+        .eq('id', job.brief_id);
+
+      // Update batch counters for permanently failed job
+      if (job.batch_id) {
+        await updateBatchCounters(supabase, job.batch_id, 'failed');
+      }
+
+      console.log(`Marked stale job ${job.id} as failed (retries exhausted)`);
+    }
+    resetCount++;
+  }
+
+  return resetCount;
+}
+
+// ============================================
 // Main Handler
 // ============================================
 
@@ -1102,6 +1174,12 @@ Deno.serve(async (req: Request) => {
   );
 
   try {
+    // Reset any stale jobs before processing new ones
+    const staleCount = await resetStaleJobs(supabase);
+    if (staleCount > 0) {
+      console.log(`Reset ${staleCount} stale job(s)`);
+    }
+
     // Find pending jobs, ordered by creation time (FIFO)
     const { data: pendingJobs, error: fetchError } = await supabase
       .from('generation_jobs')
@@ -1120,7 +1198,7 @@ Deno.serve(async (req: Request) => {
 
     if (!pendingJobs || pendingJobs.length === 0) {
       return new Response(
-        JSON.stringify({ processed: 0, message: 'No pending jobs' }),
+        JSON.stringify({ processed: 0, stale_reset: staleCount, message: 'No pending jobs' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -1232,7 +1310,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ processed: results.length, results }),
+      JSON.stringify({ processed: results.length, stale_reset: staleCount, results }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {

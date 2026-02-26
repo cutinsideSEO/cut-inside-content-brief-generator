@@ -149,6 +149,8 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
   });
 
   // PHASE 2: Enrichment
+  // Use flash model for enrichment (faster, no creative reasoning needed)
+  const flashModel = model.replace('-pro', '-flash') as GeminiModel;
   const enrichmentSystemInstruction = getStructureEnrichmentPrompt(language);
   const enrichmentPrompt = `
       **Full Context from Previous Steps:**
@@ -160,8 +162,6 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
       **Original Competitor Data:**
       ${competitorDataJson}
 
-      ${groundTruthText ? `**"Ground Truth" Competitor Text:**\n${groundTruthText}` : ''}
-
       ${userFeedback ? `**User Feedback:**\n${userFeedback}` : ''}
 
       **Task:** Please enrich the 'guidelines', 'targeted_keywords', and 'competitor_coverage' fields.
@@ -169,13 +169,12 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
 
   const enrichedStructure = await retryOperation(async () => {
     const response = await callGeminiDirect(
-      model,
+      flashModel,
       enrichmentPrompt,
       {
         systemInstruction: enrichmentSystemInstruction,
         responseMimeType: 'application/json',
         responseSchema: schema,
-        ...(genConfig.thinkingConfig ? { thinkingConfig: genConfig.thinkingConfig as { thinkingBudget: number } } : {}),
       }
     );
     const text = response.text;
@@ -195,13 +194,12 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
   try {
     const finalStructure = await retryOperation(async () => {
       const response = await callGeminiDirect(
-        model,
+        flashModel,
         resourceAnalysisPrompt,
         {
           systemInstruction: resourceAnalysisSystemInstruction,
           responseMimeType: 'application/json',
           responseSchema: schema,
-          ...(genConfig.thinkingConfig ? { thinkingConfig: genConfig.thinkingConfig as { thinkingBudget: number } } : {}),
         }
       );
       const text = response.text;

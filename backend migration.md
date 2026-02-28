@@ -321,7 +321,7 @@ Key Logic That Moves from Frontend to Edge Functions
   Phase 3 fixes:
   - FIXED: Documented that thinkingLevel is intentionally ignored for article generation (JSDoc on buildArticleGenerationConfig and ArticleSectionParams.thinkingLevel)
 
-  No regressions found. All previously-passing checks remain passing. Build succeeds, 39/39 tests pass.
+  Status update (February 27, 2026): Build succeeds. Unit tests are now split from Playwright E2E and `npm run test:run` is green at 45/45 passing tests.
 
 ---
 
@@ -329,7 +329,9 @@ Key Logic That Moves from Frontend to Edge Functions
 
 - ✅ Move DataForSEO calls to Edge Function (`_shared/dataforseo-client.ts` — getSerpUrls, getOnPageElements)
 - ✅ Store credentials as Edge Function secrets (DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD)
-- ✅ Remove DataForSEO credentials from frontend env vars
+- ⚠️ DataForSEO frontend credential removal is only partial in current codebase.
+  - Supabase mode uses Edge Function secrets (`DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD`)
+  - Standalone mode still reads `VITE_DATAFORSEO_LOGIN` / `VITE_DATAFORSEO_PASSWORD`
 - ✅ Implement competitors job type in process-generation-queue
 - ✅ Frontend delegates in Supabase mode, standalone mode preserved (`services/dataforseoService.ts`)
 - Milestone achieved: Full generation pipeline runs server-side, no browser dependency

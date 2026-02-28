@@ -67,14 +67,38 @@ export async function createGenerationBatch(
 
 /** Cancel all pending jobs in a batch */
 export async function cancelBatch(batchId: string): Promise<void> {
-  // Set all pending jobs to cancelled
+  // Resolve cancellable jobs first so we can clear brief active pointers deterministically.
+  const { data: cancellableJobs, error: lookupError } = await supabase
+    .from('generation_jobs')
+    .select('id')
+    .eq('batch_id', batchId)
+    .in('status', ['pending', 'running']);
+
+  if (lookupError) console.warn('Failed to look up cancellable batch jobs:', lookupError.message);
+
+  const jobIds = (cancellableJobs || []).map((job) => job.id);
+
+  // Set all pending/running jobs to cancelled
   const { error: jobError } = await supabase
     .from('generation_jobs')
-    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .update({
+      status: 'cancelled',
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
     .eq('batch_id', batchId)
-    .eq('status', 'pending');
+    .in('status', ['pending', 'running']);
 
-  if (jobError) console.warn('Failed to cancel pending jobs:', jobError.message);
+  if (jobError) console.warn('Failed to cancel pending/running jobs:', jobError.message);
+
+  if (jobIds.length > 0) {
+    const { error: briefError } = await supabase
+      .from('briefs')
+      .update({ active_job_id: null })
+      .in('active_job_id', jobIds);
+
+    if (briefError) console.warn('Failed to clear active_job_id for cancelled batch jobs:', briefError.message);
+  }
 
   // Update batch status
   const { error: batchError } = await supabase

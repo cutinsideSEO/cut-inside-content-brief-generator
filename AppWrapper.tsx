@@ -320,6 +320,17 @@ const AppWrapperInner: React.FC = () => {
     }, 3000);
   }, []);
 
+  // Memoized wrappers for generation callbacks — inline arrow functions in JSX
+  // create new references every render, causing infinite re-render loops when
+  // effects in App.tsx depend on them and call them (triggering state updates).
+  const wrappedOnGenerationStart = useCallback((type: 'competitors' | 'brief' | 'content', briefId: string) => {
+    handleGenerationStart(type, briefId, state.selectedClientId || undefined, state.selectedClientName || undefined);
+  }, [state.selectedClientId, state.selectedClientName, handleGenerationStart]);
+
+  const wrappedOnGenerationProgress = useCallback((step: number) => {
+    if (state.currentBriefId) handleGenerationProgress(state.currentBriefId, step);
+  }, [state.currentBriefId, handleGenerationProgress]);
+
   // Handle client selection
   const handleSelectClient = useCallback((clientId: string, clientName: string, logoUrl?: string, brandColor?: string) => {
     setState((prev) => ({
@@ -657,8 +668,8 @@ const AppWrapperInner: React.FC = () => {
           saveStatus={state.saveStatus}
           lastSavedAt={state.lastSavedAt}
           isSupabaseMode={true}
-          onGenerationStart={(type, briefId) => handleGenerationStart(type, briefId, state.selectedClientId || undefined, state.selectedClientName || undefined)}
-          onGenerationProgress={(step) => state.currentBriefId && handleGenerationProgress(state.currentBriefId, step)}
+          onGenerationStart={wrappedOnGenerationStart}
+          onGenerationProgress={wrappedOnGenerationProgress}
           onGenerationComplete={handleGenerationComplete}
           isBackgroundMode={false}
           onSaveNowRef={saveNowRef}

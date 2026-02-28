@@ -167,7 +167,11 @@ const App: React.FC<AppProps> = ({
   onSaveNowRef,
 }) => {
   const [currentView, setCurrentView] = useState<AppView>('initial_input');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  // Start as loading when briefId is provided — prevents auto-save from
+  // writing stale default state during initial brief load (especially
+  // important because React StrictMode double-mounts in dev, triggering
+  // the unmount cleanup which would save stale data before load completes).
+  const [isLoading, setIsLoading] = useState<boolean>(Boolean(briefId));
   const [error, setError] = useState<string | null>(null);
   const [analysisLogs, setAnalysisLogs] = useState<string[]>([]);
 
@@ -311,7 +315,7 @@ const App: React.FC<AppProps> = ({
     },
     {
       briefId: briefId || null,
-      enabled: isSupabaseMode && Boolean(briefId),
+      enabled: isSupabaseMode && Boolean(briefId) && !isLoading,
       currentDbStatus: briefStatus,
       debounceMs: 500, // Reduced to minimize data loss
       onSaveStart: () => {
@@ -517,12 +521,15 @@ const App: React.FC<AppProps> = ({
     }
   }, [activeJob?.status, activeJob?.job_type, activeJob?.error_message, briefId, onGenerationComplete]);
 
-  // Propagate backend progress to parent
+  // Propagate backend progress to parent (use ref to avoid re-render loop —
+  // onGenerationProgress can change on every render if not memoized by the caller)
+  const onGenerationProgressRef2 = useRef(onGenerationProgress);
+  useEffect(() => { onGenerationProgressRef2.current = onGenerationProgress; }, [onGenerationProgress]);
   useEffect(() => {
-    if (isBackendGenerating && backendCurrentStep && onGenerationProgress) {
-      onGenerationProgress(backendCurrentStep);
+    if (isBackendGenerating && backendCurrentStep && onGenerationProgressRef2.current) {
+      onGenerationProgressRef2.current(backendCurrentStep);
     }
-  }, [isBackendGenerating, backendCurrentStep, onGenerationProgress]);
+  }, [isBackendGenerating, backendCurrentStep]);
 
   // Map backend article progress to generationProgress for ContentGenerationScreen
   useEffect(() => {

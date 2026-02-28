@@ -163,7 +163,7 @@ const buildGenerationConfig = (step: number, schema?: any) => {
 };
 
 // Retry utility to handle transient errors or occasional schema validation hiccups
-const retryOperation = async <T>(operation: () => Promise<T>, retries = 3, delay = 2000, timeoutMs = 60000): Promise<T> => {
+const retryOperation = async <T>(operation: () => Promise<T>, retries = 3, delay = 2000, timeoutMs = 120000): Promise<T> => {
     let lastError: any;
     for (let i = 0; i < retries; i++) {
         try {
@@ -496,6 +496,8 @@ const normalizeOutline = (items: OutlineItem[]): OutlineItem[] => {
 const generateHierarchicalArticleStructure = async (params: GenerationParams): Promise<{ article_structure: ArticleStructure }> => {
     const { competitorDataJson, subjectInfo, brandInfo, previousStepsData, userFeedback, isRegeneration, groundTruthText, language, lengthConstraints, templateHeadings, signal } = params;
     const modelName = getModelForStep(5);
+    // Use flash model for enrichment + resources (faster, no creative reasoning needed)
+    const flashModelName = modelName.replace('-pro', '-flash');
     const schema = getSchemaForStep(5);
     const genConfig = buildGenerationConfig(5, schema);
 
@@ -594,10 +596,10 @@ const generateHierarchicalArticleStructure = async (params: GenerationParams): P
       **Task:** Please enrich the 'guidelines', 'targeted_keywords', and 'competitor_coverage' fields.
     `;
 
-    // RETRY 2: Enrichment
+    // RETRY 2: Enrichment (use flash model — faster, no creative reasoning needed)
     const enrichedStructure = await retryOperation(async () => {
         const response = await callGemini(
-            modelName,
+            flashModelName,
             enrichmentPrompt,
             {
                 systemInstruction: enrichmentSystemInstruction,
@@ -620,11 +622,11 @@ const generateHierarchicalArticleStructure = async (params: GenerationParams): P
         **Task:** Identify necessary non-textual resources based on the guidelines.
     `;
 
-    // RETRY 3: Resource Analysis (with fallback)
+    // RETRY 3: Resource Analysis (with fallback, use flash model)
     try {
         const finalStructure = await retryOperation(async () => {
              const response = await callGemini(
-                modelName,
+                flashModelName,
                 resourceAnalysisPrompt,
                 {
                     systemInstruction: resourceAnalysisSystemInstruction,

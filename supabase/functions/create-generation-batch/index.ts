@@ -9,6 +9,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
+import { userHasClientAccess } from '../_shared/generation-guards.ts'
 
 // ============================================
 // Types
@@ -57,6 +58,10 @@ async function snapshotBriefConfig(supabase: any, briefId: string, writerInstruc
 
   if (briefError || !brief) {
     throw new Error(`Brief ${briefId} not found: ${briefError?.message || 'not found'}`)
+  }
+
+  if (!brief.client_id) {
+    throw new Error(`Brief ${briefId} is missing client_id`)
   }
 
   // Fetch competitors
@@ -230,7 +235,7 @@ Deno.serve(async (req: Request) => {
     // Validate user exists in access_codes
     const { data: accessCode, error: accessError } = await supabase
       .from('access_codes')
-      .select('id')
+      .select('id, is_admin, client_ids')
       .eq('id', user_id)
       .eq('is_active', true)
       .maybeSingle()
@@ -239,6 +244,14 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: 'Invalid user_id: access code not found or inactive' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate user can create jobs for this client
+    if (!userHasClientAccess(accessCode, client_id)) {
+      return new Response(
+        JSON.stringify({ error: `User ${user_id} does not have access to client ${client_id}` }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -376,6 +389,7 @@ Deno.serve(async (req: Request) => {
           .from('briefs')
           .select('id, status, active_job_id, client_id')
           .eq('id', briefId)
+          .eq('client_id', client_id)
           .single()
 
         if (briefError || !brief) {
@@ -447,6 +461,7 @@ Deno.serve(async (req: Request) => {
           .from('briefs')
           .select('id, status, active_job_id, client_id, brief_data')
           .eq('id', briefId)
+          .eq('client_id', client_id)
           .single()
 
         if (briefError || !brief) {

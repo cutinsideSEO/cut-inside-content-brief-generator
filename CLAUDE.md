@@ -27,6 +27,8 @@ npm run dev           # Start dev server on port 3000
 npm run build         # Production build
 npm run preview       # Preview production build
 npm test              # Run tests in watch mode
+npm run test:unit     # Run unit tests once (same as test:run)
+npm run test:e2e      # Run Playwright E2E tests
 npm run test:run      # Run tests once (CI mode)
 npm run test:coverage # Run tests with coverage report
 
@@ -34,7 +36,7 @@ npm run test:coverage # Run tests with coverage report
 npx vitest run tests/services/dataforseoService.test.ts
 ```
 
-Tests are in `tests/services/` (39 tests across 3 files). Test environment is `node` (not jsdom).
+Unit tests are in `tests/services/` (currently 45 tests across 4 files). `test:run` only collects `tests/**` and excludes Playwright specs under `e2e/`.
 
 ## Environment Variables
 
@@ -43,8 +45,11 @@ Tests are in `tests/services/` (39 tests across 3 files). Test environment is `n
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-# DataForSEO credentials are stored as Supabase Edge Function secrets
-# (DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD) — not exposed to the frontend
+# Supabase mode: DataForSEO credentials are stored as Edge Function secrets
+# (DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD)
+# Standalone mode can still use optional frontend defaults:
+# VITE_DATAFORSEO_LOGIN=...
+# VITE_DATAFORSEO_PASSWORD=...
 ```
 
 When Supabase env vars are not set, app runs in standalone mode without persistence.
@@ -186,6 +191,7 @@ pg_cron (every 10-30s) → process-generation-queue Edge Function
 - `brief-context.ts` — Brand context building, token budget management, competitor text truncation
 - `generation-config.ts` — Thinking budgets, model config builders
 - `dataforseo-client.ts` — Direct DataForSEO REST API client (SERP analysis + on-page content parsing)
+- `generation-guards.ts` — Shared guard helpers for client ownership and cancellation/chaining control flow
 - `cors.ts` — CORS headers configuration for Edge Functions
 
 **Batch generation flow** (`create-generation-batch` → `process-generation-queue`):
@@ -293,6 +299,7 @@ The `@/` alias maps to project root: `import { Card } from '@/components/ui'`
 - **Article thinking budget:** `buildArticleGenerationConfig()` uses a fixed `ARTICLE_THINKING_BUDGET` (8192) regardless of user's thinking level preference. This is intentional — do not wire `thinkingLevel` through for articles.
 - **`cancelGenerationJob()` clears `active_job_id`:** After cancelling a job, the service also clears `briefs.active_job_id` to prevent stale pointers. This is best-effort (warns on failure, doesn't throw).
 - **Regenerate Realtime race:** When a regenerate job completes, `App.tsx` does a one-time `getBrief()` fetch to catch brief data that may have been dropped by the Realtime subscription guard. This is necessary because the job status event can arrive before the brief data event.
+- **Resumable article generation:** Articles with 20+ sections survive EF timeouts via checkpoint-based resume. After each section, `contentParts[]` and `completed_section_index` are saved to `job.progress` JSONB. Critical: the `onProgress` callback must always carry forward the last checkpoint state (`lastCheckpointContent`/`lastCheckpointIndex`), because `updateJobProgress` replaces the entire JSONB — non-checkpoint progress calls (e.g., trim notifications) would otherwise wipe checkpoint data. Stale job timeout is 4 minutes.
 
 ## Deployment
 

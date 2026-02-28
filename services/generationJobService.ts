@@ -46,24 +46,55 @@ export async function createGenerationJob(
  * Also clears the brief's active_job_id pointer so it doesn't remain stale.
  */
 export async function cancelGenerationJob(jobId: string): Promise<void> {
-  const { error } = await supabase
+  const { data: targetJob, error: targetJobError } = await supabase
     .from('generation_jobs')
-    .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+    .select('id, brief_id, batch_id')
     .eq('id', jobId)
+    .single();
+
+  if (targetJobError || !targetJob) {
+    throw new Error(`Failed to load job for cancellation: ${targetJobError?.message || 'not found'}`);
+  }
+
+  let cancelQuery = supabase
+    .from('generation_jobs')
+    .update({
+      status: 'cancelled',
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('brief_id', targetJob.brief_id)
     .in('status', ['pending', 'running']);
 
+  if (targetJob.batch_id) {
+    cancelQuery = cancelQuery.eq('batch_id', targetJob.batch_id);
+  }
+
+  const { error } = await cancelQuery;
+
   if (error) throw new Error(`Failed to cancel job: ${error.message}`);
+
+  const { data: activeJob, error: activeJobError } = await supabase
+    .from('generation_jobs')
+    .select('id')
+    .eq('brief_id', targetJob.brief_id)
+    .in('status', ['pending', 'running'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   // Clear the stale active_job_id pointer on the brief.
   // This is best-effort — the cancellation itself already succeeded above,
   // so we log a warning rather than throwing if the brief update fails.
   const { error: briefError } = await supabase
     .from('briefs')
-    .update({ active_job_id: null })
-    .eq('active_job_id', jobId);
+    .update({ active_job_id: activeJob?.id ?? null })
+    .eq('id', targetJob.brief_id);
 
-  if (briefError) {
-    console.warn(`Job ${jobId} cancelled, but failed to clear briefs.active_job_id: ${briefError.message}`);
+  if (activeJobError || briefError) {
+    console.warn(
+      `Job ${jobId} cancelled, but failed to clear briefs.active_job_id: ${briefError?.message || activeJobError?.message}`
+    );
   }
 }
 

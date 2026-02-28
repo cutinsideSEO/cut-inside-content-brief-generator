@@ -245,11 +245,12 @@ export function useAutoSave(
       clearTimeout(timeoutRef.current);
     }
 
-    // Set new timeout
+    // Set new timeout — use ref to always call the latest performSave,
+    // preventing stale closures from saving outdated state
     timeoutRef.current = setTimeout(() => {
-      performSave();
+      performSaveRef.current();
     }, debounceMs);
-  }, [enabled, briefId, debounceMs, performSave]);
+  }, [enabled, briefId, debounceMs]);
 
   // Immediate save (bypass debounce)
   const saveNow = useCallback(async () => {

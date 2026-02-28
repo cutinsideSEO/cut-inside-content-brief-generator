@@ -10,10 +10,10 @@
 // 5. Status changes trigger Supabase Realtime for frontend updates
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
-import { executeBriefStep } from '../_shared/step-executor.ts'
-import { generateFullArticle } from '../_shared/article-generator.ts'
-import type { ArticleJobConfig, ArticleResumeState } from '../_shared/article-generator.ts'
+import { corsHeaders } from './_shared/cors.ts'
+import { executeBriefStep } from './_shared/step-executor.ts'
+import { generateFullArticle } from './_shared/article-generator.ts'
+import type { ArticleJobConfig, ArticleResumeState } from './_shared/article-generator.ts'
 import type {
   ContentBrief,
   CompetitorPage,
@@ -25,20 +25,15 @@ import type {
   LengthConstraints,
   HeadingNode,
   StepExecutionParams,
-} from '../_shared/types.ts'
+} from './_shared/types.ts'
 import {
   buildBrandContext,
   mergeBrandContext,
   formatForBriefGeneration,
   stripCompetitorFullText,
-} from '../_shared/brief-context.ts'
-import { retryOperation } from '../_shared/gemini-client.ts'
-import { getSerpUrls, getOnPageElements } from '../_shared/dataforseo-client.ts'
-import {
-  shouldCountFailedChainSlot,
-  shouldHaltJobProcessing,
-  type ChainJobOutcome,
-} from '../_shared/generation-guards.ts'
+} from './_shared/brief-context.ts'
+import { retryOperation } from './_shared/gemini-client.ts'
+import { getSerpUrls, getOnPageElements } from './_shared/dataforseo-client.ts'
 
 // ============================================
 // Constants
@@ -288,127 +283,22 @@ async function markJobCompleted(
   jobId: string,
   briefId: string,
   clearActiveJob = true
-): Promise<boolean> {
-  const { data: completedJob, error: completeError } = await supabase
+): Promise<void> {
+  await supabase
     .from('generation_jobs')
     .update({
       status: 'completed',
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq('id', jobId)
-    .eq('status', 'running')
-    .select('id')
-    .maybeSingle();
-
-  if (completeError) {
-    throw new Error(`Failed to mark job ${jobId} as completed: ${completeError.message}`);
-  }
-
-  if (!completedJob) {
-    return false;
-  }
+    .eq('id', jobId);
 
   if (clearActiveJob) {
     await supabase
       .from('briefs')
       .update({ active_job_id: null })
-      .eq('id', briefId)
-      .eq('active_job_id', jobId);
+      .eq('id', briefId);
   }
-
-  return true;
-}
-
-async function readProcessingStatuses(
-  supabase: SupabaseClient,
-  jobId: string,
-  batchId?: string | null
-): Promise<{ jobStatus: string; batchStatus: string | null }> {
-  const { data: jobRow, error: jobError } = await supabase
-    .from('generation_jobs')
-    .select('status')
-    .eq('id', jobId)
-    .single();
-
-  if (jobError || !jobRow) {
-    throw new Error(`Failed to read status for job ${jobId}: ${jobError?.message || 'not found'}`);
-  }
-
-  if (!batchId) {
-    return { jobStatus: jobRow.status as string, batchStatus: null };
-  }
-
-  const { data: batchRow, error: batchError } = await supabase
-    .from('generation_batches')
-    .select('status')
-    .eq('id', batchId)
-    .maybeSingle();
-
-  if (batchError) {
-    throw new Error(`Failed to read status for batch ${batchId}: ${batchError.message}`);
-  }
-
-  return {
-    jobStatus: jobRow.status as string,
-    batchStatus: (batchRow?.status as string | null) || null,
-  };
-}
-
-async function isProcessingCancelled(
-  supabase: SupabaseClient,
-  jobId: string,
-  batchId?: string | null
-): Promise<boolean> {
-  const { jobStatus, batchStatus } = await readProcessingStatuses(supabase, jobId, batchId);
-  return shouldHaltJobProcessing(jobStatus, batchStatus);
-}
-
-async function clearActiveJobPointer(
-  supabase: SupabaseClient,
-  briefId: string,
-  jobId: string
-): Promise<void> {
-  await supabase
-    .from('briefs')
-    .update({ active_job_id: null })
-    .eq('id', briefId)
-    .eq('active_job_id', jobId);
-}
-
-async function markJobCancelledIfActive(
-  supabase: SupabaseClient,
-  jobId: string,
-  briefId: string
-): Promise<void> {
-  await supabase
-    .from('generation_jobs')
-    .update({
-      status: 'cancelled',
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', jobId)
-    .in('status', ['pending', 'running']);
-
-  await clearActiveJobPointer(supabase, briefId, jobId);
-}
-
-async function readJobStatus(
-  supabase: SupabaseClient,
-  jobId: string
-): Promise<string> {
-  const { data: row, error } = await supabase
-    .from('generation_jobs')
-    .select('status')
-    .eq('id', jobId)
-    .single();
-
-  if (error || !row) {
-    throw new Error(`Failed to read final status for job ${jobId}: ${error?.message || 'not found'}`);
-  }
-
-  return row.status as string;
 }
 
 /**
@@ -552,12 +442,8 @@ async function chainFullBriefJob(
   supabase: SupabaseClient,
   job: JobRow,
   briefId: string
-): Promise<ChainJobOutcome> {
+): Promise<void> {
   try {
-    if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
-      return 'cancelled';
-    }
-
     // Fetch the brief with all related data for config snapshotting
     // (same pattern as create-generation-job)
     const { data: brief, error: briefError } = await supabase
@@ -568,7 +454,7 @@ async function chainFullBriefJob(
 
     if (briefError || !brief) {
       console.error(`Failed to read brief ${briefId} for chaining:`, briefError?.message);
-      return 'failed';
+      return;
     }
 
     // Fetch the freshly-saved competitors
@@ -604,10 +490,6 @@ async function chainFullBriefJob(
       .select('url, scraped_content, label')
       .eq('client_id', brief.client_id)
       .eq('scrape_status', 'done');
-
-    if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
-      return 'cancelled';
-    }
 
     // Build the full_brief config snapshot
     const nextConfig: Record<string, unknown> = {
@@ -679,25 +561,18 @@ async function chainFullBriefJob(
 
     if (nextJobError || !nextJob) {
       console.error(`Failed to create chained full_brief job for brief ${briefId}:`, nextJobError?.message);
-      return 'failed';
+      return;
     }
 
     // Update the brief's active_job_id to point to the new full_brief job
-    const { error: briefUpdateError } = await supabase
+    await supabase
       .from('briefs')
       .update({ active_job_id: nextJob.id })
       .eq('id', briefId);
 
-    if (briefUpdateError) {
-      console.error(`Failed to set active_job_id for chained full_brief job ${nextJob.id}:`, briefUpdateError.message);
-      return 'failed';
-    }
-
     console.log(`Chained full_brief job ${nextJob.id} for brief ${briefId} in batch ${job.batch_id}`);
-    return 'chained';
   } catch (err) {
     console.error(`Error chaining full_brief for brief ${briefId}:`, (err as Error).message);
-    return 'failed';
   }
 }
 
@@ -781,10 +656,6 @@ async function processFullBrief(supabase: SupabaseClient, job: JobRow): Promise<
   const hasNextStep = currentIndex >= 0 && currentIndex < EXECUTION_ORDER.length - 1;
 
   if (hasNextStep) {
-    if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
-      return;
-    }
-
     const nextStep = EXECUTION_ORDER[currentIndex + 1];
     const nextStepIndex = currentIndex + 1; // 0-based position in execution order
 
@@ -828,12 +699,15 @@ async function processFullBrief(supabase: SupabaseClient, job: JobRow): Promise<
       .eq('id', briefId);
 
     // Mark THIS job as completed (don't clear active_job_id since we set it to the new job)
-    await markJobCompleted(supabase, job.id, briefId, false);
+    await supabase
+      .from('generation_jobs')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', job.id);
   } else {
-    if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
-      return;
-    }
-
     // Step 7 — final step. Mark brief as complete (with workflow guard)
     const { currentStatus } = await readCurrentBriefData(supabase, briefId);
 
@@ -1068,10 +942,6 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
   const collectedPaaQuestions: string[] = [];
 
   for (let i = 0; i < keywords.length; i++) {
-    if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
-      return;
-    }
-
     const keyword = keywords[i];
     const volume = keywordVolumes[keyword] || 0;
 
@@ -1133,10 +1003,6 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
   }> = [];
 
   for (let i = 0; i < sortedUrls.length; i++) {
-    if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
-      return;
-    }
-
     const [url, data] = sortedUrls[i];
 
     await updateJobProgress(supabase, job.id, {
@@ -1253,21 +1119,8 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
   // If this is a batched full_pipeline job, chain a full_brief job next.
   // Don't clear active_job_id — chainFullBriefJob will set it to the new job.
   if (job.batch_id) {
-    const completed = await markJobCompleted(supabase, job.id, briefId, false);
-    if (!completed) {
-      return;
-    }
-
-    const chainOutcome = await chainFullBriefJob(supabase, job, briefId);
-    if (chainOutcome === 'cancelled') {
-      await clearActiveJobPointer(supabase, briefId, job.id as string);
-      return;
-    }
-
-    if (shouldCountFailedChainSlot(chainOutcome)) {
-      await clearActiveJobPointer(supabase, briefId, job.id as string);
-      await updateBatchCounters(supabase, job.batch_id as string, 'failed');
-    }
+    await markJobCompleted(supabase, job.id, briefId, false);
+    await chainFullBriefJob(supabase, job, briefId);
   } else {
     await markJobCompleted(supabase, job.id, briefId, true);
   }
@@ -1409,12 +1262,6 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
-        await markJobCancelledIfActive(supabase, job.id, job.brief_id);
-        results.push({ job_id: job.id, status: 'cancelled' });
-        continue;
-      }
-
       try {
         // Route to the appropriate handler
         switch (job.job_type) {
@@ -1437,17 +1284,6 @@ Deno.serve(async (req: Request) => {
             throw new Error(`Unsupported job type: ${job.job_type}`);
         }
 
-        const finalStatus = await readJobStatus(supabase, job.id);
-        if (finalStatus === 'cancelled') {
-          results.push({ job_id: job.id, status: 'cancelled' });
-          continue;
-        }
-
-        if (finalStatus !== 'completed') {
-          results.push({ job_id: job.id, status: finalStatus });
-          continue;
-        }
-
         // Update batch counters if this job belongs to a batch.
         // For full_brief jobs, only count the final step (step 7) since intermediate
         // steps chain to the next step and shouldn't each count as a separate batch job.
@@ -1462,16 +1298,10 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        results.push({ job_id: job.id, status: finalStatus });
+        results.push({ job_id: job.id, status: 'completed' });
       } catch (err) {
         const error = err as Error;
         console.error(`Job ${job.id} failed:`, error.message);
-
-        const liveStatus = await readJobStatus(supabase, job.id).catch(() => null);
-        if (liveStatus === 'cancelled') {
-          results.push({ job_id: job.id, status: 'cancelled' });
-          continue;
-        }
 
         const retryCount = ((job.retry_count as number) || 0) + 1;
         const maxRetries = (job.max_retries as number) || 3;
@@ -1486,8 +1316,7 @@ Deno.serve(async (req: Request) => {
               error_message: error.message,
               updated_at: new Date().toISOString(),
             })
-            .eq('id', job.id)
-            .eq('status', 'running');
+            .eq('id', job.id);
         } else {
           // Max retries exceeded — mark as failed
           await supabase
@@ -1499,11 +1328,13 @@ Deno.serve(async (req: Request) => {
               completed_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             })
-            .eq('id', job.id)
-            .eq('status', 'running');
+            .eq('id', job.id);
 
           // Clear brief's active_job_id so user can retry
-          await clearActiveJobPointer(supabase, job.brief_id, job.id);
+          await supabase
+            .from('briefs')
+            .update({ active_job_id: null })
+            .eq('id', job.brief_id);
 
           // Update batch counters for permanently failed job
           if (job.batch_id) {

@@ -10,6 +10,9 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        watch: {
+          ignored: ['**/screenshots/**', '**/test-results/**', '**/playwright-report/**', '**/e2e/**'],
+        },
       },
       plugins: [react(), tailwindcss()],
       define: {},
@@ -22,7 +25,8 @@ export default defineConfig(({ mode }) => {
         globals: true,
         environment: 'node',
         setupFiles: ['./tests/setup.ts'],
-        include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+        include: ['tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+        exclude: ['e2e/**', 'playwright-report/**', 'test-results/**'],
         coverage: {
           provider: 'v8',
           reporter: ['text', 'json', 'html'],

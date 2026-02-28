@@ -5,7 +5,6 @@ import SaveStatusIndicator from './SaveStatusIndicator';
 import type { SaveStatus } from '../types/appState';
 
 interface HeaderProps {
-  isSupabaseMode?: boolean;
   clientName?: string | null;
   clientLogoUrl?: string | null;
   clientBrandColor?: string | null;
@@ -15,7 +14,6 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({
-  isSupabaseMode,
   clientName,
   clientLogoUrl,
   clientBrandColor,
@@ -38,7 +36,7 @@ const Header: React.FC<HeaderProps> = ({
             />
             <div className="hidden md:flex items-center gap-2 pl-4 border-l border-gray-200">
               <p className="text-sm text-gray-600 font-heading tracking-wider">Content Brief Generator</p>
-              {isSupabaseMode && clientName && (
+              {clientName && (
                 <>
                   <ChevronRightIcon className="h-3.5 w-3.5 text-gray-400" />
                   <div className="flex items-center gap-1.5">
@@ -73,9 +71,7 @@ const Header: React.FC<HeaderProps> = ({
 
           {/* Right side: Save Status + Sound Toggle */}
           <div className="flex items-center gap-4">
-            {isSupabaseMode && (
-              <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt ?? null} />
-            )}
+            <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt ?? null} />
             <button
               onClick={sound?.toggleSound}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all ${

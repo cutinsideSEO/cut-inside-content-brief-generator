@@ -36,27 +36,23 @@ npm run test:coverage # Run tests with coverage report
 npx vitest run tests/services/dataforseoService.test.ts
 ```
 
-Unit tests are in `tests/services/` (currently 45 tests across 4 files). `test:run` only collects `tests/**` and excludes Playwright specs under `e2e/`.
+Unit tests are in `tests/services/` (currently 93 tests across 6 files). `test:run` only collects `tests/**` and excludes Playwright specs under `e2e/`.
 
 ## Environment Variables
 
 ```env
-# Supabase (required for full functionality — auth, persistence, AI proxy)
+# Supabase (required — app runs exclusively in Supabase mode)
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-# Supabase mode: DataForSEO credentials are stored as Edge Function secrets
-# (DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD)
-# Standalone mode can still use optional frontend defaults:
-# VITE_DATAFORSEO_LOGIN=...
-# VITE_DATAFORSEO_PASSWORD=...
+# DataForSEO and Gemini credentials are stored as Edge Function secrets
+# (DATAFORSEO_LOGIN, DATAFORSEO_PASSWORD, GEMINI_API_KEY)
+# No client-side API keys needed.
 ```
 
-When Supabase env vars are not set, app runs in standalone mode without persistence.
+**Important:** There is no client-side `GEMINI_API_KEY` or DataForSEO credentials. All Gemini calls go through a Supabase Edge Function (`gemini-proxy`) which holds the API key in its secrets. DataForSEO calls are handled server-side via the `competitors` job type. See `services/geminiService.ts` — both `callGemini()` and `callGeminiStream()` hit the edge function endpoint.
 
-**Important:** There is no client-side `GEMINI_API_KEY`. All Gemini calls go through a Supabase Edge Function (`gemini-proxy`) which holds the API key in its secrets. See `services/geminiService.ts` — both `callGemini()` and `callGeminiStream()` hit the edge function endpoint.
-
-Vite requires `VITE_` prefix for all client-side env vars (`import.meta.env.VITE_*`). Check Supabase availability with `isSupabaseConfigured()` from `services/supabaseClient.ts`.
+Vite requires `VITE_` prefix for all client-side env vars (`import.meta.env.VITE_*`).
 
 ## Architecture
 
@@ -65,34 +61,27 @@ Vite requires `VITE_` prefix for all client-side env vars (`import.meta.env.VITE
 All source files are at the **project root** — there is no `src/` directory.
 
 - `App.tsx` — Main brief wizard logic, state hub with 20+ useState hooks
-- `AppWrapper.tsx` — Auth flow, navigation between screens, background generation orchestration
+- `AppWrapper.tsx` — Auth flow, navigation between screens, generation job tracking via Realtime
 - `constants.ts` — All Gemini system prompts, word count thresholds, thinking budget configs
 - `types.ts` — Core domain types (`ContentBrief`, `CompetitorPage`, `OnPageSeo`, etc.)
 - `types/appState.ts` — Full `AppState` interface, `SaveStatus` type
 - `types/database.ts` — Supabase table row types
 - `styles/globals.css` — Tailwind v4 `@theme` block with all design tokens
 
-### Application Modes
+### Application Flow
 
-The app has two modes controlled by `AppWrapper.tsx`:
-
-1. **Standalone Mode** (no Supabase): Direct access to brief wizard, no persistence
-2. **Supabase Mode**: Login → Client Select → Brief List → Brief Editor with auto-save
+The app runs exclusively in Supabase mode, controlled by `AppWrapper.tsx`:
 
 ```
 index.tsx → AppWrapper.tsx → AuthProvider
                            ↓
-              ┌────────────┴────────────┐
-              │                         │
-        isConfigured?              standalone
-              │                         │
-        LoginScreen                 App (no briefId)
-              ↓
-        ClientSelectScreen
-              ↓
-        BriefListScreen
-              ↓
-        App (with briefId)
+                     LoginScreen
+                           ↓
+                   ClientSelectScreen
+                           ↓
+                    BriefListScreen
+                           ↓
+                    App (with briefId)
 ```
 
 ### Brief Generation Pipeline (7 Steps)
@@ -107,25 +96,25 @@ Each step is a screen in `components/stages/Stage{1-7}*.tsx` and a Gemini prompt
 6. **FAQ Generation** — Questions from People Also Ask data
 7. **On-Page SEO** — Title tag, meta description, H1, slug, OG tags
 
-### Gemini AI Integration (Dual Mode)
+### Gemini AI Integration
 
-The app supports two generation paths: **frontend** (legacy, still used in standalone mode) and **backend** (Supabase mode, actively being migrated to):
+Generation uses two layers:
 
-**Frontend path** (`services/geminiService.ts` → `gemini-proxy` Edge Function):
+**Frontend helpers** (`services/geminiService.ts` → `gemini-proxy` Edge Function):
 - `callGemini()` / `callGeminiStream()` — Proxied Gemini API calls
-- `generateBriefStep()` — Brief steps 1-7 with structured JSON output
-- `generateArticleSection()` — Article content with streaming
-- System prompts and JSON schemas in `constants.ts`
+- `generateBriefStep()` — Manual step-by-step brief generation (steps 1-7)
+- `regenerateParagraph()` — Inline paragraph editing
+- Optimizer/validator functions (`optimizeMetaTitle`, `optimizeMetaDescription`, etc.)
 
-**Backend path** (job queue → Edge Functions → direct Gemini REST API):
+**Backend job queue** (Edge Functions → direct Gemini REST API):
 - `create-generation-job` Edge Function — Creates jobs, snapshots brief config
 - `process-generation-queue` Edge Function — Worker processing pending jobs via pg_cron
-- `_shared/` modules — Server-side ports of generation logic (types, prompts, schemas, gemini-client, step-executor, article-generator, brief-context, generation-config)
+- `_shared/` modules — Server-side generation logic (types, prompts, schemas, gemini-client, step-executor, article-generator, brief-context, generation-config)
 - Frontend subscribes via Supabase Realtime for live progress updates
 
-**In Supabase mode**, the backend handles all job types (`competitors`, `brief_step`, `full_brief`, `regenerate`, `article`). The frontend delegates via `services/generationJobService.ts` → `createGenerationJob()`.
+The backend handles all job types (`competitors`, `brief_step`, `full_brief`, `regenerate`, `article`). The frontend delegates via `services/generationJobService.ts` → `createGenerationJob()`.
 
-**DataForSEO dual mode:** `services/dataforseoService.ts` is kept for standalone mode (no Supabase). In Supabase mode, competitor analysis runs server-side via the `competitors` job type using `_shared/dataforseo-client.ts`.
+**DataForSEO:** Competitor analysis runs server-side via the `competitors` job type using `_shared/dataforseo-client.ts`. The frontend `services/dataforseoService.ts` provides `getOnPageElementsViaProxy()` for context URL scraping and `getDetailedOnpageElements()` for template extraction.
 
 ### Key Component Layers
 
@@ -157,10 +146,6 @@ components/
 - `staleSteps: Set<number>` — Steps needing regeneration after edits
 
 Auto-save: `useAutoSave` hook debounces state changes (500ms) and persists to Supabase. Accepts `currentDbStatus` option to guard against overwriting workflow statuses.
-
-### Parallel Background Generation
-
-`AppWrapper.tsx` tracks multiple simultaneous brief generations via `generatingBriefs: Record<string, GeneratingBrief>`. Hidden `<App>` instances render off-screen to maintain React state while the user navigates elsewhere. A floating panel shows progress with "View" buttons.
 
 ### Backend Generation Architecture (Job Queue)
 

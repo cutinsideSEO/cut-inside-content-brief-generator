@@ -479,7 +479,8 @@ async function mergeAndSaveBriefData(
 async function updateBatchCounters(
   supabase: SupabaseClient,
   batchId: string,
-  outcome: 'completed' | 'failed'
+  outcome: 'completed' | 'failed',
+  count = 1
 ): Promise<void> {
   try {
     // Atomically increment the counter using the RPC function (avoids race conditions)
@@ -487,7 +488,7 @@ async function updateBatchCounters(
     const { error: rpcError } = await supabase.rpc('increment_batch_counter', {
       p_batch_id: batchId,
       p_column: column,
-      p_increment: 1,
+      p_increment: count,
     });
 
     if (rpcError) {
@@ -1331,7 +1332,10 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
 
       // Update batch counters for permanently failed job
       if (job.batch_id) {
-        await updateBatchCounters(supabase, job.batch_id, 'failed');
+        // For full_pipeline competitors: count both the failed competitors slot
+        // and the never-created chained full_brief slot
+        const failCount = job.job_type === 'competitors' ? 2 : 1;
+        await updateBatchCounters(supabase, job.batch_id, 'failed', failCount);
       }
 
       console.log(`Marked stale job ${job.id} as failed (retries exhausted)`);
@@ -1350,6 +1354,20 @@ Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Auth gate: require QUEUE_PROCESSOR_SECRET for non-preflight requests.
+  // This function uses verify_jwt: false (called by pg_cron), so we validate
+  // a shared secret instead. Set QUEUE_PROCESSOR_SECRET as an EF secret.
+  const expectedSecret = Deno.env.get('QUEUE_PROCESSOR_SECRET');
+  if (expectedSecret) {
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader !== `Bearer ${expectedSecret}`) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   }
 
   const supabase = createClient(
@@ -1507,7 +1525,10 @@ Deno.serve(async (req: Request) => {
 
           // Update batch counters for permanently failed job
           if (job.batch_id) {
-            await updateBatchCounters(supabase, job.batch_id, 'failed');
+            // For full_pipeline competitors: count both the failed competitors slot
+            // and the never-created chained full_brief slot
+            const failCount = job.job_type === 'competitors' ? 2 : 1;
+            await updateBatchCounters(supabase, job.batch_id, 'failed', failCount);
           }
         }
 

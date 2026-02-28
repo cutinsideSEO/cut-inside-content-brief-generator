@@ -235,6 +235,128 @@ async function cancelJobById(jobId: string, briefId: string | null): Promise<voi
 }
 
 /**
+ * Find the most recent completed brief for the CI client that has all 7 steps.
+ */
+export async function findCompletedCIBrief(): Promise<{ id: string; name: string } | null> {
+  // Find CI client
+  const clientRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/clients?select=id,name&limit=10`,
+    {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!clientRes.ok) return null;
+  const clients = await clientRes.json();
+  const ciClient = clients.find((c: any) => c.name === 'CI' || c.name.startsWith('CI'));
+  if (!ciClient) return null;
+
+  // Find most recent completed brief with on_page_seo (step 7 done)
+  const briefRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/briefs?client_id=eq.${ciClient.id}&status=eq.complete&select=id,name,current_view,brief_data&order=updated_at.desc&limit=5`,
+    {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!briefRes.ok) return null;
+  const briefs = await briefRes.json();
+  const target = briefs.find((b: any) => b.brief_data?.on_page_seo) || briefs[0];
+  return target ? { id: target.id, name: target.name } : null;
+}
+
+/**
+ * Force a brief's current_view to 'dashboard' via direct DB update.
+ */
+export async function setBriefDashboardView(briefId: string): Promise<void> {
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/briefs?id=eq.${briefId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ current_view: 'dashboard' }),
+    }
+  );
+}
+
+/**
+ * Fetch a brief's data from Supabase.
+ */
+export async function fetchBriefData(briefId: string): Promise<any> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/briefs?id=eq.${briefId}&select=id,name,status,brief_data,active_job_id`,
+    {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) throw new Error(`Failed to fetch brief: ${res.status}`);
+  const briefs = await res.json();
+  return briefs?.[0] || null;
+}
+
+/**
+ * Update a brief's brief_data JSONB via direct DB PATCH.
+ */
+export async function patchBriefData(briefId: string, briefData: Record<string, any>): Promise<void> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/briefs?id=eq.${briefId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ brief_data: briefData }),
+    }
+  );
+  if (!res.ok) throw new Error(`Failed to patch brief data: ${res.status}`);
+}
+
+/**
+ * Call the create-generation-job Edge Function directly.
+ */
+export async function callCreateGenerationJob(
+  body: {
+    brief_id: string;
+    job_type: string;
+    step_number?: number;
+    user_feedback?: string;
+  }
+): Promise<{ job_id: string }> {
+  const res = await fetch(
+    `${SUPABASE_URL}/functions/v1/create-generation-job`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`create-generation-job failed (${res.status}): ${errText}`);
+  }
+  return res.json();
+}
+
+/**
  * Cancel any stale (pending/running) generation jobs via direct Supabase REST API.
  * This is needed because the Edge Function can timeout before markJobCompleted runs,
  * leaving the competitors job stuck in 'running' status. This blocks creating new jobs (409).

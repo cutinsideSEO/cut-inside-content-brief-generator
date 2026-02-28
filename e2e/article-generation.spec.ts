@@ -1,64 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { login, selectClient, TEST_CLIENT_NAME, waitForJobsToComplete, SUPABASE_URL, SUPABASE_ANON_KEY } from './helpers';
+import { login, selectClient, TEST_CLIENT_NAME, waitForJobsToComplete, findCompletedCIBrief, setBriefDashboardView } from './helpers';
 import * as os from 'os';
 import * as path from 'path';
 
 // Use OS temp dir for debug screenshots to avoid triggering Vite HMR
 const SCREENSHOT_DIR = path.join(os.tmpdir(), 'playwright-debug');
-
-/**
- * Find the most recent completed brief for the CI client that has all 7 steps.
- */
-async function findCompletedCIBrief(): Promise<{ id: string; name: string } | null> {
-  // Find CI client
-  const clientRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/clients?select=id,name&limit=10`,
-    {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!clientRes.ok) return null;
-  const clients = await clientRes.json();
-  const ciClient = clients.find((c: any) => c.name === 'CI' || c.name.startsWith('CI'));
-  if (!ciClient) return null;
-
-  // Find most recent completed brief with on_page_seo (step 7 done)
-  const briefRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/briefs?client_id=eq.${ciClient.id}&status=eq.complete&select=id,name,current_view,brief_data&order=updated_at.desc&limit=5`,
-    {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!briefRes.ok) return null;
-  const briefs = await briefRes.json();
-  const target = briefs.find((b: any) => b.brief_data?.on_page_seo) || briefs[0];
-  return target ? { id: target.id, name: target.name } : null;
-}
-
-/**
- * Force a brief's current_view to 'dashboard' via direct DB update.
- */
-async function setBriefDashboardView(briefId: string): Promise<void> {
-  await fetch(
-    `${SUPABASE_URL}/rest/v1/briefs?id=eq.${briefId}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ current_view: 'dashboard' }),
-    }
-  );
-}
 
 test.describe('Article Generation', () => {
   test('generate article from a completed brief', async ({ page }) => {

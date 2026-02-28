@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
+import { userHasClientAccess } from '../_shared/generation-guards.ts'
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -15,7 +16,7 @@ Deno.serve(async (req: Request) => {
     )
 
     // Parse request
-    const { brief_id, job_type, step_number, batch_id, user_feedback, writer_instructions, keywords, keyword_volumes, country, serp_language, output_language } = await req.json()
+    const { brief_id, job_type, step_number, batch_id, user_id, user_feedback, writer_instructions, keywords, keyword_volumes, country, serp_language, output_language } = await req.json()
 
     // Validate required fields
     if (!brief_id || !job_type) {
@@ -61,6 +62,37 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: 'Brief not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate user ownership
+    if (!user_id) {
+      return new Response(
+        JSON.stringify({ error: 'user_id is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Verify user exists and is active
+    const { data: accessCode, error: accessError } = await supabase
+      .from('access_codes')
+      .select('id, is_admin, client_ids')
+      .eq('id', user_id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (accessError || !accessCode) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid user_id: access code not found or inactive' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate user has access to this brief's client
+    if (!userHasClientAccess(accessCode, brief.client_id)) {
+      return new Response(
+        JSON.stringify({ error: `User does not have access to client ${brief.client_id}` }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -165,7 +197,7 @@ Deno.serve(async (req: Request) => {
       .insert({
         brief_id,
         client_id: brief.client_id,
-        created_by: brief.created_by,
+        created_by: user_id,
         batch_id: batch_id || null,
         job_type,
         step_number: initialStep,

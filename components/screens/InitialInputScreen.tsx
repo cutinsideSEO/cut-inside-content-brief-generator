@@ -4,9 +4,8 @@ import { AlertTriangleIcon, UploadCloudIcon, XIcon, FileCodeIcon, BrainCircuitIc
 import ModelSelector from '../ModelSelector';
 import LengthSettings from '../LengthSettings';
 import KeywordTableInput from '../KeywordTableInput';
-import { Card, Input, Textarea, Alert, Badge, Tabs, Select, Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui';
+import { Card, Input, Alert, Tabs, Select, Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui';
 import type { ModelSettings, LengthConstraints, ExtractedTemplate } from '../../types';
-import { isSupabaseConfigured } from '../../services/supabaseClient';
 
 interface KeywordRow {
   id: string;
@@ -51,11 +50,6 @@ const findDefaultColumn = (headers: string[], keywords: string[]): string => {
   return headers.length > 0 ? headers[0] : '';
 };
 
-// Check if DataForSEO credentials are configured via environment variables
-const dfsEnvLogin = import.meta.env.VITE_DATAFORSEO_LOGIN || '';
-const dfsEnvPassword = import.meta.env.VITE_DATAFORSEO_PASSWORD || '';
-const hasDfsEnvCredentials = Boolean(dfsEnvLogin && dfsEnvPassword);
-
 // Proper CSV line parser that handles quoted values with commas and escaped quotes
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
@@ -90,8 +84,8 @@ const StepDots = ({ current, total }: { current: number; total: number }) => (
 );
 
 const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis, isLoading, error, onStartUpload }) => {
-  const [login, setLogin] = useState(dfsEnvLogin);
-  const [password, setPassword] = useState(dfsEnvPassword);
+  const [login] = useState('');
+  const [password] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [keywordColumn, setKeywordColumn] = useState('');
@@ -163,10 +157,6 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
 
   const handleSubmit = async () => {
     setLocalError('');
-    if (!isSupabaseConfigured() && !login && !password) {
-        setLocalError("Please enter your DataForSEO credentials.");
-        return;
-    }
 
     let keywords: { kw: string, volume: number }[] = [];
 
@@ -275,10 +265,9 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
     return manualKeywordRows.some(row => row.keyword.trim() !== '' && row.volume.trim() !== '');
   };
 
-  // Validation for step 2: credentials must exist (not needed in Supabase mode)
+  // Validation for step 2: always valid (backend handles credentials)
   const isStep2Valid = (): boolean => {
-    if (isSupabaseConfigured()) return true; // Backend handles credentials
-    return Boolean(login && password);
+    return true;
   };
 
   const handleNextFromStep1 = () => {
@@ -441,29 +430,6 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
           </div>
         </Card>
 
-        {!hasDfsEnvCredentials && !isSupabaseConfigured() && (
-          <Card variant="default" padding="lg">
-            <div className="mb-4">
-              <h3 className="font-heading font-semibold text-foreground">DataForSEO Credentials</h3>
-              <p className="text-sm text-muted-foreground mt-1">Required to fetch SERP data for your keywords.</p>
-            </div>
-            <div className="space-y-4">
-              <Input
-                label="DataForSEO Login"
-                value={login}
-                onChange={(e) => setLogin(e.target.value)}
-                placeholder="Enter login..."
-              />
-              <Input
-                type="password"
-                label="DataForSEO Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password..."
-              />
-            </div>
-          </Card>
-        )}
       </div>
 
       {(error || localError) && (

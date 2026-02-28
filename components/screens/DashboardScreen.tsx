@@ -47,7 +47,6 @@ interface DashboardScreenProps {
   // Save status
   saveStatus?: SaveStatus;
   lastSavedAt?: Date | null;
-  isSupabaseMode?: boolean;
   // Lifted sidebar state
   selectedSection?: number | null;
   onSelectSection?: (section: number | null) => void;
@@ -164,8 +163,8 @@ const EEATSignalsDisplay: React.FC<{ signals: EEATSignals }> = ({ signals }) => 
 };
 
 // A new component for the "home" state of the dashboard
-const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'isUploadedBrief' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'isSupabaseMode' | 'briefId' | 'briefStatus' | 'onWorkflowStatusChange'>> = ({
-    briefData, setBriefData, staleSteps, isUploadedBrief, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, isSupabaseMode, briefId, briefStatus, onWorkflowStatusChange,
+const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'isUploadedBrief' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'briefId' | 'briefStatus' | 'onWorkflowStatusChange'>> = ({
+    briefData, setBriefData, staleSteps, isUploadedBrief, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, briefId, briefStatus, onWorkflowStatusChange,
 }) => {
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingEEAT, setIsGeneratingEEAT] = useState(false);
@@ -273,7 +272,7 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                             <span>{h2Count} sections</span>
                             <Separator orientation="vertical" className="h-3.5" />
                             <span>{faqCount} FAQs</span>
-                            {isSupabaseMode && saveStatus && (
+                            {saveStatus && (
                                 <>
                                     <Separator orientation="vertical" className="h-3.5" />
                                     <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt ?? null} />
@@ -554,7 +553,7 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
 
 
 const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
-    const { briefData, setBriefData, staleSteps, userFeedbacks, onFeedbackChange, onRegenerate, isLoading, loadingStep, competitorData, keywordVolumeMap, isUploadedBrief, outputLanguage, saveStatus, lastSavedAt, isSupabaseMode, selectedSection: externalSelectedSection, onSelectSection: externalOnSelectSection } = props;
+    const { briefData, setBriefData, staleSteps, userFeedbacks, onFeedbackChange, onRegenerate, isLoading, loadingStep, competitorData, keywordVolumeMap, isUploadedBrief, outputLanguage, saveStatus, lastSavedAt, selectedSection: externalSelectedSection, onSelectSection: externalOnSelectSection } = props;
     const [internalSelectedSection, setInternalSelectedSection] = useState<number | null>(null);
     const selectedSection = externalSelectedSection !== undefined ? externalSelectedSection : internalSelectedSection;
     const setSelectedSection = externalOnSelectSection || setInternalSelectedSection;

@@ -1,6 +1,7 @@
 // Generation Job Service - CRUD operations for server-side generation jobs
 import { supabase } from './supabaseClient';
 import type { GenerationJob, GenerationJobType, GenerationBatch } from '../types/database';
+import { getCurrentUserId } from './authService';
 
 /**
  * Create a generation job by calling the create-generation-job Edge Function.
@@ -24,6 +25,7 @@ export async function createGenerationJob(
   const { data, error } = await supabase.functions.invoke('create-generation-job', {
     body: {
       brief_id: briefId,
+      user_id: getCurrentUserId(),
       job_type: jobType,
       step_number: options?.stepNumber,
       user_feedback: options?.userFeedback,

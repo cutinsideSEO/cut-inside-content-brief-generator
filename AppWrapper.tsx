@@ -1,7 +1,7 @@
 // AppWrapper - Integrates Supabase auth and brief management with the existing App
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { isSupabaseConfigured, supabase } from './services/supabaseClient';
+import { supabase } from './services/supabaseClient';
 import { createBrief, getBrief, updateBriefStatus } from './services/briefService';
 import { isWorkflowStatus } from './types/database';
 import { getAccessibleClients, getClientWithContext } from './services/clientService';
@@ -48,7 +48,7 @@ interface GeneratingBrief {
 // Types for the wrapper state
 interface WrapperState {
   // Navigation mode
-  mode: 'standalone' | 'client_select' | 'brief_list' | 'brief_editor' | 'client_profile';
+  mode: 'client_select' | 'brief_list' | 'brief_editor' | 'client_profile';
 
   // Selected context
   selectedClientId: string | null;
@@ -70,14 +70,14 @@ interface WrapperState {
 
 // Inner component that uses auth context
 const AppWrapperInner: React.FC = () => {
-  const { isAuthenticated, isLoading: authLoading, logout, isConfigured, userName } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, logout, userName } = useAuth();
   const { loadBrief, isLoading: briefLoading } = useBriefLoader();
 
   // Ref to hold saveNow function from the currently active App instance
   const saveNowRef = useRef<(() => Promise<void>) | null>(null);
 
   const [state, setState] = useState<WrapperState>({
-    mode: 'standalone',
+    mode: 'client_select',
     selectedClientId: null,
     selectedClientName: null,
     selectedClientLogoUrl: null,
@@ -197,33 +197,23 @@ const AppWrapperInner: React.FC = () => {
     };
   }, [isAuthenticated, state.selectedClientId, state.selectedClientName]);
 
-  // Determine initial mode based on auth and config
+  // Determine initial mode — always client_select (login shown if not authenticated)
   useEffect(() => {
     if (!authLoading) {
-      if (isConfigured) {
-        // Supabase configured - show client_select (which will show login if not authenticated)
-        setState((prev) => ({ ...prev, mode: 'client_select' }));
-      } else {
-        // No Supabase - run in standalone mode
-        setState((prev) => ({ ...prev, mode: 'standalone' }));
-      }
+      setState((prev) => ({ ...prev, mode: 'client_select' }));
     }
-  }, [authLoading, isAuthenticated, isConfigured]);
+  }, [authLoading]);
 
   // Handle login success
   const handleLoginSuccess = useCallback(() => {
-    if (isConfigured) {
-      setState((prev) => ({ ...prev, mode: 'client_select' }));
-    } else {
-      setState((prev) => ({ ...prev, mode: 'standalone' }));
-    }
-  }, [isConfigured]);
+    setState((prev) => ({ ...prev, mode: 'client_select' }));
+  }, []);
 
   // Handle logout
   const handleLogout = useCallback(() => {
     logout();
     setState({
-      mode: 'standalone',
+      mode: 'client_select',
       selectedClientId: null,
       selectedClientName: null,
       selectedClientLogoUrl: null,
@@ -667,19 +657,12 @@ const AppWrapperInner: React.FC = () => {
           onSaveStatusChange={handleSaveStatusChange}
           saveStatus={state.saveStatus}
           lastSavedAt={state.lastSavedAt}
-          isSupabaseMode={true}
           onGenerationStart={wrappedOnGenerationStart}
           onGenerationProgress={wrappedOnGenerationProgress}
           onGenerationComplete={handleGenerationComplete}
-          isBackgroundMode={false}
           onSaveNowRef={saveNowRef}
         />
       );
-
-    case 'standalone':
-    default:
-      // Run the original app without Supabase integration
-      return <OriginalApp isSupabaseMode={false} />;
   }
 };
 

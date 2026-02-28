@@ -59,59 +59,6 @@ const executePost = async (endpoint: string, payload: any[], login: string, pass
 };
 
 
-export interface SerpResult {
-    url: string;
-    rank: number;
-}
-
-export interface SerpResponse {
-    urls: SerpResult[];
-    paaQuestions: string[];
-}
-
-export const getSerpUrls = async (keyword: string, login: string, password: string, country: string, language: string): Promise<SerpResponse> => {
-    const payload = [{
-        language_name: language,
-        location_name: country,
-        keyword: keyword,
-        depth: 20 // Search deeper to ensure we get 10 organic results
-    }];
-
-    const data = await executePost("serp/google/organic/live/regular", payload, login, password);
-
-    if (data.tasks_count > 0 && data.tasks[0].status_code === 20000 && data.tasks[0].result) {
-        const result = data.tasks[0].result[0];
-        const items = result.items || [];
-
-        // Extract organic results
-        const organicResults = items
-            .filter((item: any) => item.type === 'organic')
-            .slice(0, 10);
-
-        const urls = organicResults
-            .map((item: any) => ({ url: item.url, rank: item.rank_absolute }))
-            .filter((item: any) => item.url && typeof item.rank === 'number');
-
-        // Extract People Also Ask questions
-        const paaQuestions: string[] = [];
-        for (const item of items) {
-            if (item.type === 'people_also_ask') {
-                const paaItems = item.items || [];
-                for (const paaItem of paaItems) {
-                    if (paaItem.title) {
-                        paaQuestions.push(paaItem.title);
-                    }
-                }
-            }
-        }
-
-        return { urls, paaQuestions };
-    }
-
-    return { urls: [], paaQuestions: [] };
-};
-
-
 export const getDetailedOnpageElements = async (url: string, login: string, password: string) => {
     const payload = [{
         url: url,
@@ -161,3 +108,38 @@ export const getDetailedOnpageElements = async (url: string, login: string, pass
 
     return errorResult;
 };
+
+/**
+ * Proxy on-page elements request through Supabase Edge Function.
+ * Used in Supabase mode to avoid exposing DataForSEO credentials to the frontend.
+ */
+export async function getOnPageElementsViaProxy(url: string): Promise<{
+    H1s: string[];
+    H2s: string[];
+    H3s: string[];
+    Word_Count: number;
+    Full_Text: string;
+}> {
+    // Dynamic import to avoid circular dependency at module level
+    const { supabase } = await import('./supabaseClient');
+    const { getCurrentUserId } = await import('./authService');
+
+    const { data, error } = await supabase.functions.invoke('dataforseo-proxy', {
+        body: {
+            action: 'on_page_elements',
+            url,
+            user_id: getCurrentUserId(),
+        },
+    });
+
+    if (error) {
+        throw new Error(`DataForSEO proxy error: ${error.message}`);
+    }
+
+    if (!data?.data) {
+        throw new Error('No on-page data returned from proxy');
+    }
+
+    // The proxy returns a single OnPageElements object from getOnPageElements
+    return data.data;
+}

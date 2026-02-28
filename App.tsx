@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef, createContext, useContext } from 'react';
 import Header from './components/Header';
-import { generateBriefStep, generateArticleSection, setModelSettings, regenerateParagraph, trimSectionToWordCount } from './services/geminiService';
+import { generateBriefStep, setModelSettings, regenerateParagraph } from './services/geminiService';
 import * as dataforseoService from './services/dataforseoService';
 import { parseMarkdownBrief } from './services/markdownParserService';
 import { extractTemplateFromUrl } from './services/templateExtractionService';
-import type { CompetitorPage, ContentBrief, CompetitorRanking, OutlineItem, ModelSettings, LengthConstraints, ExtractedTemplate, HeadingNode } from './types';
-import { UI_TO_LOGICAL_STEP_MAP, SOUND_EFFECTS, WC_EXPAND_THRESHOLD, WC_TRIM_STRICT, WC_TRIM_NONSTRICT, WC_PROMPT_MAX } from './constants';
+import type { CompetitorPage, ContentBrief, OutlineItem, ModelSettings, LengthConstraints, ExtractedTemplate } from './types';
+import { UI_TO_LOGICAL_STEP_MAP, SOUND_EFFECTS } from './constants';
 import { stripCompetitorFullText } from './services/briefContextService';
 import { getClientWithContext } from './services/clientService';
 import { buildBrandContext, mergeBrandContext, formatForBriefGeneration, formatForArticleGeneration } from './services/brandContextBuilder';
@@ -30,7 +30,7 @@ import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
 import { saveBriefState, updateBriefProgress, updateBriefStatus, updateBrief, updateBriefWorkflowStatus, getBrief } from './services/briefService';
 import { saveCompetitors, getCompetitorsForBrief, toCompetitorPages } from './services/competitorService';
-import { createArticle, getCurrentArticle } from './services/articleService';
+import { getCurrentArticle } from './services/articleService';
 import { uploadContextFile, addContextUrl as addContextUrlToDb, deleteContextFile, deleteContextUrl } from './services/contextService';
 import { createGenerationJob, cancelGenerationJob } from './services/generationJobService';
 import { useGenerationSubscription } from './hooks/useGenerationSubscription';
@@ -50,13 +50,10 @@ interface AppProps {
   onSaveStatusChange?: (status: SaveStatus, savedAt?: Date) => void;
   saveStatus?: SaveStatus;
   lastSavedAt?: Date | null;
-  isSupabaseMode?: boolean;
-  // Background generation callbacks
+  // Generation callbacks
   onGenerationStart?: (type: 'competitors' | 'brief' | 'content', briefId: string) => void;
   onGenerationProgress?: (step: number) => void;
   onGenerationComplete?: (briefId: string, success: boolean) => void;
-  isBackgroundMode?: boolean;
-  shouldAutoGenerate?: boolean;
   // Callback for parent to request an immediate save (for save-before-navigation)
   onSaveNowRef?: React.MutableRefObject<(() => Promise<void>) | null>;
 }
@@ -158,12 +155,9 @@ const App: React.FC<AppProps> = ({
   onSaveStatusChange,
   saveStatus: externalSaveStatus,
   lastSavedAt: externalLastSavedAt,
-  isSupabaseMode = false,
   onGenerationStart,
   onGenerationProgress,
   onGenerationComplete,
-  isBackgroundMode = false,
-  shouldAutoGenerate = false,
   onSaveNowRef,
 }) => {
   const [currentView, setCurrentView] = useState<AppView>('initial_input');
@@ -193,8 +187,6 @@ const App: React.FC<AppProps> = ({
   const [briefData, setBriefData] = useState<Partial<ContentBrief>>({});
   const [serpLanguage, setSerpLanguage] = useState('English');
   const [outputLanguage, setOutputLanguage] = useState('English');
-  const [apiLogin, setApiLogin] = useState(import.meta.env.VITE_DATAFORSEO_LOGIN || '');
-  const [apiPassword, setApiPassword] = useState(import.meta.env.VITE_DATAFORSEO_PASSWORD || '');
   
   // File context state
   const [contextFiles, setContextFiles] = useState<Map<string, File>>(new Map());
@@ -231,7 +223,7 @@ const App: React.FC<AppProps> = ({
 
   // Fetch client brand profile when clientId is available
   useEffect(() => {
-    if (!clientId || !isSupabaseMode) return;
+    if (!clientId) return;
     let cancelled = false;
     getClientWithContext(clientId).then(({ data }) => {
       if (!cancelled && data) {
@@ -241,7 +233,7 @@ const App: React.FC<AppProps> = ({
       console.warn('Failed to load client profile:', err);
     });
     return () => { cancelled = true; };
-  }, [clientId, isSupabaseMode]);
+  }, [clientId]);
 
   // Apply client defaults to new briefs when profile loads
   const hasAppliedDefaults = useRef(false);
@@ -261,7 +253,7 @@ const App: React.FC<AppProps> = ({
   }, [clientProfile, currentView, subjectInfo, brandInfo]);
 
   // "I'm Feeling Lucky" flow state
-  const [isFeelingLuckyFlow, setIsFeelingLuckyFlow] = useState<boolean>(shouldAutoGenerate);
+  const [isFeelingLuckyFlow, setIsFeelingLuckyFlow] = useState<boolean>(false);
 
   // "Fun Factor" State
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -315,7 +307,7 @@ const App: React.FC<AppProps> = ({
     },
     {
       briefId: briefId || null,
-      enabled: isSupabaseMode && Boolean(briefId) && !isLoading,
+      enabled: Boolean(briefId) && !isLoading,
       currentDbStatus: briefStatus,
       debounceMs: 500, // Reduced to minimize data loss
       onSaveStart: () => {
@@ -358,10 +350,10 @@ const App: React.FC<AppProps> = ({
     progress: backendProgress,
     error: backendError,
     refreshJob,
-  } = useGenerationSubscription(isSupabaseMode ? briefId || null : null);
+  } = useGenerationSubscription(briefId || null);
 
   // Subscribe to real-time brief data updates (when backend saves step results)
-  useBriefRealtimeSync(isSupabaseMode ? briefId || null : null, {
+  useBriefRealtimeSync(briefId || null, {
     onBriefDataUpdated: useCallback((newBriefData: Partial<ContentBrief>) => {
       // Only sync from backend when a backend job is active
       if (activeJob && (activeJob.status === 'pending' || activeJob.status === 'running')) {
@@ -550,7 +542,7 @@ const App: React.FC<AppProps> = ({
   // Load brief data when briefId is provided (Supabase mode)
   useEffect(() => {
     const loadExistingBrief = async () => {
-      if (!briefId || !isSupabaseMode) return;
+      if (!briefId) return;
 
       setIsLoading(true);
       const loadedState = await loadBrief(briefId);
@@ -593,11 +585,11 @@ const App: React.FC<AppProps> = ({
     };
 
     loadExistingBrief();
-  }, [briefId, isSupabaseMode, loadBrief]);
+  }, [briefId, loadBrief]);
 
-  // Mark state as unsaved when relevant data changes (Supabase mode)
+  // Mark state as unsaved when relevant data changes
   useEffect(() => {
-    if (isSupabaseMode && briefId) {
+    if (briefId) {
       setInternalSaveStatus('unsaved');
     }
   }, [
@@ -607,7 +599,6 @@ const App: React.FC<AppProps> = ({
     userFeedbacks,
     subjectInfo,
     brandInfo,
-    isSupabaseMode,
     briefId,
     // Include new fields
     outputLanguage,
@@ -631,8 +622,6 @@ const App: React.FC<AppProps> = ({
   const removeToast = (id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
-
-  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const getGroundTruthCompetitors = (competitors: CompetitorPage[]): CompetitorPage[] => {
     const starred = competitors.filter(c => c.is_starred);
@@ -674,8 +663,6 @@ const App: React.FC<AppProps> = ({
     setCurrentView('context_input');
     setSerpLanguage(serpLanguage);
     setOutputLanguage(outputLanguage);
-    setApiLogin(login);
-    setApiPassword(password);
     setSerpCountry(country);
 
     // Feature 6: Apply model settings
@@ -695,7 +682,7 @@ const App: React.FC<AppProps> = ({
     }
 
     // Update brief name to primary keyword (makes it meaningful in the dashboard)
-    if (briefId && isSupabaseMode && keywords.length > 0) {
+    if (briefId && keywords.length > 0) {
       const primaryKeyword = [...keywords].sort((a, b) => b.volume - a.volume)[0].kw;
       updateBrief(briefId, { name: primaryKeyword }).catch(err => {
         console.error('Failed to update brief name:', err);
@@ -712,7 +699,7 @@ const App: React.FC<AppProps> = ({
         throw new Error("No keywords provided or parsed. Please check your input.");
       }
 
-      // Feature 1: Extract template from URL if provided (both modes)
+      // Feature 1: Extract template from URL if provided
       if (templateUrl) {
         addLog(`Extracting template structure from ${templateUrl}...`);
         try {
@@ -729,97 +716,32 @@ const App: React.FC<AppProps> = ({
       setKeywordVolumeMap(newVolumeMap);
       setTopKeywordsForViz([...keywords].sort((a, b) => b.volume - a.volume).slice(0, 5));
 
-      if (isSupabaseMode && briefId) {
-        // ====== BACKEND MODE: Delegate to Edge Function ======
-        addLog(`Starting backend competitor analysis for ${keywords.length} keywords...`);
-
-        // Save current state first so the job snapshot is up to date
-        await saveNow();
-
-        // Build keyword volumes map
-        const keywordVolumes: Record<string, number> = {};
-        for (const k of keywords) {
-          keywordVolumes[k.kw] = k.volume;
-        }
-
-        const { jobId } = await createGenerationJob(briefId, 'competitors', {
-          keywords: keywords.map(k => k.kw),
-          keywordVolumes,
-          country,
-          serpLanguage,
-          outputLanguage,
-        });
-        console.log('Started backend competitor analysis job:', jobId);
-        await refreshJob();
-        setIsLoading(false); // Backend handles the work, no need for frontend loading
-      } else {
-        // ====== STANDALONE MODE: Keep existing frontend DataForSEO calls ======
-        addLog(`Found ${keywords.length} keywords. Starting SERP analysis for ${country} in ${serpLanguage}.`);
-
-        const urlDataMap = new Map<string, { rankings: CompetitorRanking[], score: number }>();
-        const collectedPaaQuestions: string[] = [];
-
-        for (let i = 0; i < keywords.length; i++) {
-          const { kw, volume } = keywords[i];
-          addLog(`Fetching SERP for "${kw}" (${i + 1}/${keywords.length})...`);
-          const serpResponse = await dataforseoService.getSerpUrls(kw, login, password, country, serpLanguage);
-
-          // Collect PAA questions (deduplicated)
-          for (const paaQuestion of serpResponse.paaQuestions) {
-            if (!collectedPaaQuestions.includes(paaQuestion)) {
-              collectedPaaQuestions.push(paaQuestion);
-            }
-          }
-
-          serpResponse.urls.forEach(result => {
-            if (!result.url) return;
-            if (!urlDataMap.has(result.url)) {
-              urlDataMap.set(result.url, { rankings: [], score: 0 });
-            }
-            const data = urlDataMap.get(result.url)!;
-            data.rankings.push({ keyword: kw, rank: result.rank, volume });
-            const rankWeight = Math.max(0, 11 - result.rank);
-            data.score += volume * rankWeight;
-          });
-          await sleep(1000);
-        }
-
-        // Store collected PAA questions
-        if (collectedPaaQuestions.length > 0) {
-          setPaaQuestions(collectedPaaQuestions);
-          addLog(`Collected ${collectedPaaQuestions.length} "People Also Ask" questions from SERPs.`);
-        }
-        addLog('All SERP data fetched.');
-        addLog("Calculating competitor strength scores...");
-
-        const sortedUrls = Array.from(urlDataMap.entries())
-          .sort(([, dataA], [, dataB]) => dataB.score - dataA.score)
-          .slice(0, 10);
-        addLog(`Identified top ${sortedUrls.length} competitors. Starting on-page analysis.`);
-
-        const finalCompetitorData: CompetitorPage[] = [];
-        for (let i = 0; i < sortedUrls.length; i++) {
-          const [url, data] = sortedUrls[i];
-          addLog(`Analyzing ${url.substring(0, 50)}... (${i + 1}/${sortedUrls.length})`);
-          const onpageData = await dataforseoService.getDetailedOnpageElements(url, login, password);
-          finalCompetitorData.push({
-            URL: url,
-            Weighted_Score: Math.round(data.score),
-            rankings: data.rankings,
-            ...onpageData,
-            is_starred: false,
-          });
-          await sleep(1000);
-        }
-
-        addLog("Analysis complete! You may now add context below or proceed.");
-        setCompetitorData(finalCompetitorData);
-
-        // Notify parent that competitor analysis completed successfully
-        if (briefId && onGenerationComplete) {
-          onGenerationComplete(briefId, true);
-        }
+      if (!briefId) {
+        throw new Error("Cannot start analysis without a brief ID.");
       }
+
+      // Delegate to Edge Function
+      addLog(`Starting backend competitor analysis for ${keywords.length} keywords...`);
+
+      // Save current state first so the job snapshot is up to date
+      await saveNow();
+
+      // Build keyword volumes map
+      const keywordVolumes: Record<string, number> = {};
+      for (const k of keywords) {
+        keywordVolumes[k.kw] = k.volume;
+      }
+
+      const { jobId } = await createGenerationJob(briefId, 'competitors', {
+        keywords: keywords.map(k => k.kw),
+        keywordVolumes,
+        country,
+        serpLanguage,
+        outputLanguage,
+      });
+      console.log('Started backend competitor analysis job:', jobId);
+      await refreshJob();
+      setIsLoading(false); // Backend handles the work, no need for frontend loading
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown analysis error occurred.';
       setError(errorMessage);
@@ -833,7 +755,7 @@ const App: React.FC<AppProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [hasCompletedFirstBrief, addToast, briefId, onGenerationStart, onGenerationComplete, isSupabaseMode, saveNow, refreshJob]);
+  }, [hasCompletedFirstBrief, addToast, briefId, onGenerationStart, onGenerationComplete, saveNow, refreshJob]);
 
   const handleBriefUpload = useCallback(async (briefFile: File) => {
     setError(null);
@@ -953,8 +875,8 @@ const App: React.FC<AppProps> = ({
             const result = await parseFile(file);
             setFileContents(prev => new Map(prev).set(file.name, { ...result, status: 'done' }));
 
-            // Save to database if in Supabase mode
-            if (briefId && isSupabaseMode) {
+            // Save to database
+            if (briefId) {
                 try {
                     await uploadContextFile(briefId, file, result.content || undefined);
                 } catch (err) {
@@ -966,7 +888,7 @@ const App: React.FC<AppProps> = ({
             setFileContents(prev => new Map(prev).set(file.name, { content: null, error: String(err), status: 'done' }));
         }
     }));
-  }, [parseFile, addToast, hasAchievedDataMaven, briefId, isSupabaseMode]);
+  }, [parseFile, addToast, hasAchievedDataMaven, briefId]);
 
   const removeContextFile = useCallback((fileName: string) => {
     setContextFiles(prev => {
@@ -996,12 +918,12 @@ const App: React.FC<AppProps> = ({
     setUrlContents(prev => new Map(prev).set(url, { content: null, error: null, status: 'scraping' }));
 
     try {
-        const onpageData = await dataforseoService.getDetailedOnpageElements(url, apiLogin, apiPassword);
+        const onpageData = await dataforseoService.getOnPageElementsViaProxy(url);
         if (onpageData.Full_Text && onpageData.Full_Text !== "Could not parse the JSON response." && onpageData.H1s[0] !== "PARSE_FAILED") {
             setUrlContents(prev => new Map(prev).set(url, { content: onpageData.Full_Text, error: null, status: 'done' }));
 
-            // Save to database if in Supabase mode
-            if (briefId && isSupabaseMode) {
+            // Save to database
+            if (briefId) {
                 try {
                     await addContextUrlToDb(briefId, url, onpageData.Full_Text);
                 } catch (err) {
@@ -1015,7 +937,7 @@ const App: React.FC<AppProps> = ({
         const errorMessage = err instanceof Error ? err.message : 'An unknown scraping error occurred.';
         setUrlContents(prev => new Map(prev).set(url, { content: null, error: errorMessage, status: 'done' }));
     }
-  }, [urlContents, apiLogin, apiPassword, briefId, isSupabaseMode]);
+  }, [urlContents, briefId]);
 
   const removeContextUrl = useCallback((url: string) => {
     setUrlContents(prev => {
@@ -1191,40 +1113,18 @@ const App: React.FC<AppProps> = ({
   }, [competitorData, subjectInfo, mergedBrandInfoForBrief, fileContents, urlContents, outputLanguage, lengthConstraints]);
   
   const handleFeelingLucky = useCallback(() => {
-    // In Supabase mode, use backend generation for the full brief
-    if (isSupabaseMode && briefId) {
+    if (briefId) {
       setCurrentView('briefing');
       handleBackendFullBrief();
       return;
     }
-    // Standalone mode: use browser-side generation
+    // Fallback: use browser-side step-by-step generation
     setIsFeelingLuckyFlow(true);
     if (briefId && onGenerationStart) {
       onGenerationStart('brief', briefId);
     }
     handleProceedToBriefing();
-  }, [isSupabaseMode, briefId, handleBackendFullBrief, handleProceedToBriefing, onGenerationStart]);
-
-  // Auto-start generation for background mode: once brief loads from DB and
-  // competitor data is available, kick off the briefing pipeline automatically.
-  const hasAutoStarted = useRef(false);
-  useEffect(() => {
-    if (
-      shouldAutoGenerate &&
-      !hasAutoStarted.current &&
-      !isBriefLoading &&
-      competitorData.length > 0 &&
-      currentView !== 'briefing' &&
-      currentView !== 'dashboard'
-    ) {
-      hasAutoStarted.current = true;
-      // Notify parent that brief generation is starting
-      if (briefId && onGenerationStart) {
-        onGenerationStart('brief', briefId);
-      }
-      handleProceedToBriefing();
-    }
-  }, [shouldAutoGenerate, isBriefLoading, competitorData, currentView, briefId, onGenerationStart, handleProceedToBriefing]);
+  }, [briefId, handleBackendFullBrief, handleProceedToBriefing, onGenerationStart]);
 
   // Use refs to avoid re-firing the Feeling Lucky effect when callbacks change
   const handleNextStepRef = useRef(handleNextStep);
@@ -1252,13 +1152,14 @@ const App: React.FC<AppProps> = ({
     setError(null);
     if (logicalStepToRegen < 1 || logicalStepToRegen > 7) return;
 
-    // In Supabase mode, use backend regeneration
-    if (isSupabaseMode && briefId) {
+    if (briefId) {
+      // Use backend regeneration
       setLoadingStep(logicalStepToRegen);
       await handleBackendRegenerate(logicalStepToRegen, feedback);
       return;
     }
 
+    // Fallback: frontend regeneration (when no briefId)
     setIsLoading(true);
     setLoadingStep(logicalStepToRegen);
 
@@ -1287,7 +1188,6 @@ const App: React.FC<AppProps> = ({
         availableKeywords: logicalStepToRegen === 2 ? keywordsWithVolume : undefined,
         isRegeneration: true,
         language: outputLanguage,
-        // Feature: Pass PAA questions for step 6 (FAQ generation)
         paaQuestions: logicalStepToRegen === 6 ? paaQuestions : undefined,
         signal,
       });
@@ -1320,7 +1220,7 @@ const App: React.FC<AppProps> = ({
       setIsLoading(false);
       setLoadingStep(null);
     }
-  }, [currentView, competitorData, subjectInfo, combinedSubjectInfo, mergedBrandInfoForBrief, briefData, keywordVolumeMap, userFeedbacks, outputLanguage, paaQuestions]);
+  }, [currentView, competitorData, subjectInfo, combinedSubjectInfo, mergedBrandInfoForBrief, briefData, keywordVolumeMap, userFeedbacks, outputLanguage, paaQuestions, briefId, handleBackendRegenerate]);
   
   const handleUserFeedbackChange = (step: number, value: string) => {
     setUserFeedbacks(prev => ({ ...prev, [step]: value }));
@@ -1343,14 +1243,8 @@ const App: React.FC<AppProps> = ({
       return;
     }
 
-    // In Supabase mode, delegate to backend article generation
-    if (isSupabaseMode && briefId) {
-      setError(null);
-      setCurrentView('content_generation');
-      setIsLoading(true);
-      setGeneratedArticleDbId(null);
-      setGeneratedArticle(null);
-      await handleBackendArticleGeneration();
+    if (!briefId) {
+      setError("Cannot generate content without a brief ID.");
       return;
     }
 
@@ -1358,384 +1252,8 @@ const App: React.FC<AppProps> = ({
     setCurrentView('content_generation');
     setIsLoading(true);
     setGeneratedArticleDbId(null);
-
-    // Create a fresh AbortController for article generation
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
-
-    // Notify parent that content generation is starting
-    if (briefId && onGenerationStart) {
-      onGenerationStart('content', briefId);
-    }
-
-    const flattenOutline = (items: OutlineItem[]): OutlineItem[] => {
-      const flatList: OutlineItem[] = [];
-      const recurse = (item: OutlineItem) => {
-        flatList.push(item);
-        if (item.children) {
-          item.children.forEach(recurse);
-        }
-      };
-      items.forEach(recurse);
-      return flatList;
-    };
-
-    const countWords = (text: string): number => text.trim().split(/\s+/).filter(Boolean).length;
-
-    const allSections = flattenOutline(briefData.article_structure.outline);
-    // Use a sections array to avoid ambiguous string matching when trimming
-    const contentParts: string[] = [];
-    let fullContent = '';
-
-    // Extract word count constraints — fall back to the AI-computed target from Step 5
-    const globalWordTarget = lengthConstraints.globalTarget
-        || briefData.article_structure?.word_count_target
-        || null;
-    const isStrictMode = lengthConstraints.strictMode;
-
-    // Initialize with H1
-    const initialTitle = briefData.on_page_seo?.h1?.value || briefData.keyword_strategy?.primary_keywords?.[0]?.keyword || "Untitled Article";
-    contentParts.push(`# ${initialTitle}\n\n`);
-    fullContent = contentParts.join('');
-    setGeneratedArticle({ title: initialTitle, content: fullContent });
-
-    try {
-      for (let i = 0; i < allSections.length; i++) {
-        const section = allSections[i];
-        setGenerationProgress({
-          currentSection: section.heading,
-          currentIndex: i + 1,
-          total: allSections.length,
-        });
-
-        const upcomingHeadings = allSections.slice(i + 1, i + 4).map(s => `${'#'.repeat(s.level.startsWith('H') ? parseInt(s.level.substring(1), 10) : 2)} ${s.heading}`);
-
-        const headingLevel = section.level.startsWith('H') ? parseInt(section.level.substring(1), 10) : 2;
-        const heading = `${'#'.repeat(headingLevel)} ${section.heading}\n\n`;
-
-        // Add heading before streaming starts
-        fullContent += heading;
-        setGeneratedArticle({ title: initialTitle, content: fullContent });
-
-        // Track the section content start index in contentParts
-        const sectionPartIndex = contentParts.length;
-        // Temporarily push heading + empty content
-        contentParts.push(heading);
-
-        // Use streaming to show real-time content generation
-        let streamedContent = '';
-        const sectionContent = await generateArticleSection({
-          brief: briefData,
-          contentSoFar: fullContent,
-          sectionToWrite: section,
-          upcomingHeadings,
-          language: outputLanguage,
-          writerInstructions: writerInstructions?.trim() || undefined,
-          brandContext: brandContextForArticle,
-          signal,
-          globalWordTarget,
-          wordsWrittenSoFar: countWords(fullContent),
-          totalSections: allSections.length,
-          currentSectionIndex: i,
-          strictMode: isStrictMode,
-          onStream: (chunk) => {
-            streamedContent += chunk;
-            fullContent += chunk;
-            setGeneratedArticle({ title: initialTitle, content: fullContent });
-          },
-        });
-
-        // Determine the final section body text
-        const finalSectionBody = streamedContent || sectionContent;
-
-        // If streaming didn't add content, add the fallback
-        if (!streamedContent) {
-          fullContent += sectionContent;
-        }
-
-        // Update the contentParts entry for this section (heading + body)
-        contentParts[sectionPartIndex] = heading + finalSectionBody;
-        // Rebuild fullContent from contentParts to stay in sync after streaming
-        fullContent = contentParts.join('');
-
-        // Post-generation retry: if section is under 70% of target, regenerate once
-        let currentSectionBody = finalSectionBody;
-        const sectionTarget = section.target_word_count || 0;
-        if (sectionTarget > 0) {
-          const sectionWords = countWords(currentSectionBody);
-          if (sectionWords < sectionTarget * WC_EXPAND_THRESHOLD) {
-            if (import.meta.env.DEV) console.log(`Expanding "${section.heading}": ${sectionWords} words < 70% of ${sectionTarget} target`);
-            setGenerationProgress({
-              currentSection: `Expanding: ${section.heading}`,
-              currentIndex: i + 1,
-              total: allSections.length,
-            });
-
-            // Remove current section body from contentParts to build contentSoFar without it
-            contentParts[sectionPartIndex] = heading;
-            const contentSoFarWithoutSection = contentParts.join('');
-
-            const expandedContent = await generateArticleSection({
-              brief: briefData,
-              contentSoFar: contentSoFarWithoutSection,
-              sectionToWrite: {
-                ...section,
-                guidelines: [
-                  ...section.guidelines,
-                  `CRITICAL: Your previous attempt was only ${sectionWords} words. You MUST write at least ${Math.round(sectionTarget * 0.85)} words for this section. Expand with more detail, examples, and depth.`,
-                ],
-              },
-              upcomingHeadings,
-              language: outputLanguage,
-              writerInstructions: writerInstructions?.trim() || undefined,
-              brandContext: brandContextForArticle,
-              signal,
-              globalWordTarget,
-              wordsWrittenSoFar: countWords(contentSoFarWithoutSection),
-              totalSections: allSections.length,
-              currentSectionIndex: i,
-              strictMode: isStrictMode,
-            });
-
-            // Update contentParts and rebuild fullContent from parts
-            currentSectionBody = expandedContent;
-            contentParts[sectionPartIndex] = heading + currentSectionBody;
-            fullContent = contentParts.join('');
-            setGeneratedArticle({ title: initialTitle, content: fullContent });
-          }
-        }
-
-        // Auto-trim over-budget sections (strict: >120%, non-strict: >150%)
-        if (sectionTarget > 0) {
-          const sectionWords = countWords(currentSectionBody);
-          const shouldTrim = isStrictMode
-            ? sectionWords > sectionTarget * WC_TRIM_STRICT
-            : sectionWords > sectionTarget * WC_TRIM_NONSTRICT;
-
-          if (shouldTrim) {
-            if (import.meta.env.DEV) console.log(`Trimming "${section.heading}": ${sectionWords} → ~${sectionTarget} words`);
-            setGenerationProgress({
-              currentSection: `Trimming: ${section.heading}`,
-              currentIndex: i + 1,
-              total: allSections.length,
-            });
-
-            const trimmedContent = await trimSectionToWordCount(
-              currentSectionBody,
-              sectionTarget,
-              outputLanguage,
-              section.heading
-            );
-
-            // Replace the section at its known index instead of ambiguous string matching
-            contentParts[sectionPartIndex] = heading + trimmedContent;
-            fullContent = contentParts.join('');
-            setGeneratedArticle({ title: initialTitle, content: fullContent });
-          }
-        }
-
-        contentParts.push('\n\n');
-        fullContent = contentParts.join('');
-        setGeneratedArticle({ title: initialTitle, content: fullContent });
-      }
-
-      // Add FAQs if they exist
-      if (briefData.faqs?.questions?.length && briefData.faqs.questions.length > 0) {
-        const totalSectionsWithFaqs = allSections.length + briefData.faqs.questions.length;
-        setGenerationProgress({ currentSection: 'FAQs', currentIndex: allSections.length + 1, total: totalSectionsWithFaqs});
-        const faqHeading = `## Frequently Asked Questions\n\n`;
-        contentParts.push(faqHeading);
-        fullContent = contentParts.join('');
-        setGeneratedArticle({ title: initialTitle, content: fullContent });
-
-        // Calculate remaining word budget for FAQs — default to 80 words each if no global target
-        const wordsBeforeFaqs = countWords(fullContent);
-        const faqCount = briefData.faqs.questions.length;
-        const faqBudget = globalWordTarget ? Math.max(0, globalWordTarget - wordsBeforeFaqs) : 0;
-        const perFaqBudget = faqBudget > 0 ? Math.round(faqBudget / faqCount) : 80;
-
-        for (let i = 0; i < briefData.faqs.questions.length; i++) {
-            const faq = briefData.faqs.questions[i];
-            setGenerationProgress({
-                currentSection: `FAQ: ${faq.question}`,
-                currentIndex: allSections.length + 1 + i,
-                total: totalSectionsWithFaqs
-            });
-
-            // Add FAQ heading before streaming
-            const faqHeadingText = `### ${faq.question}\n\n`;
-            fullContent += faqHeadingText;
-            setGeneratedArticle({ title: initialTitle, content: fullContent });
-
-            // Track FAQ content in contentParts
-            const faqPartIndex = contentParts.length;
-            contentParts.push(faqHeadingText);
-
-            // Build FAQ guidelines with word budget
-            const faqGuidelines = [...faq.guidelines];
-            faqGuidelines.push(`Target approximately ${perFaqBudget} words for this FAQ answer.`);
-
-            let faqStreamedContent = '';
-            const questionContent = await generateArticleSection({
-                brief: briefData,
-                contentSoFar: fullContent,
-                sectionToWrite: {
-                    heading: `Answer the question: ${faq.question}`,
-                    guidelines: faqGuidelines,
-                    level: 'H3',
-                    reasoning: 'Answering a user FAQ',
-                    target_word_count: perFaqBudget,
-                    children: [], targeted_keywords: [], competitor_coverage: []
-                },
-                upcomingHeadings: [],
-                language: outputLanguage,
-                writerInstructions: writerInstructions?.trim() || undefined,
-                brandContext: brandContextForArticle,
-                signal,
-                globalWordTarget,
-                wordsWrittenSoFar: countWords(fullContent),
-                totalSections: allSections.length + briefData.faqs.questions.length,
-                currentSectionIndex: allSections.length + i,
-                strictMode: isStrictMode,
-                onStream: (chunk) => {
-                  faqStreamedContent += chunk;
-                  fullContent += chunk;
-                  setGeneratedArticle({ title: initialTitle, content: fullContent });
-                },
-            });
-
-            // Determine final FAQ body text
-            let faqBody = faqStreamedContent || questionContent;
-
-            // If streaming didn't add content, add the fallback
-            if (!faqStreamedContent) {
-              fullContent += questionContent;
-            }
-
-            // Update contentParts entry for this FAQ (heading + body)
-            contentParts[faqPartIndex] = faqHeadingText + faqBody;
-
-            // Auto-trim over-budget FAQs (same logic as main sections)
-            if (perFaqBudget > 0) {
-              const faqWords = countWords(faqBody);
-              const faqTrimThreshold = isStrictMode ? WC_TRIM_STRICT : WC_TRIM_NONSTRICT;
-              if (faqWords > perFaqBudget * faqTrimThreshold) {
-                if (import.meta.env.DEV) console.log(`Trimming FAQ "${faq.question}": ${faqWords} → ~${perFaqBudget} words`);
-                setGenerationProgress({
-                  currentSection: `Trimming FAQ: ${faq.question}`,
-                  currentIndex: allSections.length + 1 + i,
-                  total: totalSectionsWithFaqs,
-                });
-
-                const trimmedFaq = await trimSectionToWordCount(
-                  faqBody,
-                  perFaqBudget,
-                  outputLanguage,
-                  faq.question
-                );
-
-                // Update contentParts and rebuild fullContent from parts
-                faqBody = trimmedFaq;
-                contentParts[faqPartIndex] = faqHeadingText + faqBody;
-                fullContent = contentParts.join('');
-                setGeneratedArticle({ title: initialTitle, content: fullContent });
-              }
-            }
-
-            contentParts.push('\n\n');
-            fullContent = contentParts.join('');
-            setGeneratedArticle({ title: initialTitle, content: fullContent });
-        }
-      }
-
-      // Final total word count check — trim worst offenders if article exceeds target
-      if (globalWordTarget && globalWordTarget > 0) {
-        const totalWords = countWords(fullContent);
-        const maxAllowed = Math.round(globalWordTarget * WC_PROMPT_MAX);
-        if (totalWords > maxAllowed) {
-          if (import.meta.env.DEV) console.log(`Final trim: ${totalWords} words > ${maxAllowed} max (target ${globalWordTarget})`);
-          const faqQuestionCount = briefData.faqs?.questions?.length || 0;
-          setGenerationProgress({
-            currentSection: 'Trimming article to target word count...',
-            currentIndex: allSections.length + faqQuestionCount + 1,
-            total: allSections.length + faqQuestionCount + 1,
-          });
-
-          // Find the most over-budget sections to trim
-          const sectionOverages: { index: number; heading: string; overage: number; body: string; target: number }[] = [];
-          for (let idx = 0; idx < contentParts.length; idx++) {
-            const part = contentParts[idx];
-            // Skip non-content parts (newlines, heading-only)
-            if (!part || part.trim().length < 20) continue;
-            // Extract the heading and body from the part
-            const lines = part.split('\n');
-            const headingLine = lines.find(l => l.startsWith('#'));
-            if (!headingLine) continue;
-            const bodyText = lines.filter(l => !l.startsWith('#')).join('\n').trim();
-            if (!bodyText) continue;
-            const bodyWords = countWords(bodyText);
-            // Find the matching section's target
-            const matchedSection = allSections.find(s => headingLine.includes(s.heading));
-            const sTarget = matchedSection?.target_word_count || 0;
-            if (sTarget > 0 && bodyWords > sTarget) {
-              sectionOverages.push({ index: idx, heading: matchedSection!.heading, overage: bodyWords - sTarget, body: bodyText, target: sTarget });
-            }
-          }
-
-          // Sort by overage (worst first) and trim up to 3 worst offenders
-          sectionOverages.sort((a, b) => b.overage - a.overage);
-          const sectionsToTrim = sectionOverages.slice(0, 3);
-
-          for (const sec of sectionsToTrim) {
-            const trimmedContent = await trimSectionToWordCount(
-              sec.body,
-              sec.target,
-              outputLanguage,
-              sec.heading
-            );
-            const headingLine = contentParts[sec.index].split('\n').find(l => l.startsWith('#')) || '';
-            contentParts[sec.index] = headingLine + '\n\n' + trimmedContent;
-          }
-
-          if (sectionsToTrim.length > 0) {
-            fullContent = contentParts.join('');
-            setGeneratedArticle({ title: initialTitle, content: fullContent });
-            if (import.meta.env.DEV) console.log(`After final trim: ${countWords(fullContent)} words`);
-          }
-        }
-      }
-
-      // Content generation completed successfully
-      // Save the generated article to the database
-      if (briefId && isSupabaseMode) {
-        try {
-          const { data: savedArticle } = await createArticle(briefId, initialTitle, fullContent, {
-            model_settings: modelSettings,
-            length_constraints: lengthConstraints,
-            writer_instructions: writerInstructions?.trim() || undefined,
-          });
-          if (savedArticle) {
-            setGeneratedArticleDbId(savedArticle.id);
-          }
-        } catch (saveErr) {
-          console.error('Failed to save article to database:', saveErr);
-        }
-      }
-
-      if (briefId && onGenerationComplete) {
-        onGenerationComplete(briefId, true);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred during content generation.");
-      // Notify parent that content generation failed
-      if (briefId && onGenerationComplete) {
-        onGenerationComplete(briefId, false);
-      }
-    } finally {
-      setIsLoading(false);
-      setGenerationProgress(null);
-    }
+    setGeneratedArticle(null);
+    await handleBackendArticleGeneration();
   };
 
   // Feature F2: Handle paragraph-level regeneration in generated content with enhanced context
@@ -1814,7 +1332,7 @@ const App: React.FC<AppProps> = ({
 
   const handleRestart = async () => {
     // Save current state before clearing (prevents data loss)
-    if (isSupabaseMode && briefId) {
+    if (briefId) {
       await saveNow();
     }
 
@@ -1840,8 +1358,6 @@ const App: React.FC<AppProps> = ({
     setContextFiles(new Map());
     setFileContents(new Map());
     setUrlContents(new Map());
-    setApiLogin(import.meta.env.VITE_DATAFORSEO_LOGIN || '');
-    setApiPassword(import.meta.env.VITE_DATAFORSEO_PASSWORD || '');
     setGeneratedArticle(null);
     setGeneratedArticleDbId(null);
     setGenerationProgress(null);
@@ -1940,7 +1456,6 @@ const App: React.FC<AppProps> = ({
                   // Save status
                   saveStatus={saveStatus}
                   lastSavedAt={lastSavedAt}
-                  isSupabaseMode={isSupabaseMode}
                   // Lifted sidebar state
                   selectedSection={dashboardSection}
                   onSelectSection={setDashboardSection}
@@ -1991,7 +1506,6 @@ const App: React.FC<AppProps> = ({
     <SoundProvider>
         <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
         <Header
-          isSupabaseMode={isSupabaseMode}
           clientName={clientName}
           clientLogoUrl={clientLogoUrl}
           clientBrandColor={clientBrandColor}

@@ -194,7 +194,7 @@ export interface LengthConstraints {
 /** Parameters needed by the worker Edge Function to execute a brief step */
 export interface StepExecutionParams {
   step: number;
-  competitorData: CompetitorPage[];
+  competitorData: CompetitorPage[] | CompetitorSummary[];
   subjectInfo: string;
   brandInfo: string;
   previousStepsData: Partial<ContentBrief>;

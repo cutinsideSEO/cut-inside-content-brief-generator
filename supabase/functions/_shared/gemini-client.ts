@@ -118,12 +118,14 @@ export async function retryOperation<T>(
   for (let i = 0; i < retries; i++) {
     try {
       // Race the operation against a per-attempt timeout
+      let timeoutId: ReturnType<typeof setTimeout>;
       const result = await Promise.race([
         operation(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs)
-        ),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+        }),
       ]);
+      clearTimeout(timeoutId!);
       return result;
     } catch (error) {
       console.warn(`Attempt ${i + 1} failed. Retrying...`, error);

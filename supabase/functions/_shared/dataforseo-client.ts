@@ -169,11 +169,11 @@ export async function getOnPageElements(url: string): Promise<OnPageElements> {
   ];
 
   const errorResult: OnPageElements = {
-    H1s: ['PARSE_FAILED'],
+    H1s: [],
     H2s: [],
     H3s: [],
     Word_Count: 0,
-    Full_Text: 'Could not parse the JSON response.',
+    Full_Text: '',
   };
 
   const data = await executePost('on_page/content_parsing/live', payload);
@@ -216,7 +216,7 @@ export async function getOnPageElements(url: string): Promise<OnPageElements> {
         H1s: h1s.length > 0 ? h1s : ['No H1 Found'],
         H2s: h2s,
         H3s: h3s,
-        Word_Count: cleanText.split(' ').length,
+        Word_Count: cleanText ? cleanText.split(' ').length : 0,
         Full_Text: cleanText,
       };
     }

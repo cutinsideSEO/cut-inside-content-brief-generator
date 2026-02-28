@@ -58,7 +58,7 @@ export const WORKFLOW_STATUSES: BriefStatus[] = ['sent_to_client', 'approved', '
 export function isWorkflowStatus(status: BriefStatus): boolean {
   return (WORKFLOW_STATUSES as string[]).includes(status);
 }
-export type AppView = 'login' | 'client_select' | 'brief_list' | 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_upload';
+export type AppView = 'login' | 'client_select' | 'brief_list' | 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'article_view' | 'brief_upload';
 
 export interface KeywordInput {
   kw: string;

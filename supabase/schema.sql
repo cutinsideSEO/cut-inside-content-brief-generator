@@ -113,6 +113,7 @@ CREATE TABLE brief_competitors (
 
 -- Index for competitors
 CREATE INDEX idx_brief_competitors_brief_id ON brief_competitors(brief_id);
+CREATE UNIQUE INDEX idx_brief_competitors_brief_url ON brief_competitors(brief_id, url);
 
 -- ============================================
 -- 5. Brief Context Files

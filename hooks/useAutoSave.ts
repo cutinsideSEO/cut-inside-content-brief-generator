@@ -115,7 +115,6 @@ export function useAutoSave(
 
   const isSavingRef = useRef(false);
   const [isSavingState, setIsSavingState] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedDataRef = useRef<string | null>(null);
@@ -322,7 +321,6 @@ export function useAutoSave(
 
   const pauseAutoSave = useCallback(() => {
     isPausedRef.current = true;
-    setIsPaused(true);
     // Clear any pending debounced save
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -332,7 +330,6 @@ export function useAutoSave(
 
   const resumeAutoSave = useCallback(() => {
     isPausedRef.current = false;
-    setIsPaused(false);
   }, []);
 
   return {

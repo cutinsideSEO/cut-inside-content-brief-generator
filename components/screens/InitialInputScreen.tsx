@@ -16,8 +16,6 @@ interface KeywordRow {
 interface InitialInputScreenProps {
   onStartAnalysis: (
     keywords: { kw: string; volume: number }[],
-    login: string,
-    password: string,
     country: string,
     serpLanguage: string,
     outputLanguage: string,
@@ -84,8 +82,6 @@ const StepDots = ({ current, total }: { current: number; total: number }) => (
 );
 
 const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis, isLoading, error, onStartUpload }) => {
-  const [login] = useState('');
-  const [password] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [keywordColumn, setKeywordColumn] = useState('');
@@ -236,8 +232,6 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
 
     onStartAnalysis(
       keywords,
-      login,
-      password,
       country,
       serpLanguage,
       outputLanguage,

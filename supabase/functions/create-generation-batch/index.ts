@@ -199,6 +199,12 @@ Deno.serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+      if (brief_entries.length > 50) {
+        return new Response(
+          JSON.stringify({ error: 'Maximum 50 briefs per batch' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
       // Validate each entry has at least one keyword
       for (let i = 0; i < brief_entries.length; i++) {
         if (!brief_entries[i].keywords || brief_entries[i].keywords.length === 0) {
@@ -213,6 +219,12 @@ Deno.serve(async (req: Request) => {
       if (!brief_ids || brief_ids.length === 0) {
         return new Response(
           JSON.stringify({ error: 'brief_ids is required for full_brief or article generation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      if (brief_ids.length > 50) {
+        return new Response(
+          JSON.stringify({ error: 'Maximum 50 briefs per batch' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }

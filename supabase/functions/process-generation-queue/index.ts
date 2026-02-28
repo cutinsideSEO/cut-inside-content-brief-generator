@@ -17,6 +17,7 @@ import type { ArticleJobConfig, ArticleResumeState } from '../_shared/article-ge
 import type {
   ContentBrief,
   CompetitorPage,
+  CompetitorSummary,
   ClientBrandData,
   ContextFileData,
   ContextUrlData,
@@ -44,7 +45,7 @@ import {
 // Constants
 // ============================================
 
-const MAX_JOBS_PER_INVOCATION = 3;
+const MAX_JOBS_PER_INVOCATION = 1;
 
 /** Jobs stuck in 'running' for longer than this are considered stale and reset to pending.
  *  Set to 4min (above 150s EF timeout) to allow quick article resume cycles. */
@@ -99,10 +100,10 @@ const STEPS_NEEDING_FULL_TEXT = [3, 4, 5];
 /** Steps that need ground truth text from top competitors */
 const STEPS_NEEDING_GROUND_TRUTH = [1, 3, 4, 5];
 
-/** Position-based weights for competitor URL scoring */
-const RANK_WEIGHTS: Record<number, number> = {
-  1: 10, 2: 9, 3: 8, 4: 7, 5: 6, 6: 5, 7: 4, 8: 3, 9: 2, 10: 1
-};
+/** Position-based weight for competitor URL scoring (ranks 1-20) */
+function getRankWeight(rank: number): number {
+  return Math.max(1, 21 - rank);
+}
 
 // ============================================
 // Helper Types
@@ -210,9 +211,9 @@ function buildStepParams(
 
   // Determine competitor data for this step
   const needsFullText = STEPS_NEEDING_FULL_TEXT.includes(step);
-  const competitorData: CompetitorPage[] = needsFullText
+  const competitorData = needsFullText
     ? competitors
-    : (stripCompetitorFullText(competitors) as unknown as CompetitorPage[]);
+    : stripCompetitorFullText(competitors);
 
   // Ground truth text
   const needsGroundTruth = STEPS_NEEDING_GROUND_TRUTH.includes(step);
@@ -783,6 +784,8 @@ async function processFullBrief(supabase: SupabaseClient, job: JobRow): Promise<
 
   if (hasNextStep) {
     if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
+      await supabase.from('generation_jobs').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', job.id);
+      await supabase.from('briefs').update({ active_job_id: null }).eq('id', briefId);
       return;
     }
 
@@ -832,6 +835,8 @@ async function processFullBrief(supabase: SupabaseClient, job: JobRow): Promise<
     await markJobCompleted(supabase, job.id, briefId, false);
   } else {
     if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
+      await supabase.from('generation_jobs').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', job.id);
+      await supabase.from('briefs').update({ active_job_id: null }).eq('id', briefId);
       return;
     }
 
@@ -1001,16 +1006,7 @@ async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<vo
   const latestVersion = existingArticles?.[0]?.version || 0;
   const newVersion = latestVersion + 1;
 
-  // Mark previous versions as not current
-  if (latestVersion > 0) {
-    await supabase
-      .from('brief_articles')
-      .update({ is_current: false })
-      .eq('brief_id', briefId)
-      .eq('is_current', true);
-  }
-
-  // Insert new article
+  // Insert new article (mark_previous_articles_not_current trigger handles is_current)
   const { error: insertError } = await supabase
     .from('brief_articles')
     .insert({
@@ -1070,6 +1066,8 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
 
   for (let i = 0; i < keywords.length; i++) {
     if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
+      await supabase.from('generation_jobs').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', job.id);
+      await supabase.from('briefs').update({ active_job_id: null }).eq('id', briefId);
       return;
     }
 
@@ -1105,7 +1103,7 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
       }
       const data = urlDataMap.get(result.url)!;
       data.rankings.push({ keyword, rank: result.rank, volume });
-      const rankWeight = RANK_WEIGHTS[result.rank] || Math.max(0, 11 - result.rank);
+      const rankWeight = getRankWeight(result.rank);
       data.score += volume * rankWeight;
     }
 
@@ -1135,6 +1133,8 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
 
   for (let i = 0; i < sortedUrls.length; i++) {
     if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
+      await supabase.from('generation_jobs').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', job.id);
+      await supabase.from('briefs').update({ active_job_id: null }).eq('id', briefId);
       return;
     }
 
@@ -1356,13 +1356,18 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Auth gate: require QUEUE_PROCESSOR_SECRET for non-preflight requests.
-  // This function uses verify_jwt: false (called by pg_cron), so we validate
-  // a shared secret instead. Set QUEUE_PROCESSOR_SECRET as an EF secret.
-  const expectedSecret = Deno.env.get('QUEUE_PROCESSOR_SECRET');
-  if (expectedSecret) {
+  // Auth gate: accept either QUEUE_PROCESSOR_SECRET or SUPABASE_SERVICE_ROLE_KEY.
+  // This function uses verify_jwt: false (called by pg_cron with the service role key).
+  // If neither secret is configured, the gate is skipped (open access for backwards compat).
+  const queueSecret = Deno.env.get('QUEUE_PROCESSOR_SECRET');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (queueSecret || serviceRoleKey) {
     const authHeader = req.headers.get('Authorization');
-    if (authHeader !== `Bearer ${expectedSecret}`) {
+    const validTokens = [
+      queueSecret ? `Bearer ${queueSecret}` : null,
+      serviceRoleKey ? `Bearer ${serviceRoleKey}` : null,
+    ].filter(Boolean);
+    if (!validTokens.includes(authHeader)) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

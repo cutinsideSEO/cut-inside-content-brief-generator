@@ -52,10 +52,6 @@ export interface AppState {
   outputLanguage: string;
   serpCountry: string;
 
-  // DataForSEO API credentials (from env or user input)
-  apiLogin: string;
-  apiPassword: string;
-
   // Competitor data
   competitorData: CompetitorPage[];
   topKeywordsForViz: { kw: string; volume: number }[];

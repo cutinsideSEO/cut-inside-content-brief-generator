@@ -80,7 +80,7 @@ test.describe('Article Generation', () => {
     // ============================================
     // STEP 7: Wait for article generation to complete
     // ============================================
-    await waitForJobsToComplete(600_000);
+    await waitForJobsToComplete(900_000); // 15 min — articles can be 20+ sections across multiple resume cycles
 
     console.log('Backend article job completed. Waiting for UI...');
     await page.waitForTimeout(8000);

@@ -35,6 +35,14 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // Validate step_number for step-based job types
+    if ((job_type === 'brief_step' || job_type === 'regenerate') && (!step_number || step_number < 1 || step_number > 7)) {
+      return new Response(
+        JSON.stringify({ error: 'step_number (1-7) is required for brief_step and regenerate job types' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Check for existing active job on this brief
     const { data: existingJob } = await supabase
       .from('generation_jobs')

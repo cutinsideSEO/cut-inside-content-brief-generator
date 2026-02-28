@@ -648,8 +648,6 @@ const App: React.FC<AppProps> = ({
 
   const handleStartAnalysis = useCallback(async (
     keywords: { kw: string; volume: number }[],
-    login: string,
-    password: string,
     country: string,
     serpLanguage: string,
     outputLanguage: string,
@@ -703,7 +701,7 @@ const App: React.FC<AppProps> = ({
       if (templateUrl) {
         addLog(`Extracting template structure from ${templateUrl}...`);
         try {
-          const template = await extractTemplateFromUrl(templateUrl, login, password, outputLanguage);
+          const template = await extractTemplateFromUrl(templateUrl, outputLanguage);
           setExtractedTemplate(template);
           addLog(`Template extracted: ${template.headingStructure.length} top-level headings found.`);
         } catch (templateError) {

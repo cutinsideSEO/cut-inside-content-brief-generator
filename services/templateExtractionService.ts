@@ -8,12 +8,10 @@ import * as dataforseoService from './dataforseoService';
  */
 export async function extractTemplateFromUrl(
   url: string,
-  apiLogin: string,
-  apiPassword: string,
   language: string
 ): Promise<ExtractedTemplate> {
-  // Fetch URL content using existing DataForSEO service
-  const onpageData = await dataforseoService.getDetailedOnpageElements(url, apiLogin, apiPassword);
+  // Fetch URL content using DataForSEO proxy (credentials stored server-side)
+  const onpageData = await dataforseoService.getOnPageElementsViaProxy(url);
 
   if (!onpageData.Full_Text || onpageData.Full_Text === "Could not parse the JSON response.") {
     throw new Error("Failed to fetch content from the provided URL.");

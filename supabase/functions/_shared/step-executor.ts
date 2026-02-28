@@ -67,7 +67,7 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
     thinkingLevel,
   } = params;
 
-  const competitorDataJson = JSON.stringify(competitorData);
+  const competitorDataJson = truncateCompetitorText(JSON.stringify(competitorData));
   const schema = getSchemaForStep(5);
   const effectiveThinkingLevel = getThinkingLevelForStep(5, thinkingLevel);
   const genConfig = buildGenerationConfig(model, 5, effectiveThinkingLevel, schema);
@@ -150,7 +150,11 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
 
   // PHASE 2: Enrichment
   // Use flash model for enrichment (faster, no creative reasoning needed)
-  const flashModel = model.replace('-pro', '-flash') as GeminiModel;
+  const FLASH_MODEL_MAP: Record<string, string> = {
+    'gemini-2.5-pro': 'gemini-2.5-flash',
+    'gemini-3-pro-preview': 'gemini-3-flash-preview',
+  };
+  const flashModel = (FLASH_MODEL_MAP[model] || model) as GeminiModel;
   const enrichmentSystemInstruction = getStructureEnrichmentPrompt(language);
   const enrichmentPrompt = `
       **Full Context from Previous Steps:**

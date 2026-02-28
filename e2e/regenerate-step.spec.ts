@@ -179,12 +179,23 @@ test.describe('Regenerate Step', () => {
     // Job should be completed or cancelled (stuck job cleaned up)
     expect(['completed', 'cancelled']).toContain(job.status);
 
-    // Give UI time to process
-    await page.waitForTimeout(5000);
+    // ============================================
+    // STEP 10: Wait for UI to clear the loading state, then verify
+    // ============================================
+    // Wait for the "Regenerating..." button text to disappear (up to 60s for Realtime delivery)
+    console.log('Waiting for UI to clear regenerating state...');
+    try {
+      await page.waitForFunction(
+        () => !document.querySelector('button[disabled]')?.textContent?.includes('Regenerating...'),
+        { timeout: 60_000 }
+      );
+      console.log('UI cleared regenerating state.');
+    } catch {
+      // If it still says Regenerating after 60s, take screenshot and fail
+      await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'regen-stuck.png') });
+      throw new Error('UI still shows "Regenerating..." 60s after job completion — Realtime subscription may not be working.');
+    }
 
-    // ============================================
-    // STEP 10: Verify UI state
-    // ============================================
     const hasError = await page.getByText(/Content Generation Failed/i).first()
       .isVisible()
       .catch(() => false);

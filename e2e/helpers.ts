@@ -30,6 +30,26 @@ export const SUPABASE_URL = envVars.VITE_SUPABASE_URL;
 export const SUPABASE_ANON_KEY = envVars.VITE_SUPABASE_ANON_KEY;
 
 /**
+ * Fetch the user ID (access_codes.id) for the ADMIN123 access code.
+ * Used to satisfy the user_id requirement on create-generation-job.
+ */
+export async function getAdminUserId(): Promise<string> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/access_codes?code=eq.${ACCESS_CODE}&is_active=eq.true&select=id&limit=1`,
+    {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) throw new Error(`Failed to fetch admin user id: ${res.status}`);
+  const rows = await res.json();
+  if (!rows || rows.length === 0) throw new Error(`Access code "${ACCESS_CODE}" not found or inactive`);
+  return rows[0].id;
+}
+
+/**
  * Login with the admin access code
  */
 export async function login(page: Page) {
@@ -49,14 +69,30 @@ export async function login(page: Page) {
 }
 
 /**
- * Select the test client from client select screen
+ * Select the test client from client select screen.
+ * Waits for the client grid to render, then clicks the card whose h3 heading
+ * matches clientName exactly. Falls back to text locator if heading not found.
  */
 export async function selectClient(page: Page, clientName: string) {
-  // Click on the client card
-  const card = page.locator(`text="${clientName}"`).first();
-  await card.click();
+  // Wait for client select screen to be ready (heading visible)
+  await expect(page.getByText(/Select a client/i)).toBeVisible({ timeout: 15_000 });
 
-  // Wait for brief list to load
+  // Wait for at least one client card to appear (grid has loaded)
+  await expect(page.locator('h3').first()).toBeVisible({ timeout: 15_000 });
+
+  // Click the client card whose h3 heading exactly matches the client name
+  const heading = page.getByRole('heading', { name: clientName, exact: true }).first();
+  const headingVisible = await heading.isVisible().catch(() => false);
+
+  if (headingVisible) {
+    await heading.click();
+  } else {
+    // Fallback: use text locator (less precise but may work for short names)
+    const card = page.locator(`text="${clientName}"`).first();
+    await card.click();
+  }
+
+  // Wait for brief list to load (New Brief button appears)
   await expect(page.getByRole('button', { name: /New Brief/i })).toBeVisible({ timeout: 15_000 });
 }
 
@@ -328,6 +364,7 @@ export async function patchBriefData(briefId: string, briefData: Record<string, 
 
 /**
  * Call the create-generation-job Edge Function directly.
+ * Automatically resolves user_id from the ADMIN123 access code if not provided.
  */
 export async function callCreateGenerationJob(
   body: {
@@ -335,8 +372,12 @@ export async function callCreateGenerationJob(
     job_type: string;
     step_number?: number;
     user_feedback?: string;
+    user_id?: string;
   }
 ): Promise<{ job_id: string }> {
+  // Resolve user_id if not provided — required by the Edge Function for ownership validation
+  const user_id = body.user_id ?? await getAdminUserId();
+
   const res = await fetch(
     `${SUPABASE_URL}/functions/v1/create-generation-job`,
     {
@@ -346,7 +387,7 @@ export async function callCreateGenerationJob(
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, user_id }),
     }
   );
   if (!res.ok) {

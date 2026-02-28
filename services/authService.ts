@@ -1,5 +1,5 @@
 // Auth Service - Access Code Authentication
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import type { AccessCode, AuthSession, ApiResponse } from '../types/database';
 
 const SESSION_KEY = 'cutinside_auth_session';
@@ -8,10 +8,6 @@ const SESSION_KEY = 'cutinside_auth_session';
  * Validate an access code and create a session
  */
 export async function loginWithAccessCode(code: string): Promise<ApiResponse<AuthSession>> {
-  if (!isSupabaseConfigured()) {
-    return { data: null, error: 'Supabase is not configured' };
-  }
-
   try {
     // Look up the access code
     const { data: accessCode, error } = await supabase

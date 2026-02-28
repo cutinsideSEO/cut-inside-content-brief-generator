@@ -36,7 +36,7 @@ export function useBriefRealtimeSync(
         const cb = callbacksRef.current;
 
         // Check what changed and fire appropriate callbacks
-        if (cb.onBriefDataUpdated && newRecord.brief_data !== oldRecord.brief_data) {
+        if (cb.onBriefDataUpdated && JSON.stringify(newRecord.brief_data) !== JSON.stringify(oldRecord.brief_data)) {
           cb.onBriefDataUpdated(newRecord.brief_data as Partial<ContentBrief>);
         }
         if (cb.onStaleStepsUpdated && JSON.stringify(newRecord.stale_steps) !== JSON.stringify(oldRecord.stale_steps)) {

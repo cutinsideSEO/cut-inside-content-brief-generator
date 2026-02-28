@@ -17,6 +17,10 @@ BEGIN
   DELETE FROM generation_jobs
   WHERE status IN ('completed', 'failed', 'cancelled')
     AND updated_at < NOW() - INTERVAL '30 days';
+
+  DELETE FROM generation_batches
+  WHERE status = 'running'
+    AND created_at < NOW() - INTERVAL '1 day';
 END;
 $$;
 

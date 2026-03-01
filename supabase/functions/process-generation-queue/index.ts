@@ -36,6 +36,8 @@ import {
 import { retryOperation } from '../_shared/gemini-client.ts'
 import { getSerpUrls, getOnPageElements } from '../_shared/dataforseo-client.ts'
 import {
+  isJobStaleForRecovery,
+  resolveQueueModelSettings,
   shouldCountFailedChainSlot,
   shouldHaltJobProcessing,
   type ChainJobOutcome,
@@ -47,9 +49,12 @@ import {
 
 const MAX_JOBS_PER_INVOCATION = 1;
 
-/** Jobs stuck in 'running' for longer than this are considered stale and reset to pending.
+/** Jobs with no progress heartbeat for longer than this are considered stale.
  *  Set to 4min (above 150s EF timeout) to allow quick article resume cycles. */
 const STALE_JOB_TIMEOUT_MINUTES = 4;
+
+/** Keep article jobs alive while long section/model calls are in flight. */
+const ARTICLE_HEARTBEAT_INTERVAL_MS = 45_000;
 
 /** Workflow statuses that must not be overwritten by auto-computed statuses */
 const WORKFLOW_STATUSES = [
@@ -203,7 +208,8 @@ function buildBrandInfoFromConfig(config: Record<string, unknown>): string {
 function buildStepParams(
   config: Record<string, unknown>,
   step: number,
-  options: { isRegeneration?: boolean; userFeedback?: string } = {}
+  options: { isRegeneration?: boolean; userFeedback?: string } = {},
+  jobType: 'brief_step' | 'full_brief' | 'regenerate' = 'brief_step'
 ): StepExecutionParams {
   const competitors = transformCompetitors(
     (config.competitors as Record<string, unknown>[]) || []
@@ -224,8 +230,10 @@ function buildStepParams(
   const keywords = rawKeywords.map(k => ({ keyword: k.kw, volume: k.volume }));
 
   // Model settings
-  const modelSettings = (config.model_settings as { model: string; thinkingLevel: string }) ||
-    { model: 'gemini-2.5-pro', thinkingLevel: 'high' };
+  const configuredModelSettings =
+    (config.model_settings as { model: string; thinkingLevel: string } | undefined) ||
+    { model: 'gemini-3-pro-preview', thinkingLevel: 'high' };
+  const modelSettings = resolveQueueModelSettings(jobType, step, configuredModelSettings);
 
   // Length constraints
   const lengthConstraints = config.length_constraints as LengthConstraints | undefined;
@@ -282,6 +290,33 @@ async function updateJobProgress(
       updated_at: new Date().toISOString(),
     })
     .eq('id', jobId);
+}
+
+function startRunningJobHeartbeat(
+  supabase: SupabaseClient,
+  jobId: string,
+  intervalMs = ARTICLE_HEARTBEAT_INTERVAL_MS
+): () => void {
+  let updateInFlight = false;
+  const timer = setInterval(() => {
+    if (updateInFlight) return;
+    updateInFlight = true;
+    void supabase
+      .from('generation_jobs')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', jobId)
+      .eq('status', 'running')
+      .then(({ error }) => {
+        if (error) {
+          console.warn(`Heartbeat update failed for job ${jobId}: ${error.message}`);
+        }
+      })
+      .finally(() => {
+        updateInFlight = false;
+      });
+  }, intervalMs);
+
+  return () => clearInterval(timer);
 }
 
 async function markJobCompleted(
@@ -623,7 +658,7 @@ async function chainFullBriefJob(
       output_language: brief.output_language || 'English',
       serp_language: brief.serp_language || 'English',
       serp_country: brief.serp_country || 'United States',
-      model_settings: brief.model_settings || { model: 'gemini-2.5-pro', thinkingLevel: 'high' },
+      model_settings: brief.model_settings || { model: 'gemini-3-pro-preview', thinkingLevel: 'high' },
       length_constraints: brief.length_constraints,
       extracted_template: brief.extracted_template,
       user_feedbacks: brief.user_feedbacks || {},
@@ -723,7 +758,7 @@ async function processBriefStep(supabase: SupabaseClient, job: JobRow): Promise<
   });
 
   // Build params and execute
-  const params = buildStepParams(config, step);
+  const params = buildStepParams(config, step, {}, 'brief_step');
   const result = await executeBriefStep(params);
 
   // Save result to DB — check if brief should be marked 'complete'
@@ -770,7 +805,7 @@ async function processFullBrief(supabase: SupabaseClient, job: JobRow): Promise<
   });
 
   // Build params and execute current step
-  const params = buildStepParams(config, step);
+  const params = buildStepParams(config, step, {}, 'full_brief');
   const result = await executeBriefStep(params);
 
   // Merge result into brief_data in DB
@@ -885,7 +920,7 @@ async function processRegenerate(supabase: SupabaseClient, job: JobRow): Promise
   const params = buildStepParams(config, step, {
     isRegeneration: true,
     userFeedback,
-  });
+  }, 'regenerate');
 
   const result = await executeBriefStep(params);
 
@@ -907,6 +942,8 @@ async function processRegenerate(supabase: SupabaseClient, job: JobRow): Promise
  * Generates a full article from the brief, saves to brief_articles table.
  */
 async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<void> {
+  const stopHeartbeat = startRunningJobHeartbeat(supabase, job.id as string);
+  try {
   const config = job.config as Record<string, unknown>;
   const briefId = job.brief_id as string;
 
@@ -914,8 +951,10 @@ async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<vo
   const { briefData } = await readCurrentBriefData(supabase, briefId);
 
   // Model settings
-  const modelSettings = (config.model_settings as { model: string; thinkingLevel: string }) ||
-    { model: 'gemini-2.5-pro', thinkingLevel: 'high' };
+  const configuredModelSettings =
+    (config.model_settings as { model: string; thinkingLevel: string } | undefined) ||
+    { model: 'gemini-3-pro-preview', thinkingLevel: 'high' };
+  const modelSettings = resolveQueueModelSettings('article', null, configuredModelSettings);
 
   // Build brand context from client data
   const brandContext = buildBrandInfoFromConfig(config);
@@ -1038,7 +1077,13 @@ async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<vo
   });
 
   // Mark job completed and clear active_job_id
-  await markJobCompleted(supabase, job.id, briefId, true);
+  const completed = await markJobCompleted(supabase, job.id, briefId, true);
+  if (!completed) {
+    throw new Error(`Article job ${job.id} finished content but could not transition to completed`);
+  }
+  } finally {
+    stopHeartbeat();
+  }
 }
 
 /**
@@ -1279,20 +1324,22 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
 // ============================================
 
 /**
- * Reset jobs stuck in 'running' state for longer than STALE_JOB_TIMEOUT_MINUTES.
+ * Reset jobs stuck in 'running' state with no recent heartbeat for STALE_JOB_TIMEOUT_MINUTES.
  * This handles Edge Function timeouts where the job was claimed but never completed.
  * Jobs under max_retries are returned to 'pending'; exhausted jobs are marked 'failed'.
  */
 async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
   const cutoff = new Date(Date.now() - STALE_JOB_TIMEOUT_MINUTES * 60 * 1000).toISOString();
 
-  const { data: staleJobs, error } = await supabase
+  const { data: runningJobs, error } = await supabase
     .from('generation_jobs')
-    .select('id, brief_id, batch_id, retry_count, max_retries, job_type, step_number')
-    .eq('status', 'running')
-    .lt('started_at', cutoff);
+    .select('id, brief_id, batch_id, retry_count, max_retries, job_type, step_number, started_at, updated_at')
+    .eq('status', 'running');
 
-  if (error || !staleJobs || staleJobs.length === 0) return 0;
+  if (error || !runningJobs || runningJobs.length === 0) return 0;
+
+  const staleJobs = runningJobs.filter((job) => isJobStaleForRecovery(job, cutoff));
+  if (staleJobs.length === 0) return 0;
 
   let resetCount = 0;
   for (const job of staleJobs) {
@@ -1306,7 +1353,7 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
         .update({
           status: 'pending',
           retry_count: retryCount,
-          error_message: `Auto-reset: stuck in running for >${STALE_JOB_TIMEOUT_MINUTES}min (likely timeout)`,
+          error_message: `Auto-reset: no heartbeat for >${STALE_JOB_TIMEOUT_MINUTES}min (likely timeout)`,
           updated_at: new Date().toISOString(),
         })
         .eq('id', job.id);
@@ -1318,7 +1365,7 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
         .update({
           status: 'failed',
           retry_count: retryCount,
-          error_message: `Failed: stuck in running >${STALE_JOB_TIMEOUT_MINUTES}min, max retries exhausted`,
+          error_message: `Failed: no heartbeat for >${STALE_JOB_TIMEOUT_MINUTES}min, max retries exhausted`,
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })

@@ -11,7 +11,11 @@
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "qa:gate:checks": "node scripts/qa/release-gate-checks.mjs",
+    "qa:gate:core": "npm run build && npm run test:unit && npm run qa:gate:checks",
+    "qa:gate:e2e:migration": "playwright test e2e/single-brief.spec.ts e2e/brief-step.spec.ts e2e/regenerate-step.spec.ts e2e/article-generation.spec.ts e2e/bulk-generation.spec.ts",
+    "qa:gate:full": "npm run qa:gate:core && npm run qa:gate:e2e:migration"
   },
   "dependencies": {
     "@google/genai": "^1.16.0",

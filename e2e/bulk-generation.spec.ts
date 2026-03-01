@@ -195,8 +195,10 @@ test.describe('Bulk Generation E2E', () => {
     // ============================================
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 });
 
-    // Click "Generate Article" option
-    await page.getByText('Generate Article').click();
+    // Click the card button by role to avoid strict-mode collisions with heading + description text.
+    const generateArticleOption = page.getByRole('button', { name: /Generate Article/i }).first();
+    await expect(generateArticleOption).toBeVisible();
+    await generateArticleOption.click();
 
     // Click Start Batch
     const startBtn = page.getByRole('button', { name: /Start Batch/i });

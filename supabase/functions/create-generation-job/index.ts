@@ -150,7 +150,7 @@ Deno.serve(async (req: Request) => {
       output_language: brief.output_language || 'English',
       serp_language: brief.serp_language || 'English',
       serp_country: brief.serp_country || 'United States',
-      model_settings: brief.model_settings || { model: 'gemini-2.5-pro', thinkingLevel: 'high' },
+      model_settings: brief.model_settings || { model: 'gemini-3-pro-preview', thinkingLevel: 'high' },
       length_constraints: brief.length_constraints,
       extracted_template: brief.extracted_template,
       user_feedbacks: brief.user_feedbacks || {},

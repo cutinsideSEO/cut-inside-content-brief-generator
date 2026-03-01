@@ -29,6 +29,50 @@ export const TEST_CLIENT_NAME = 'CI';  // existing client (displayed as abbrevia
 export const SUPABASE_URL = envVars.VITE_SUPABASE_URL;
 export const SUPABASE_ANON_KEY = envVars.VITE_SUPABASE_ANON_KEY;
 
+const FETCH_RETRY_ATTEMPTS = 5;
+const FETCH_RETRY_DELAY_MS = 2_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableFetchError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return (
+    msg.includes('ENOTFOUND') ||
+    msg.includes('EAI_AGAIN') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('ECONNREFUSED') ||
+    msg.includes('fetch failed')
+  );
+}
+
+async function fetchWithRetry(
+  input: string,
+  init: RequestInit,
+  options?: { attempts?: number; delayMs?: number; label?: string }
+): Promise<Response> {
+  const attempts = options?.attempts ?? FETCH_RETRY_ATTEMPTS;
+  const delayMs = options?.delayMs ?? FETCH_RETRY_DELAY_MS;
+  const label = options?.label ?? input;
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fetch(input, init);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableFetchError(error) || attempt === attempts) {
+        throw error;
+      }
+      console.warn(`[fetchWithRetry] ${label} failed on attempt ${attempt}/${attempts}. Retrying...`);
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
+
 /**
  * Fetch the user ID (access_codes.id) for the ADMIN123 access code.
  * Used to satisfy the user_id requirement on create-generation-job.
@@ -58,13 +102,27 @@ export async function login(page: Page) {
   const accessInput = page.locator('input[placeholder="Enter your access code"]');
   await expect(accessInput).toBeVisible({ timeout: 10_000 });
 
-  // Fill access code
-  await accessInput.fill(ACCESS_CODE);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await accessInput.fill(ACCESS_CODE);
+    await page.getByRole('button', { name: /Sign In/i }).click();
 
-  // Click Sign In
-  await page.getByRole('button', { name: /Sign In/i }).click();
+    const reachedClientScreen = await page.getByText(/Select a client/i)
+      .waitFor({ timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
 
-  // Wait for client select screen
+    if (reachedClientScreen) {
+      return;
+    }
+
+    console.warn(`Login attempt ${attempt}/3 did not reach client screen.`);
+    if (attempt < 3) {
+      await page.waitForTimeout(3_000);
+      await page.goto('/');
+      await expect(accessInput).toBeVisible({ timeout: 10_000 });
+    }
+  }
+
   await expect(page.getByText(/Select a client/i)).toBeVisible({ timeout: 15_000 });
 }
 
@@ -141,15 +199,23 @@ export async function waitForJobsToComplete(timeoutMs: number = 300_000): Promis
   let jobSeen = false;
   const maxWaitForJob = 90_000;
   while (Date.now() - start < maxWaitForJob) {
-    const checkRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/generation_jobs?status=in.(pending,running)&select=id&limit=1`,
-      {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    let checkRes: Response;
+    try {
+      checkRes = await fetchWithRetry(
+        `${SUPABASE_URL}/rest/v1/generation_jobs?status=in.(pending,running)&select=id&limit=1`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
         },
-      }
-    );
+        { attempts: 3, delayMs: 2_000, label: 'Phase 1 active-job poll' }
+      );
+    } catch (error) {
+      console.warn('Phase 1 active-job poll failed:', error);
+      await sleep(3_000);
+      continue;
+    }
     if (checkRes.ok) {
       const checkJobs = await checkRes.json();
       if (checkJobs && checkJobs.length > 0) {
@@ -158,7 +224,7 @@ export async function waitForJobsToComplete(timeoutMs: number = 300_000): Promis
         break;
       }
     }
-    await new Promise(r => setTimeout(r, 3000));
+    await sleep(3_000);
   }
 
   if (!jobSeen) {
@@ -168,19 +234,27 @@ export async function waitForJobsToComplete(timeoutMs: number = 300_000): Promis
 
   // Phase 2: Poll until all active jobs complete
   while (Date.now() - start < timeoutMs) {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/generation_jobs?status=in.(pending,running)&select=id,status,job_type,progress&limit=5`,
-      {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    let res: Response;
+    try {
+      res = await fetchWithRetry(
+        `${SUPABASE_URL}/rest/v1/generation_jobs?status=in.(pending,running)&select=id,status,job_type,progress&limit=5`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
         },
-      }
-    );
+        { attempts: 3, delayMs: 2_000, label: 'Phase 2 active-job poll' }
+      );
+    } catch (error) {
+      console.error('Failed to poll jobs (network error):', error);
+      await sleep(pollInterval);
+      continue;
+    }
 
     if (!res.ok) {
       console.error('Failed to poll jobs:', res.status);
-      await new Promise(r => setTimeout(r, pollInterval));
+      await sleep(pollInterval);
       continue;
     }
 
@@ -208,7 +282,7 @@ export async function waitForJobsToComplete(timeoutMs: number = 300_000): Promis
 
     if (allDoneOrStuck) return;
 
-    await new Promise(r => setTimeout(r, pollInterval));
+    await sleep(pollInterval);
   }
 
   // Timeout: force-cancel remaining jobs
@@ -405,15 +479,22 @@ export async function callCreateGenerationJob(
  */
 export async function cancelStaleJobs(): Promise<number> {
   // Find all active jobs
-  const findRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/generation_jobs?status=in.(pending,running)&order=created_at.desc&limit=10&select=id,brief_id,status,job_type`,
-    {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  let findRes: Response;
+  try {
+    findRes = await fetchWithRetry(
+      `${SUPABASE_URL}/rest/v1/generation_jobs?status=in.(pending,running)&order=created_at.desc&limit=10&select=id,brief_id,status,job_type`,
+      {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
       },
-    }
-  );
+      { attempts: 5, delayMs: 2_000, label: 'cancelStaleJobs query active jobs' }
+    );
+  } catch (error) {
+    console.error('Failed to query active jobs (network error):', error);
+    return 0;
+  }
 
   if (!findRes.ok) {
     console.error('Failed to query active jobs:', findRes.status, await findRes.text());

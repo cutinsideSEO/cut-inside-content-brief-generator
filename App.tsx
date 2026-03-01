@@ -37,6 +37,7 @@ import { useGenerationSubscription } from './hooks/useGenerationSubscription';
 import { useBriefRealtimeSync } from './hooks/useBriefRealtimeSync';
 import type { SaveStatus } from './types/appState';
 import type { BriefStatus } from './types/database';
+import { shouldMarkBriefCompleteOnJobCompletion } from './utils/generationStatus';
 
 type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'article_view' | 'brief_upload';
 type ToastMessage = { id: number; title: string; message: string };
@@ -500,7 +501,7 @@ const App: React.FC<AppProps> = ({
         }
       }
       if (briefId && onGenerationComplete) {
-        onGenerationComplete(briefId, true);
+        onGenerationComplete(briefId, shouldMarkBriefCompleteOnJobCompletion(activeJob.job_type));
       }
     } else if (activeJob?.status === 'failed') {
       setLoadingStep(null);

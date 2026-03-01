@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { supabase } from './services/supabaseClient';
-import { createBrief, getBrief, updateBriefStatus } from './services/briefService';
+import { createBrief, getBrief, updateBrief, updateBriefStatus } from './services/briefService';
 import { isWorkflowStatus } from './types/database';
 import { getAccessibleClients, getClientWithContext } from './services/clientService';
 import { createGenerationJob } from './services/generationJobService';
@@ -118,6 +118,58 @@ const AppWrapperInner: React.FC = () => {
   useEffect(() => {
     if (!isAuthenticated || !state.selectedClientId) return;
 
+    let isCancelled = false;
+    const statusMap: Record<string, GenerationStatus> = {
+      'full_brief': 'generating_brief',
+      'brief_step': 'generating_brief',
+      'regenerate': 'generating_brief',
+      'article': 'generating_content',
+      'competitors': 'analyzing_competitors',
+    };
+
+    // Hydrate active jobs on mount so list loading/progress reflects reality
+    // even when the app opens mid-generation.
+    const loadInitialActiveJobs = async () => {
+      const { data, error } = await supabase
+        .from('generation_jobs')
+        .select('*')
+        .eq('client_id', state.selectedClientId)
+        .in('status', ['pending', 'running'])
+        .order('created_at', { ascending: false });
+
+      if (isCancelled || error || !data || data.length === 0) return;
+
+      const latestJobByBriefId = new Map<string, GenerationJob>();
+      for (const rawJob of data as GenerationJob[]) {
+        if (!rawJob.brief_id) continue;
+        if (!latestJobByBriefId.has(rawJob.brief_id)) {
+          latestJobByBriefId.set(rawJob.brief_id, rawJob);
+        }
+      }
+
+      setState(prev => {
+        const nextGeneratingBriefs = { ...prev.generatingBriefs };
+        latestJobByBriefId.forEach((job) => {
+          const progress = (job.progress || {}) as GenerationJobProgress;
+          nextGeneratingBriefs[job.brief_id] = {
+            clientId: job.client_id,
+            clientName: prev.selectedClientName || '',
+            status: statusMap[job.job_type] || 'generating_brief',
+            step: progress.current_step || null,
+            isBackend: true,
+            jobId: job.id,
+            jobProgress: progress,
+          };
+        });
+        return {
+          ...prev,
+          generatingBriefs: nextGeneratingBriefs,
+        };
+      });
+    };
+
+    void loadInitialActiveJobs();
+
     const channel = supabase
       .channel(`gen-jobs-client:${state.selectedClientId}`)
       .on('postgres_changes', {
@@ -134,13 +186,6 @@ const AppWrapperInner: React.FC = () => {
           setState(prev => {
             if (job.status === 'pending' || job.status === 'running') {
               // Track this generating brief
-              const statusMap: Record<string, GenerationStatus> = {
-                'full_brief': 'generating_brief',
-                'brief_step': 'generating_brief',
-                'regenerate': 'generating_brief',
-                'article': 'generating_content',
-                'competitors': 'analyzing_competitors',
-              };
               return {
                 ...prev,
                 generatingBriefs: {
@@ -193,6 +238,7 @@ const AppWrapperInner: React.FC = () => {
       .subscribe();
 
     return () => {
+      isCancelled = true;
       channel.unsubscribe();
     };
   }, [isAuthenticated, state.selectedClientId, state.selectedClientName]);
@@ -282,7 +328,11 @@ const AppWrapperInner: React.FC = () => {
     if (success) {
       getBrief(briefId).then(({ data }) => {
         if (data && !isWorkflowStatus(data.status)) {
-          updateBriefStatus(briefId, 'complete');
+          updateBrief(briefId, {
+            status: 'complete',
+            current_view: 'dashboard',
+            current_step: 7,
+          });
         }
       });
     }

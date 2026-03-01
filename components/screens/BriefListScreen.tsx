@@ -6,6 +6,7 @@ import { cancelBatch } from '../../services/batchService';
 import { toast } from 'sonner';
 import type { BriefWithClient, ArticleWithBrief, BriefStatus, ArticleStatus } from '../../types/database';
 import { isWorkflowStatus } from '../../types/database';
+import { getEffectiveBriefStatusForList, isBriefActivelyGenerating } from '../../utils/generationStatus';
 import { useBatchSubscription } from '../../hooks/useBatchSubscription';
 import { useAuth } from '../../contexts/AuthContext';
 import BriefListCard from '../briefs/BriefListCard';
@@ -262,9 +263,30 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     }
   };
 
+  // Normalize list status so stale/inconsistent DB rows are shown in a useful state.
+  const briefsWithEffectiveStatus = useMemo(() => {
+    return briefs.map((brief) => {
+      const effectiveStatus = getEffectiveBriefStatusForList({
+        status: brief.status,
+        current_step: brief.current_step,
+        active_job_id: brief.active_job_id,
+        brief_data: brief.brief_data,
+      });
+
+      if (effectiveStatus === brief.status) {
+        return brief;
+      }
+
+      return {
+        ...brief,
+        status: effectiveStatus,
+      };
+    });
+  }, [briefs]);
+
   // Filter, search, and sort briefs
   const filteredBriefs = useMemo(() => {
-    let result = briefs.filter((brief) => {
+    let result = briefsWithEffectiveStatus.filter((brief) => {
       if (filterStatus === 'workflow') {
         return ['sent_to_client', 'approved', 'changes_requested', 'in_writing'].includes(brief.status);
       }
@@ -301,17 +323,17 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     });
 
     return result;
-  }, [briefs, filterStatus, searchQuery, sortBy]);
+  }, [briefsWithEffectiveStatus, filterStatus, searchQuery, sortBy]);
 
   // Count briefs by status
   const workflowStatuses = ['sent_to_client', 'approved', 'changes_requested', 'in_writing'];
   const counts = {
-    all: briefs.length,
-    draft: briefs.filter((b) => b.status === 'draft').length,
-    in_progress: briefs.filter((b) => b.status === 'in_progress').length,
-    complete: briefs.filter((b) => b.status === 'complete').length,
-    workflow: briefs.filter((b) => workflowStatuses.includes(b.status)).length,
-    published: briefs.filter((b) => b.status === 'published').length,
+    all: briefsWithEffectiveStatus.length,
+    draft: briefsWithEffectiveStatus.filter((b) => b.status === 'draft').length,
+    in_progress: briefsWithEffectiveStatus.filter((b) => b.status === 'in_progress').length,
+    complete: briefsWithEffectiveStatus.filter((b) => b.status === 'complete').length,
+    workflow: briefsWithEffectiveStatus.filter((b) => workflowStatuses.includes(b.status)).length,
+    published: briefsWithEffectiveStatus.filter((b) => b.status === 'published').length,
   };
 
   // Sync counts with parent (sidebar) whenever briefs or articleCount change
@@ -604,6 +626,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {inProgressBriefs.map((brief) => {
                   const generating = generatingBriefs[brief.id];
+                  const isGenerating = isBriefActivelyGenerating(generating?.status);
                   return (
                     <BriefListCard
                       key={brief.id}
@@ -614,7 +637,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       onArchive={handleArchiveClick}
                       isSelected={selectedBriefs.has(brief.id)}
                       onToggleSelect={toggleBriefSelection}
-                      isGenerating={!!generating}
+                      isGenerating={isGenerating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
                     />
@@ -634,6 +657,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {draftBriefs.map((brief) => {
                   const generating = generatingBriefs[brief.id];
+                  const isGenerating = isBriefActivelyGenerating(generating?.status);
                   return (
                     <BriefListCard
                       key={brief.id}
@@ -644,7 +668,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       onArchive={handleArchiveClick}
                       isSelected={selectedBriefs.has(brief.id)}
                       onToggleSelect={toggleBriefSelection}
-                      isGenerating={!!generating}
+                      isGenerating={isGenerating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
                     />
@@ -664,6 +688,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {completeBriefs.map((brief) => {
                   const generating = generatingBriefs[brief.id];
+                  const isGenerating = isBriefActivelyGenerating(generating?.status);
                   return (
                     <BriefListCard
                       key={brief.id}
@@ -674,7 +699,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       onArchive={handleArchiveClick}
                       isSelected={selectedBriefs.has(brief.id)}
                       onToggleSelect={toggleBriefSelection}
-                      isGenerating={!!generating}
+                      isGenerating={isGenerating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
                       onWorkflowStatusChange={handleWorkflowStatusChange}
@@ -695,6 +720,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {workflowBriefs.map((brief) => {
                   const generating = generatingBriefs[brief.id];
+                  const isGenerating = isBriefActivelyGenerating(generating?.status);
                   return (
                     <BriefListCard
                       key={brief.id}
@@ -705,7 +731,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       onArchive={handleArchiveClick}
                       isSelected={selectedBriefs.has(brief.id)}
                       onToggleSelect={toggleBriefSelection}
-                      isGenerating={!!generating}
+                      isGenerating={isGenerating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
                       onWorkflowStatusChange={handleWorkflowStatusChange}
@@ -726,6 +752,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {publishedBriefs.map((brief) => {
                   const generating = generatingBriefs[brief.id];
+                  const isGenerating = isBriefActivelyGenerating(generating?.status);
                   return (
                     <BriefListCard
                       key={brief.id}
@@ -736,7 +763,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       onArchive={handleArchiveClick}
                       isSelected={selectedBriefs.has(brief.id)}
                       onToggleSelect={toggleBriefSelection}
-                      isGenerating={!!generating}
+                      isGenerating={isGenerating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
                       onWorkflowStatusChange={handleWorkflowStatusChange}

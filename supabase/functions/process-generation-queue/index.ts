@@ -37,6 +37,7 @@ import { retryOperation } from '../_shared/gemini-client.ts'
 import { getSerpUrls, getOnPageElements } from '../_shared/dataforseo-client.ts'
 import {
   isJobStaleForRecovery,
+  resolveRecoveryPolicy,
   resolveQueueModelSettings,
   shouldCountFailedChainSlot,
   shouldHaltJobProcessing,
@@ -49,12 +50,8 @@ import {
 
 const MAX_JOBS_PER_INVOCATION = 1;
 
-/** Jobs with no progress heartbeat for longer than this are considered stale.
- *  Set to 4min (above 150s EF timeout) to allow quick article resume cycles. */
-const STALE_JOB_TIMEOUT_MINUTES = 4;
-
 /** Keep article jobs alive while long section/model calls are in flight. */
-const ARTICLE_HEARTBEAT_INTERVAL_MS = 45_000;
+const ARTICLE_HEARTBEAT_INTERVAL_MS = 20_000;
 
 /** Workflow statuses that must not be overwritten by auto-computed statuses */
 const WORKFLOW_STATUSES = [
@@ -1324,27 +1321,35 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
 // ============================================
 
 /**
- * Reset jobs stuck in 'running' state with no recent heartbeat for STALE_JOB_TIMEOUT_MINUTES.
+ * Reset jobs stuck in 'running' state with no recent heartbeat for their
+ * resolved recovery policy (timeout/retry budget depends on job type/progress).
  * This handles Edge Function timeouts where the job was claimed but never completed.
  * Jobs under max_retries are returned to 'pending'; exhausted jobs are marked 'failed'.
  */
 async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
-  const cutoff = new Date(Date.now() - STALE_JOB_TIMEOUT_MINUTES * 60 * 1000).toISOString();
+  const nowMs = Date.now();
 
   const { data: runningJobs, error } = await supabase
     .from('generation_jobs')
-    .select('id, brief_id, batch_id, retry_count, max_retries, job_type, step_number, started_at, updated_at')
+    .select('id, brief_id, batch_id, retry_count, max_retries, job_type, step_number, started_at, updated_at, progress')
     .eq('status', 'running');
 
   if (error || !runningJobs || runningJobs.length === 0) return 0;
 
-  const staleJobs = runningJobs.filter((job) => isJobStaleForRecovery(job, cutoff));
+  const staleJobs = runningJobs
+    .map((job) => {
+      const policy = resolveRecoveryPolicy(job);
+      const cutoffIso = new Date(nowMs - policy.timeoutMinutes * 60 * 1000).toISOString();
+      if (!isJobStaleForRecovery(job, cutoffIso)) return null;
+      return { job, policy };
+    })
+    .filter((entry): entry is { job: JobRow; policy: { timeoutMinutes: number; maxRetries: number } } => Boolean(entry));
   if (staleJobs.length === 0) return 0;
 
   let resetCount = 0;
-  for (const job of staleJobs) {
+  for (const { job, policy } of staleJobs) {
     const retryCount = ((job.retry_count as number) || 0) + 1;
-    const maxRetries = (job.max_retries as number) || 3;
+    const maxRetries = policy.maxRetries;
 
     if (retryCount < maxRetries) {
       // Return to pending for retry
@@ -1353,7 +1358,7 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
         .update({
           status: 'pending',
           retry_count: retryCount,
-          error_message: `Auto-reset: no heartbeat for >${STALE_JOB_TIMEOUT_MINUTES}min (likely timeout)`,
+          error_message: `Auto-reset: no heartbeat for >${policy.timeoutMinutes}min (likely timeout)`,
           updated_at: new Date().toISOString(),
         })
         .eq('id', job.id);
@@ -1365,7 +1370,7 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
         .update({
           status: 'failed',
           retry_count: retryCount,
-          error_message: `Failed: no heartbeat for >${STALE_JOB_TIMEOUT_MINUTES}min, max retries exhausted`,
+          error_message: `Failed: no heartbeat for >${policy.timeoutMinutes}min, max retries exhausted`,
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })

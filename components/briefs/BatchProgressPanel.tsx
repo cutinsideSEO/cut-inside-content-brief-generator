@@ -1,6 +1,7 @@
 // BatchProgressPanel - Floating panel showing active batch generation progress
 import React from 'react';
 import type { GenerationBatch } from '../../types/database';
+import type { BatchLiveProgress } from '../../hooks/useBatchSubscription';
 import {
   FloatingPanel,
   FloatingPanelHeader,
@@ -13,9 +14,14 @@ import {
 interface BatchProgressPanelProps {
   batches: GenerationBatch[];
   onCancel: (batchId: string) => void;
+  liveProgressByBatch?: Record<string, BatchLiveProgress>;
 }
 
-const BatchProgressPanel: React.FC<BatchProgressPanelProps> = ({ batches, onCancel }) => {
+const BatchProgressPanel: React.FC<BatchProgressPanelProps> = ({
+  batches,
+  onCancel,
+  liveProgressByBatch = {},
+}) => {
   if (batches.length === 0) return null;
 
   const totalRunning = batches.filter(b => b.status === 'running').length;
@@ -39,14 +45,20 @@ const BatchProgressPanel: React.FC<BatchProgressPanelProps> = ({ batches, onCanc
 
       {batches.map(batch => {
         const doneCount = batch.completed_jobs + batch.failed_jobs;
+        const live = liveProgressByBatch[batch.id];
+        const runningFraction = live?.fractionalCompletedJobs || 0;
+        const effectiveDoneCount = Math.min(batch.total_jobs, doneCount + runningFraction);
         const pendingCount = batch.total_jobs - doneCount;
         const isComplete = batch.status !== 'running';
+        const livePercent = batch.total_jobs > 0
+          ? Math.round((effectiveDoneCount / batch.total_jobs) * 100)
+          : 0;
 
         return (
           <FloatingPanelItem
             key={batch.id}
             title={batch.name || `Batch ${batch.id.slice(0, 8)}`}
-            subtitle={`${doneCount}/${batch.total_jobs} complete`}
+            subtitle={`${doneCount}/${batch.total_jobs} complete${live?.runningJobs ? ` - live ${livePercent}%` : ''}`}
             status={
               <div className="flex items-center gap-2 text-xs">
                 {batch.completed_jobs > 0 && (
@@ -55,6 +67,9 @@ const BatchProgressPanel: React.FC<BatchProgressPanelProps> = ({ batches, onCanc
                 {batch.failed_jobs > 0 && (
                   <Badge variant="error" size="sm">{batch.failed_jobs} failed</Badge>
                 )}
+                {live?.runningJobs ? (
+                  <span className="text-muted-foreground">{live.runningJobs} running</span>
+                ) : null}
                 {pendingCount > 0 && !isComplete && (
                   <span className="text-muted-foreground">{pendingCount} pending</span>
                 )}
@@ -65,7 +80,7 @@ const BatchProgressPanel: React.FC<BatchProgressPanelProps> = ({ batches, onCanc
             }
             progress={
               <Progress
-                value={doneCount}
+                value={effectiveDoneCount}
                 max={batch.total_jobs}
                 size="sm"
                 color={batch.failed_jobs > 0 ? 'yellow' : 'teal'}

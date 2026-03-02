@@ -84,7 +84,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
   // Bulk generation state
   const [showBulkModal, setShowBulkModal] = useState<'keywords' | 'existing' | null>(null);
-  const { activeBatches } = useBatchSubscription(clientId);
+  const { activeBatches, liveProgressByBatch } = useBatchSubscription(clientId);
 
   // Load-more pagination
   const [visibleCount, setVisibleCount] = useState(20);
@@ -847,6 +847,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       <BatchProgressPanel
         batches={activeBatches}
         onCancel={handleCancelBatch}
+        liveProgressByBatch={liveProgressByBatch}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isJobStaleForRecovery,
+  resolveRecoveryPolicy,
   resolveQueueModelSettings,
   shouldHaltJobProcessing,
   shouldCountFailedChainSlot,
@@ -67,6 +68,41 @@ describe('generation guards', () => {
 
       expect(isJobStaleForRecovery(staleJob, cutoff)).toBe(true);
       expect(isJobStaleForRecovery(freshJob, cutoff)).toBe(false);
+    });
+  });
+
+  describe('resolveRecoveryPolicy', () => {
+    it('uses a wider timeout and retry budget for article jobs', () => {
+      const policy = resolveRecoveryPolicy({
+        job_type: 'article',
+        max_retries: 3,
+        progress: { percentage: 40 },
+      });
+
+      expect(policy.timeoutMinutes).toBe(8);
+      expect(policy.maxRetries).toBe(6);
+    });
+
+    it('uses an even wider window for late-stage article jobs', () => {
+      const policy = resolveRecoveryPolicy({
+        job_type: 'article',
+        max_retries: 6,
+        progress: { percentage: 90, current_section: 'Trimming article to target word count...' },
+      });
+
+      expect(policy.timeoutMinutes).toBe(12);
+      expect(policy.maxRetries).toBe(8);
+    });
+
+    it('keeps default policy for non-article jobs', () => {
+      const policy = resolveRecoveryPolicy({
+        job_type: 'full_brief',
+        max_retries: 3,
+        progress: { percentage: 57 },
+      });
+
+      expect(policy.timeoutMinutes).toBe(4);
+      expect(policy.maxRetries).toBe(3);
     });
   });
 

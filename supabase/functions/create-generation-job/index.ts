@@ -211,6 +211,7 @@ Deno.serve(async (req: Request) => {
         step_number: initialStep,
         config,
         status: 'pending',
+        max_retries: job_type === 'article' ? 6 : 3,
         progress: job_type === 'competitors'
           ? { phase: 'serp', completed_keywords: 0, total_keywords: (config.keywords as string[] || []).length, completed_urls: 0, total_urls: 0, percentage: 0 }
           : job_type === 'full_brief'

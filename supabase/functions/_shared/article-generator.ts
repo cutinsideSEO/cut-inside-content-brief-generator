@@ -31,6 +31,15 @@ import { buildArticleGenerationConfig } from './generation-config.ts';
 import { callGeminiDirect, retryOperation } from './gemini-client.ts';
 import { stripReasoningFromBrief, countWords, checkTokenBudget } from './brief-context.ts';
 
+const ARTICLE_SECTION_CALL_TIMEOUT_MS = 60_000;
+const ARTICLE_SECTION_CALL_RETRIES = 2;
+const ARTICLE_SECTION_RETRY_DELAY_MS = 1_500;
+const ARTICLE_TRIM_CALL_TIMEOUT_MS = 45_000;
+const ARTICLE_TRIM_CALL_RETRIES = 1;
+const ARTICLE_TRIM_RETRY_DELAY_MS = 800;
+const ARTICLE_TRIM_MODEL: GeminiModel = 'gemini-3-flash-preview';
+const MAX_FINAL_TRIM_SECTIONS = 2;
+
 // ============================================
 // Types
 // ============================================
@@ -302,7 +311,7 @@ Now, write the body content for the current section.
     const text = response.text;
     if (!text) throw new Error('Received an empty response from the AI for article section generation.');
     return text;
-  });
+  }, ARTICLE_SECTION_CALL_RETRIES, ARTICLE_SECTION_RETRY_DELAY_MS, ARTICLE_SECTION_CALL_TIMEOUT_MS);
 }
 
 // ============================================
@@ -318,7 +327,6 @@ async function trimSectionToWordCount(
   targetWords: number,
   language: string,
   sectionHeading: string,
-  model: GeminiModel,
 ): Promise<string> {
   const prompt = `Condense the following section to approximately ${targetWords} words.
 
@@ -338,13 +346,13 @@ Condensed version (approximately ${targetWords} words):`;
 
   try {
     return await retryOperation(async () => {
-      const response = await callGeminiDirect(model, prompt, {
-        thinkingConfig: { thinkingBudget: 1024 },
+      const response = await callGeminiDirect(ARTICLE_TRIM_MODEL, prompt, {
+        thinkingConfig: { thinkingBudget: 512 },
       });
       const text = response.text;
       if (!text) throw new Error('Empty response from AI for section trimming.');
       return text.trim();
-    });
+    }, ARTICLE_TRIM_CALL_RETRIES, ARTICLE_TRIM_RETRY_DELAY_MS, ARTICLE_TRIM_CALL_TIMEOUT_MS);
   } catch (error) {
     console.warn('Error trimming section, returning original content:', error);
     return content;
@@ -510,7 +518,7 @@ export async function generateFullArticle(
           });
         }
 
-        sectionBody = await trimSectionToWordCount(sectionBody, sectionTarget, language, section.heading, model);
+        sectionBody = await trimSectionToWordCount(sectionBody, sectionTarget, language, section.heading);
       }
     }
 
@@ -607,7 +615,7 @@ export async function generateFullArticle(
             });
           }
 
-          faqBody = await trimSectionToWordCount(faqBody, perFaqBudget, language, faq.question, model);
+          faqBody = await trimSectionToWordCount(faqBody, perFaqBudget, language, faq.question);
         }
       }
 
@@ -665,12 +673,20 @@ export async function generateFullArticle(
         }
       }
 
-      // Sort by overage (worst first) and trim up to 3 worst offenders
+      // Sort by overage (worst first) and trim a small bounded set to stay within EF time budgets.
       sectionOverages.sort((a, b) => b.overage - a.overage);
-      const sectionsToTrim = sectionOverages.slice(0, 3);
+      const sectionsToTrim = sectionOverages.slice(0, MAX_FINAL_TRIM_SECTIONS);
 
-      for (const sec of sectionsToTrim) {
-        const trimmedContent = await trimSectionToWordCount(sec.body, sec.target, language, sec.heading, model);
+      for (let trimIndex = 0; trimIndex < sectionsToTrim.length; trimIndex++) {
+        const sec = sectionsToTrim[trimIndex];
+        if (onProgress) {
+          await onProgress({
+            currentSection: `Final trim (${trimIndex + 1}/${sectionsToTrim.length}): ${sec.heading}`,
+            currentIndex: totalSectionsWithFaqs,
+            total: totalSectionsWithFaqs,
+          });
+        }
+        const trimmedContent = await trimSectionToWordCount(sec.body, sec.target, language, sec.heading);
         const headingLine = contentParts[sec.index].split('\n').find(l => l.startsWith('#')) || '';
         contentParts[sec.index] = headingLine + '\n\n' + trimmedContent;
       }

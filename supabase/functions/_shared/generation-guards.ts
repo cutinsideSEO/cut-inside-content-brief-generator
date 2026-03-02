@@ -8,6 +8,21 @@ export interface RecoveryHeartbeatJob {
   updated_at?: string | null
 }
 
+export interface RecoveryPolicyJob extends RecoveryHeartbeatJob {
+  job_type?: string | null
+  retry_count?: number | null
+  max_retries?: number | null
+  progress?: {
+    percentage?: number | null
+    current_section?: string | null
+  } | null
+}
+
+export interface RecoveryPolicy {
+  timeoutMinutes: number
+  maxRetries: number
+}
+
 export interface QueueModelSettings {
   model?: string | null
   thinkingLevel?: string | null
@@ -23,6 +38,12 @@ export type ChainJobOutcome = 'chained' | 'cancelled' | 'failed'
 const GEMINI_3_PRO_MODEL = 'gemini-3-pro-preview'
 const GEMINI_3_FLASH_MODEL = 'gemini-3-flash-preview'
 const DEFAULT_THINKING_LEVEL = 'high'
+const DEFAULT_STALE_TIMEOUT_MINUTES = 4
+const ARTICLE_STALE_TIMEOUT_MINUTES = 8
+const ARTICLE_LATE_STAGE_TIMEOUT_MINUTES = 12
+const DEFAULT_MAX_RETRIES = 3
+const ARTICLE_MAX_RETRIES = 6
+const ARTICLE_LATE_STAGE_MAX_RETRIES = 8
 
 function normalizeString(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback
@@ -62,6 +83,42 @@ export function isJobStaleForRecovery(job: RecoveryHeartbeatJob, cutoffIso: stri
   if (Number.isNaN(heartbeatMs)) return false
 
   return heartbeatMs < cutoffMs
+}
+
+/**
+ * Resolves stale-timeout/retry policy by job characteristics.
+ * Article jobs get a larger recovery window because long section/trim calls can
+ * approach edge function timeout limits before the next checkpoint is written.
+ */
+export function resolveRecoveryPolicy(job: RecoveryPolicyJob): RecoveryPolicy {
+  const progressPercentage = typeof job.progress?.percentage === 'number'
+    ? job.progress.percentage
+    : null
+  const currentSection = normalizeString(job.progress?.current_section, '').toLowerCase()
+  const isArticle = job.job_type === 'article'
+  const isLateStageArticle = isArticle && (
+    (progressPercentage !== null && progressPercentage >= 80) ||
+    currentSection.includes('trim')
+  )
+
+  if (isLateStageArticle) {
+    return {
+      timeoutMinutes: ARTICLE_LATE_STAGE_TIMEOUT_MINUTES,
+      maxRetries: Math.max(ARTICLE_LATE_STAGE_MAX_RETRIES, Number(job.max_retries) || 0),
+    }
+  }
+
+  if (isArticle) {
+    return {
+      timeoutMinutes: ARTICLE_STALE_TIMEOUT_MINUTES,
+      maxRetries: Math.max(ARTICLE_MAX_RETRIES, Number(job.max_retries) || 0),
+    }
+  }
+
+  return {
+    timeoutMinutes: DEFAULT_STALE_TIMEOUT_MINUTES,
+    maxRetries: Math.max(DEFAULT_MAX_RETRIES, Number(job.max_retries) || 0),
+  }
 }
 
 export function resolveQueueModelSettings(

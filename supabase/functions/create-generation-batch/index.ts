@@ -367,6 +367,7 @@ Deno.serve(async (req: Request) => {
             batch_id: batchId,
             config: competitorsConfig,
             status: 'pending',
+            max_retries: 3,
             progress: {
               phase: 'serp',
               completed_keywords: 0,
@@ -439,6 +440,7 @@ Deno.serve(async (req: Request) => {
               batch_id: batchId,
               config,
               status: 'pending',
+              max_retries: 3,
               progress: {
                 current_step: 1,
                 total_steps: 7,
@@ -518,6 +520,7 @@ Deno.serve(async (req: Request) => {
               batch_id: batchId,
               config,
               status: 'pending',
+              max_retries: 6,
               progress: {
                 current_section: 'Queued',
                 current_index: 0,

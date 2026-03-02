@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getBriefsForClient, archiveBrief, deleteBrief, updateBriefWorkflowStatus } from '../../services/briefService';
 import { getArticlesForClient, deleteArticle, getArticleCountForClient, updateArticleStatus } from '../../services/articleService';
 import { cancelBatch } from '../../services/batchService';
+import { createGenerationJob } from '../../services/generationJobService';
 import { toast } from 'sonner';
 import type { BriefWithClient, ArticleWithBrief, BriefStatus, ArticleStatus } from '../../types/database';
 import type { GeneratingBrief } from '../../types/generationActivity';
@@ -63,6 +64,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [archiveConfirm, setArchiveConfirm] = useState<string | null>(null);
   const [articleCount, setArticleCount] = useState(0);
+  const [articleGenerateConfirmBriefId, setArticleGenerateConfirmBriefId] = useState<string | null>(null);
+  const [startingArticleBriefIds, setStartingArticleBriefIds] = useState<Set<string>>(new Set());
+  const startingArticleBriefIdsRef = useRef<Set<string>>(new Set());
 
   // Sort state
   const [sortBy, setSortBy] = useState<'smart' | 'newest' | 'oldest' | 'modified' | 'name'>('smart');
@@ -102,6 +106,49 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     }
     prevGeneratingIdsRef.current = currentIds;
   }, [generatingBriefs, clientId]);
+
+  // If realtime generation state arrives, stop showing "starting" on those cards.
+  useEffect(() => {
+    setStartingArticleBriefIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+
+      prev.forEach((briefId) => {
+        if (isBriefActivelyGenerating(generatingBriefs[briefId]?.status)) {
+          changed = true;
+          return;
+        }
+        next.add(briefId);
+      });
+
+      if (!changed) return prev;
+      startingArticleBriefIdsRef.current = next;
+      return next;
+    });
+  }, [generatingBriefs]);
+
+  const markArticleGenerationStarting = useCallback((briefId: string): boolean => {
+    if (startingArticleBriefIdsRef.current.has(briefId)) return false;
+    startingArticleBriefIdsRef.current.add(briefId);
+    setStartingArticleBriefIds((prev) => {
+      if (prev.has(briefId)) return prev;
+      const next = new Set(prev);
+      next.add(briefId);
+      return next;
+    });
+    return true;
+  }, []);
+
+  const clearArticleGenerationStarting = useCallback((briefId: string) => {
+    if (!startingArticleBriefIdsRef.current.has(briefId)) return;
+    startingArticleBriefIdsRef.current.delete(briefId);
+    setStartingArticleBriefIds((prev) => {
+      if (!prev.has(briefId)) return prev;
+      const next = new Set(prev);
+      next.delete(briefId);
+      return next;
+    });
+  }, []);
 
   const loadBriefs = async () => {
     setIsLoading(true);
@@ -256,6 +303,42 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     }
   };
 
+  const handleGenerateArticle = useCallback(async (briefId: string) => {
+    if (isBriefActivelyGenerating(generatingBriefs[briefId]?.status)) {
+      toast.info('A generation job is already running for this brief');
+      return;
+    }
+
+    if (!markArticleGenerationStarting(briefId)) {
+      return;
+    }
+
+    try {
+      await createGenerationJob(briefId, 'article');
+      toast.success('Article generation started');
+
+      // Keep local loading briefly in case realtime update is delayed.
+      setTimeout(() => {
+        clearArticleGenerationStarting(briefId);
+      }, 5000);
+    } catch (err) {
+      clearArticleGenerationStarting(briefId);
+      const message = err instanceof Error ? err.message : 'Failed to start article generation';
+      toast.error(message);
+    }
+  }, [generatingBriefs, markArticleGenerationStarting, clearArticleGenerationStarting]);
+
+  const handleOpenGenerateArticleConfirm = useCallback((briefId: string) => {
+    setArticleGenerateConfirmBriefId(briefId);
+  }, []);
+
+  const handleConfirmGenerateArticle = useCallback(async () => {
+    if (!articleGenerateConfirmBriefId) return;
+    const briefId = articleGenerateConfirmBriefId;
+    setArticleGenerateConfirmBriefId(null);
+    await handleGenerateArticle(briefId);
+  }, [articleGenerateConfirmBriefId, handleGenerateArticle]);
+
   // Normalize list status so stale/inconsistent DB rows are shown in a useful state.
   const briefsWithEffectiveStatus = useMemo(() => {
     return briefs.map((brief) => {
@@ -407,11 +490,13 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         brief={brief}
         onContinue={onContinueBrief}
         onEdit={onEditBrief}
+        onGenerateArticle={handleOpenGenerateArticleConfirm}
         onUseAsTemplate={onUseAsTemplate}
         onArchive={handleArchiveClick}
         isSelected={selectedBriefs.has(brief.id)}
         onToggleSelect={toggleBriefSelection}
         isGenerating={isGenerating}
+        isGeneratingArticle={startingArticleBriefIds.has(brief.id)}
         generationStatus={generating?.status}
         generationStep={generating?.step}
         generationProgress={generating?.jobProgress}
@@ -822,6 +907,27 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       </>)}
 
       {/* Archive confirmation modal */}
+      <Modal
+        isOpen={!!articleGenerateConfirmBriefId}
+        onClose={() => setArticleGenerateConfirmBriefId(null)}
+        title="Generate Full Article"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setArticleGenerateConfirmBriefId(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleConfirmGenerateArticle}>
+              Generate Article
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-600">
+          This will generate a full article based on your brief. The process may take several minutes. Continue?
+        </p>
+      </Modal>
+
       <Modal
         isOpen={!!archiveConfirm}
         onClose={() => setArchiveConfirm(null)}

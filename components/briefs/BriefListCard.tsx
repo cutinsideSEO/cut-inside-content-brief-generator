@@ -24,6 +24,7 @@ interface BriefListCardProps {
   brief: BriefWithClient;
   onContinue: (briefId: string) => void;
   onEdit: (briefId: string) => void;
+  onGenerateArticle?: (briefId: string) => void;
   onUseAsTemplate: (briefId: string) => void;
   onArchive: (briefId: string) => void;
   isSelected?: boolean;
@@ -38,6 +39,7 @@ interface BriefListCardProps {
   articleCount?: number;
   // Workflow status
   onWorkflowStatusChange?: (briefId: string, newStatus: string, metadata?: { published_url?: string; published_at?: string }) => void;
+  isGeneratingArticle?: boolean;
 }
 
 const MoreHorizontalIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -69,6 +71,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   brief,
   onContinue,
   onEdit,
+  onGenerateArticle,
   onUseAsTemplate,
   onArchive,
   isSelected = false,
@@ -79,6 +82,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   generationProgress,
   articleCount,
   onWorkflowStatusChange,
+  isGeneratingArticle = false,
 }) => {
   const [showPublishModal, setShowPublishModal] = useState(false);
 
@@ -128,6 +132,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   const primaryKeywords = getPrimaryKeywords();
   const showWorkflowSelect = !isGenerating && onWorkflowStatusChange && (brief.status === 'complete' || isWorkflowStatus(brief.status));
   const isWorkflow = isWorkflowStatus(brief.status);
+  const canGenerateArticle = !isGenerating && !!onGenerateArticle && (brief.status === 'complete' || isWorkflow);
 
   const getStatusBorderColor = () => {
     if (isGenerating) return 'border-l-amber-400';
@@ -231,17 +236,30 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
               </span>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
-              {brief.status !== 'complete' && brief.status !== 'archived' && !isWorkflow && (
-                <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
-                  Continue
-                </Button>
-              )}
-              {(brief.status === 'complete' || isWorkflow) && (
-                <Button variant="primary" size="sm" onClick={() => onEdit(brief.id)}>
-                  View / Edit
-                </Button>
-              )}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {brief.status !== 'complete' && brief.status !== 'archived' && !isWorkflow && (
+                  <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
+                    Continue
+                  </Button>
+                )}
+                {(brief.status === 'complete' || isWorkflow) && (
+                  <Button variant="primary" size="sm" onClick={() => onEdit(brief.id)}>
+                    View / Edit
+                  </Button>
+                )}
+                {canGenerateArticle && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => onGenerateArticle(brief.id)}
+                    loading={isGeneratingArticle}
+                    disabled={isGeneratingArticle}
+                  >
+                    Generate Article
+                  </Button>
+                )}
+              </div>
               {brief.status === 'archived' && <span />}
             </div>
           )

@@ -7,6 +7,8 @@ This is a Vite + React + TypeScript app with Supabase-backed backend generation.
 - Domain services: `services/` (Supabase, batch jobs, generation, articles, auth)
 - Shared types/utilities: `types/`, `utils/`, `lib/`, `constants.ts`
 - Generation activity UX: `components/briefs/GenerationActivityPanel.tsx`, `utils/generationActivity.ts`, `utils/generationActivitySummary.ts`, `utils/articleGenerationActivity.ts`
+- Shared list card primitive: `components/ui/WorkItemCard.tsx` (used by client, brief, and article cards)
+- Client profile UX state hub: `components/screens/ClientProfileScreen.tsx` (section completion + autosave visibility)
 - Backend functions: `supabase/functions/` (Edge Functions and shared backend modules)
 - Tests: unit tests in `tests/`, end-to-end tests in `e2e/`
 - QA and operational scripts: `scripts/qa/`, docs in `docs/`
@@ -29,6 +31,8 @@ Use npm scripts from `package.json`:
 - Hooks: `useXxx` naming in `hooks/`
 - Services/utilities: `camelCase` module names in `services/` and `utils/`
 - UI standard: always use `shadcn/ui` components and conventions for new UI work; avoid introducing parallel component systems
+- Brief list UX standard: default to Smart Queue ordering, keep grouped-by-status as an optional mode
+- Card UX standard: prefer `WorkItemCard` for list cards with consistent header/body/footer anatomy
 - Prefer small, focused functions; reuse `_shared` backend helpers in `supabase/functions/_shared/`
 
 ## Testing Guidelines
@@ -40,6 +44,10 @@ Use npm scripts from `package.json`:
   - Relevant E2E flow(s), or `npm run qa:gate:e2e:migration`
 - When changing generation activity/progress UX, also run targeted unit tests:
   - `npm run test:unit -- tests/services/generationActivity.test.ts tests/services/generationActivitySummary.test.ts tests/services/articleGenerationActivity.test.ts`
+- When changing batch progress detail modeling, run:
+  - `npm run test:unit -- tests/services/batchProgressDetails.test.ts`
+- When changing generation job transition normalization, run:
+  - `npm run test:unit -- tests/services/generationJobTransitions.test.ts`
 
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commit style seen in history: `feat:`, `fix:`, `chore:`

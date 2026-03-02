@@ -193,6 +193,8 @@ pg_cron (every 10-30s) → process-generation-queue Edge Function
 - `utils/generationActivity.ts` - Shared progress and status label model for generation surfaces
 - `utils/generationActivitySummary.ts` - Batch progress summary model for activity UI
 - `utils/articleGenerationActivity.ts` - Filters/sorts active article-generation items for Articles tab
+- `utils/batchProgressDetails.ts` - Shared batch detail labels and summaries for progress UI
+- `utils/generationJobTransitions.ts` - Generation transition normalization helpers
 
 **All job types implemented:** `competitors`, `brief_step`, `full_brief`, `regenerate`, `article`
 
@@ -265,6 +267,15 @@ Tailwind v4 uses the `@tailwindcss/vite` plugin (not CDN). All design tokens are
 - **`Sidebar`:** Has two view modes — brief editor mode and `brief_list` mode (with `clientName`, `onBackToClients`, `briefCounts` props).
 - **`WorkflowStatusSelect`:** Reusable dropdown for changing brief/article workflow status. Uses `entityType` prop (`'brief'` or `'article'`) to select the correct transition map.
 - **`PublishedUrlModal`:** Modal for entering a published URL when setting status to "Published". Used in BriefListCard, ArticleListCard, and DashboardScreen.
+- **`WorkItemCard`:** Shared list-card wrapper for consistent header/body/footer layout, status accents, and selection/highlight rings.
+
+### Current UX Conventions (Desktop)
+
+- **Brief list default mode:** `Smart Queue` is the default; grouped status sections are optional.
+- **Smart Queue priority:** generating -> workflow-blocked (`changes_requested`, `in_writing`, `sent_to_client`) -> in progress -> remaining.
+- **Generation language parity:** Article in-progress labels/badges should reuse `getGenerationProgressModel()` and `getGenerationStatusBadgeLabel()` so wording matches `GenerationActivityPanel`.
+- **Profile clarity:** `ClientProfileScreen` is the source of section completion signals and sticky save-status context.
+- **Microcopy consistency:** Prefer "workspace" for client-level context and action-led labels ("Active Article Jobs", "Bulk Generate Briefs").
 
 ### Path Alias
 
@@ -276,6 +287,7 @@ The `@/` alias maps to project root: `import { Card } from '@/components/ui'`
 - **`SaveStatus` type:** `'saved' | 'saving' | 'unsaved' | 'error'` — there is no `'idle'` state.
 - **App.tsx prop renaming:** When `App` receives `saveStatus` and `lastSavedAt` as props, they're renamed internally: `saveStatus: externalSaveStatus`, `lastSavedAt: externalLastSavedAt`.
 - **Build warning:** Production build produces a single ~1,064KB chunk. This is expected — the chunk size warning is pre-existing and not a regression.
+- **Build warning:** Production build still emits large chunk warnings (>500kB). Treat as known technical debt unless a task explicitly scopes bundle splitting.
 - **`ContentBrief` vs `Brief` types:** `Partial<ContentBrief>` (from `types.ts`) is the in-memory brief data for the 7-step pipeline. `Brief` (from `types/database.ts`) is the DB row with metadata like `status`, `published_url`, `published_at`. Don't confuse them — DB-only fields are NOT on `ContentBrief`.
 - **Auto-save status regression:** If you add any code path that writes `status` to the `briefs` table (e.g., setting `'in_progress'` or `'complete'`), you MUST guard it with `isWorkflowStatus()` to avoid overwriting manually-set workflow statuses. This applies to `saveBriefState()`, `updateBriefProgress()`, and all generation callbacks in `AppWrapper.tsx`.
 - **Supabase migration DDL:** When adding columns with `ADD COLUMN IF NOT EXISTS` combined with inline `CHECK` constraints, PostgreSQL may not support the inline syntax. Separate the `ADD COLUMN` and `ADD CONSTRAINT` into distinct statements (use a `DO $$ ... $$` block to conditionally add the constraint).
@@ -283,6 +295,8 @@ The `@/` alias maps to project root: `import { Card } from '@/components/ui'`
 - **Edge Function deployment:** When deploying via MCP `deploy_edge_function`, ALL `_shared/*.ts` files must be included in the `files` array (10 files total). Import paths must be `./_shared/` not `../_shared/`. Missing even one file causes "Module not found" errors. The `process-generation-queue` uses `verify_jwt: false` (called by pg_cron); `create-generation-job` and `create-generation-batch` use `verify_jwt: true`.
 - **`LengthConstraints` type:** Uses `globalTarget` (not `totalWordCount`). The property `briefData.article_structure?.word_count_target` is the fallback when `globalTarget` is null.
 - **`GenerationJobProgress` type sync:** The `GenerationJobProgress` interface in `types/database.ts` must match the JSONB shape written by edge functions. Backend writes `total_sections`, `percentage`, `word_count` — keep the interface in sync when adding new progress fields.
+- **List card consistency:** For client/brief/article list surfaces, use `WorkItemCard` rather than ad hoc card wrappers to avoid UX drift.
+- **Smart Queue behavior:** If you modify brief sorting logic in `BriefListScreen`, preserve `smart` as the default sort option unless product direction explicitly changes.
 - **Article thinking budget:** `buildArticleGenerationConfig()` uses a fixed `ARTICLE_THINKING_BUDGET` (8192) regardless of user's thinking level preference. This is intentional — do not wire `thinkingLevel` through for articles.
 - **`cancelGenerationJob()` clears `active_job_id`:** After cancelling a job, the service also clears `briefs.active_job_id` to prevent stale pointers. This is best-effort (warns on failure, doesn't throw).
 - **Manual step-by-step generation is foreground-only:** `generateBriefStep()` flow runs in the frontend (non-queued). Leaving during an in-flight step aborts it and it will not continue as a background `generation_jobs` task.

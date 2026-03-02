@@ -112,6 +112,10 @@ export type { EmptyStateProps } from './EmptyState';
 export { default as StatCard } from './StatCard';
 export type { StatCardProps } from './StatCard';
 
+// WorkItemCard
+export { default as WorkItemCard } from './WorkItemCard';
+export type { WorkItemCardProps } from './WorkItemCard';
+
 // ErrorBoundary
 export { default as ErrorBoundary } from './ErrorBoundary';
 

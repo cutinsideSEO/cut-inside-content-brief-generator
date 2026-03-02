@@ -10,6 +10,7 @@ import Button from '../Button';
 import {
   Card,
   Input,
+  Select,
   Textarea,
   Alert,
   Modal,
@@ -223,7 +224,7 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
           <h1 className="text-2xl font-heading font-bold text-gray-900">
             Welcome back, {userName || 'User'}
           </h1>
-          <p className="text-gray-600 mt-1">Select a client folder to view or create briefs</p>
+          <p className="text-gray-600 mt-1">Select a client workspace to manage briefs and generation activity</p>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -242,7 +243,7 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
 
       {/* Search and Sort */}
       {clients.length > 0 && (
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6 rounded-lg border border-border bg-card px-4 py-3">
           <div className="flex-1">
             <Input
               placeholder="Search clients..."
@@ -260,16 +261,19 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
               }
             />
           </div>
-          <select
+          <Select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="px-3 py-2 bg-white border border-gray-200 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-teal focus:border-teal"
-          >
-            <option value="name">Name A-Z</option>
-            <option value="updated">Last Updated</option>
-            <option value="created">Newest First</option>
-            <option value="briefs">Most Briefs</option>
-          </select>
+            options={[
+              { value: 'name', label: 'Name A-Z' },
+              { value: 'updated', label: 'Last Updated' },
+              { value: 'created', label: 'Newest First' },
+              { value: 'briefs', label: 'Most Briefs' },
+            ]}
+            size="sm"
+            className="sm:w-44"
+            aria-label="Sort clients"
+          />
         </div>
       )}
 
@@ -350,11 +354,11 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
                   colorIndex={clients.indexOf(client)}
                 />
                 {/* Edit/Delete/Settings overlay buttons */}
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <div className="absolute top-2 right-2 flex gap-1 opacity-90 group-hover:opacity-100 transition-opacity z-10">
                   {onOpenClientProfile && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onOpenClientProfile(client.id, client.name); }}
-                      className="p-1.5 bg-white rounded-md shadow-sm border border-gray-200 text-gray-500 hover:text-teal hover:border-teal transition-colors"
+                      className="p-1.5 bg-card/95 backdrop-blur rounded-md shadow-sm border border-gray-200 text-gray-500 hover:text-teal hover:border-teal transition-colors"
                       title="Client settings"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -365,7 +369,7 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
                   )}
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteClient(client); }}
-                    className="p-1.5 bg-white rounded-md shadow-sm border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors"
+                    className="p-1.5 bg-card/95 backdrop-blur rounded-md shadow-sm border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors"
                     title="Delete client"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

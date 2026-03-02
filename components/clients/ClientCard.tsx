@@ -3,7 +3,7 @@ import React from 'react';
 import type { ClientWithBriefCount } from '../../types/database';
 import { INDUSTRY_LABELS } from '../../types/clientProfile';
 import type { IndustryVertical } from '../../types/clientProfile';
-import { Card, Badge } from '../ui';
+import { Badge, WorkItemCard } from '../ui';
 import { getClientColor } from '../../lib/clientColors';
 import { getClientLogoUrl } from '../../lib/favicon';
 
@@ -47,7 +47,6 @@ const ClientCard: React.FC<ClientCardProps> = ({
     });
   };
 
-  // Use brand_color for border and icon background if set, otherwise fall back to palette
   const borderStyle = brandColor
     ? { borderLeftColor: brandColor }
     : undefined;
@@ -57,87 +56,80 @@ const ClientCard: React.FC<ClientCardProps> = ({
   const initialsColor = brandColor ? { color: brandColor } : undefined;
 
   return (
-    <Card
-      variant="interactive"
-      padding="md"
-      hover
-      glow={isGenerating ? 'yellow' : 'teal'}
-      className={`
-        relative cursor-pointer ${borderClass}
-        ${isGenerating ? 'border-amber-400/50 ring-1 ring-status-generating/30' : ''}
-        ${isSelected ? 'border-teal ring-1 ring-teal' : ''}
-      `}
-      style={borderStyle}
+    <WorkItemCard
+      interactive
       onClick={() => onClick(client.id)}
-    >
-      {/* Generation indicator */}
-      {isGenerating && (
-        <div className="absolute top-3 right-3 flex items-center gap-1.5">
-          <Badge variant="warning" size="sm" pulse>
-            {generatingCount > 1 ? `${generatingCount} Generating` : 'Generating'}
-          </Badge>
-        </div>
-      )}
-
-      {/* Icon/Logo/Initials and Name */}
-      <div className="flex items-start">
-        {logoUrl ? (
-          <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden mr-4 border border-gray-100">
-            <img
-              src={logoUrl}
-              alt={client.name}
-              className="w-full h-full object-contain"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          </div>
-        ) : (
-          <div
-            className={`flex-shrink-0 w-12 h-12 ${iconBg || ''} rounded-lg flex items-center justify-center mr-4`}
-            style={iconBgStyle}
-          >
-            <span
-              className={`text-base font-heading font-bold ${!brandColor ? clientColor.icon : ''}`}
-              style={initialsColor}
+      glow={isGenerating ? 'yellow' : 'teal'}
+      accentClassName={borderClass}
+      highlighted={isGenerating}
+      selected={isSelected}
+      style={borderStyle}
+      header={(
+        <div className="flex items-start gap-3">
+          {logoUrl ? (
+            <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border border-gray-100">
+              <img
+                src={logoUrl}
+                alt={client.name}
+                className="w-full h-full object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+          ) : (
+            <div
+              className={`flex-shrink-0 w-12 h-12 ${iconBg || ''} rounded-lg flex items-center justify-center`}
+              style={iconBgStyle}
             >
-              {getInitials(client.name)}
-            </span>
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-heading font-semibold text-gray-900 truncate">
-            {client.name}
-          </h3>
-          <div className="flex items-center gap-2 mt-0.5">
-            {industry && INDUSTRY_LABELS[industry] && (
-              <Badge variant="secondary" size="sm">
-                {INDUSTRY_LABELS[industry]}
-              </Badge>
-            )}
-            {client.description && !industry && (
-              <p className="text-sm text-gray-500 line-clamp-1">
+              <span
+                className={`text-base font-heading font-bold ${!brandColor ? clientColor.icon : ''}`}
+                style={initialsColor}
+              >
+                {getInitials(client.name)}
+              </span>
+            </div>
+          )}
+
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-heading font-semibold text-gray-900 truncate">
+              {client.name}
+            </h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              {industry && INDUSTRY_LABELS[industry] && (
+                <Badge variant="secondary" size="sm">
+                  {INDUSTRY_LABELS[industry]}
+                </Badge>
+              )}
+              {client.description && !industry && (
+                <p className="text-sm text-gray-500 line-clamp-1">
+                  {client.description}
+                </p>
+              )}
+            </div>
+            {client.description && industry && (
+              <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">
                 {client.description}
               </p>
             )}
           </div>
-          {client.description && industry && (
-            <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">
-              {client.description}
-            </p>
+
+          {isGenerating && (
+            <Badge variant="warning" size="sm" pulse>
+              {generatingCount > 1 ? `${generatingCount} Generating` : 'Generating'}
+            </Badge>
           )}
         </div>
-      </div>
-
-      {/* Stats */}
+      )}
+    >
       <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
         <span className="text-gray-600">
           <span className="text-gray-900 font-medium">{client.brief_count}</span>
           {' '}{client.brief_count === 1 ? 'brief' : 'briefs'}
         </span>
         <span className="text-gray-400">
-          Created {formatDate(client.created_at)}
+          Updated {formatDate(client.updated_at)}
         </span>
       </div>
-    </Card>
+    </WorkItemCard>
   );
 };
 

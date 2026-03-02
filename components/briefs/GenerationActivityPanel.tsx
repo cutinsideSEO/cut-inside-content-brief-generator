@@ -74,6 +74,10 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
       const next = { ...prev };
 
       for (const [briefId, entry] of Object.entries(generatingBriefs)) {
+        if (isBriefActivelyGenerating(entry.status)) {
+          delete next[briefId];
+          continue;
+        }
         if (entry.status !== 'idle' || !entry.terminalStatus) continue;
         const briefName = briefNamesById[briefId] || `Brief ${briefId.slice(0, 8)}`;
         next[briefId] = {
@@ -185,8 +189,10 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
                 </h3>
                 <div className="space-y-3">
                   {batches.map((batch) => {
-                    const model = buildBatchActivityModel(batch, liveProgressByBatch[batch.id]);
+                    const live = liveProgressByBatch[batch.id];
+                    const model = buildBatchActivityModel(batch, live);
                     const isRunning = batch.status === 'running';
+                    const showBriefSummary = Boolean(live?.isMultiStage && live.totalBriefs > 0);
                     return (
                       <div key={batch.id} className="rounded-md border border-border bg-card p-3">
                         <div className="flex items-center justify-between gap-2 mb-2">
@@ -195,7 +201,8 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
                               {batch.name || `Batch ${batch.id.slice(0, 8)}`}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {model.doneCount}/{batch.total_jobs} complete
+                              {model.doneCount}/{batch.total_jobs} jobs complete
+                              {showBriefSummary ? ` (${live.completedBriefs}/${live.totalBriefs} briefs finished)` : ''}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">

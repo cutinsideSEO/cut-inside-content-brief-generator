@@ -27,6 +27,9 @@ describe('generation activity summary helpers', () => {
       pendingJobs: 4,
       averageRunningPercentage: 50,
       fractionalCompletedJobs: 1.2,
+      totalBriefs: 0,
+      completedBriefs: 0,
+      isMultiStage: false,
     };
 
     const model = buildBatchActivityModel(batch, live);

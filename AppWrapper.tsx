@@ -12,6 +12,11 @@ import { useBriefLoader } from './hooks/useBriefLoader';
 import type { Brief, AppView as DatabaseAppView, GenerationJob, GenerationJobProgress } from './types/database';
 import type { SaveStatus } from './types/appState';
 import type { GeneratingBrief, GenerationStatus } from './types/generationActivity';
+import {
+  isOutOfOrderTerminalUpdate,
+  isPipelinePhaseTransition,
+  isTerminalJobUpdate,
+} from './utils/generationJobTransitions';
 
 // Import screens
 import LoginScreen from './components/screens/LoginScreen';
@@ -170,7 +175,13 @@ const AppWrapperInner: React.FC = () => {
         const progress = (job.progress || {}) as GenerationJobProgress;
 
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const isPipelineTransition = isPipelinePhaseTransition(job);
           setState(prev => {
+            const existing = prev.generatingBriefs[job.brief_id];
+            if (isOutOfOrderTerminalUpdate(existing?.jobId, job)) {
+              return prev;
+            }
+
             if (job.status === 'pending' || job.status === 'running') {
               // Track this generating brief
               return {
@@ -190,7 +201,27 @@ const AppWrapperInner: React.FC = () => {
                   },
                 },
               };
-            } else if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+            } else if (isTerminalJobUpdate(job)) {
+              if (isPipelineTransition) {
+                return {
+                  ...prev,
+                  generatingBriefs: {
+                    ...prev.generatingBriefs,
+                    [job.brief_id]: {
+                      clientId: job.client_id,
+                      clientName: prev.selectedClientName || '',
+                      status: 'generating_brief',
+                      step: 1,
+                      terminalStatus: undefined,
+                      isBackend: true,
+                      jobId: job.id,
+                      jobProgress: progress,
+                      updatedAt: job.updated_at,
+                    },
+                  },
+                };
+              }
+
               // Remove from generating briefs after a short delay
               const { [job.brief_id]: _removed, ...remaining } = prev.generatingBriefs;
               // Mark as idle briefly, then remove
@@ -216,7 +247,7 @@ const AppWrapperInner: React.FC = () => {
           });
 
           // Clean up completed jobs from the map after delay
-          if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+          if (isTerminalJobUpdate(job) && !isPipelineTransition) {
             setTimeout(() => {
               setState(prev => {
                 const { [job.brief_id]: removed, ...remaining } = prev.generatingBriefs;

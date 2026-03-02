@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { ArticleWithBrief } from '../../types/database';
-import { Badge, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../ui';
+import type { ArticleWithBrief, ArticleStatus } from '../../types/database';
+import { Badge, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, WorkItemCard } from '../ui';
 import Button from '../Button';
 import { FileTextIcon } from '../Icon';
 import ArticleStatusBadge from './ArticleStatusBadge';
@@ -27,116 +27,129 @@ const LinkIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 interface ArticleListCardProps {
-    article: ArticleWithBrief;
-    onView: (articleId: string) => void;
-    onDelete: (articleId: string) => void;
-    onStatusChange?: (articleId: string, newStatus: string, metadata?: { published_url?: string }) => void;
+  article: ArticleWithBrief;
+  onView: (articleId: string) => void;
+  onDelete: (articleId: string) => void;
+  onStatusChange?: (articleId: string, newStatus: string, metadata?: { published_url?: string }) => void;
 }
 
 const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDelete, onStatusChange }) => {
-    const wordCount = article.content.trim().split(/\s+/).filter(Boolean).length;
-    const [showPublishModal, setShowPublishModal] = useState(false);
+  const wordCount = article.content.trim().split(/\s+/).filter(Boolean).length;
+  const [showPublishModal, setShowPublishModal] = useState(false);
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    };
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
-    return (
-        <div className="group bg-card border border-border rounded-lg shadow-card transition-all duration-200 hover:shadow-card-hover hover:border-gray-300">
-            {/* Card body */}
-            <div className="p-4">
-                {/* Top row: icon + title + badges + menu */}
-                <div className="flex items-start gap-3">
-                    <div className="pt-0.5 flex-shrink-0">
-                        <FileTextIcon className="h-4 w-4 text-teal" />
-                    </div>
+  const getStatusBorderColor = (status: ArticleStatus) => {
+    switch (status) {
+      case 'published':
+        return 'border-l-emerald-500';
+      case 'approved':
+        return 'border-l-emerald-400';
+      case 'sent_to_client':
+        return 'border-l-teal-400';
+      default:
+        return 'border-l-gray-300';
+    }
+  };
 
-                    <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-heading font-semibold text-foreground leading-snug truncate">
-                            {article.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                            From: {article.brief_name}
-                        </p>
-                    </div>
+  const articleStatus = article.status || 'draft';
 
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {article.is_current && <Badge variant="success" size="sm">Current</Badge>}
-                        {onStatusChange ? (
-                            <WorkflowStatusSelect
-                                entityType="article"
-                                entityId={article.id}
-                                currentStatus={article.status || 'draft'}
-                                publishedUrl={article.published_url}
-                                onStatusChange={(newStatus, metadata) => onStatusChange(article.id, newStatus, metadata)}
-                                onPublishClick={() => setShowPublishModal(true)}
-                            />
-                        ) : (
-                            <ArticleStatusBadge status={article.status || 'draft'} />
-                        )}
-                        <Badge variant="default" size="sm">v{article.version}</Badge>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 focus:opacity-100">
-                                    <MoreHorizontalIcon className="h-4 w-4" />
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                    onClick={() => { if (window.confirm('Delete this article version?')) onDelete(article.id); }}
-                                    className="text-red-500 focus:text-red-500"
-                                >
-                                    <TrashIcon className="h-4 w-4 mr-2" />
-                                    Delete
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                </div>
-
-                {/* Meta row */}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
-                    <span>{wordCount.toLocaleString()} words</span>
-                    <span className="text-border">·</span>
-                    <span>{formatDate(article.created_at)}</span>
-                    {article.published_url && (
-                        <>
-                            <span className="text-border">·</span>
-                            <a
-                                href={article.published_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-teal hover:underline truncate max-w-[200px]"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <LinkIcon className="h-3 w-3 flex-shrink-0" />
-                                <span className="truncate">{article.published_url.replace(/^https?:\/\//, '')}</span>
-                            </a>
-                        </>
-                    )}
-                </div>
+  return (
+    <>
+      <WorkItemCard
+        hover
+        accentClassName={getStatusBorderColor(articleStatus)}
+        header={(
+          <div className="flex items-start gap-3">
+            <div className="pt-0.5 flex-shrink-0">
+              <FileTextIcon className="h-4 w-4 text-teal" />
             </div>
 
-            {/* Footer */}
-            <div className="px-4 py-2.5 border-t border-border bg-secondary/30 rounded-b-lg">
-                <Button variant="primary" size="sm" onClick={() => onView(article.id)}>
-                    View Article
-                </Button>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-heading font-semibold text-foreground leading-snug truncate">
+                {article.title}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                From: {article.brief_name}
+              </p>
             </div>
 
-            {/* Published URL Modal */}
-            <PublishedUrlModal
-                isOpen={showPublishModal}
-                onClose={() => setShowPublishModal(false)}
-                onConfirm={(url) => {
-                    onStatusChange?.(article.id, 'published', { published_url: url });
-                    setShowPublishModal(false);
-                }}
-                existingUrl={article.published_url}
-            />
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {article.is_current && <Badge variant="success" size="sm">Current</Badge>}
+              {onStatusChange ? (
+                <WorkflowStatusSelect
+                  entityType="article"
+                  entityId={article.id}
+                  currentStatus={articleStatus}
+                  publishedUrl={article.published_url}
+                  onStatusChange={(newStatus, metadata) => onStatusChange(article.id, newStatus, metadata)}
+                  onPublishClick={() => setShowPublishModal(true)}
+                />
+              ) : (
+                <ArticleStatusBadge status={articleStatus} />
+              )}
+              <Badge variant="default" size="sm">v{article.version}</Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground opacity-100">
+                    <MoreHorizontalIcon className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => { if (window.confirm('Delete this article version?')) onDelete(article.id); }}
+                    className="text-red-500 focus:text-red-500"
+                  >
+                    <TrashIcon className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        )}
+        footer={(
+          <Button variant="primary" size="sm" onClick={() => onView(article.id)}>
+            View Article
+          </Button>
+        )}
+      >
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
+          <span>{wordCount.toLocaleString()} words</span>
+          <span className="text-border">|</span>
+          <span>{formatDate(article.created_at)}</span>
+          {article.published_url && (
+            <>
+              <span className="text-border">|</span>
+              <a
+                href={article.published_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-teal hover:underline truncate max-w-[200px]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <LinkIcon className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">{article.published_url.replace(/^https?:\/\//, '')}</span>
+              </a>
+            </>
+          )}
         </div>
-    );
+      </WorkItemCard>
+
+      <PublishedUrlModal
+        isOpen={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        onConfirm={(url) => {
+          onStatusChange?.(article.id, 'published', { published_url: url });
+          setShowPublishModal(false);
+        }}
+        existingUrl={article.published_url}
+      />
+    </>
+  );
 };
 
 export default ArticleListCard;

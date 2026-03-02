@@ -50,6 +50,7 @@ const BatchProgressPanel: React.FC<BatchProgressPanelProps> = ({
         const effectiveDoneCount = Math.min(batch.total_jobs, doneCount + runningFraction);
         const pendingCount = batch.total_jobs - doneCount;
         const isComplete = batch.status !== 'running';
+        const showBriefSummary = Boolean(live?.isMultiStage && live.totalBriefs > 0);
         const livePercent = batch.total_jobs > 0
           ? Math.round((effectiveDoneCount / batch.total_jobs) * 100)
           : 0;
@@ -58,7 +59,7 @@ const BatchProgressPanel: React.FC<BatchProgressPanelProps> = ({
           <FloatingPanelItem
             key={batch.id}
             title={batch.name || `Batch ${batch.id.slice(0, 8)}`}
-            subtitle={`${doneCount}/${batch.total_jobs} complete${live?.runningJobs ? ` - live ${livePercent}%` : ''}`}
+            subtitle={`${doneCount}/${batch.total_jobs} jobs complete${showBriefSummary ? ` (${live.completedBriefs}/${live.totalBriefs} briefs finished)` : ''}${live?.runningJobs ? ` - live ${livePercent}%` : ''}`}
             status={
               <div className="flex items-center gap-2 text-xs">
                 {batch.completed_jobs > 0 && (

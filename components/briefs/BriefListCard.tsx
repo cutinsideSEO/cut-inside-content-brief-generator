@@ -8,7 +8,17 @@ import BriefStatusBadge from './BriefStatusBadge';
 import WorkflowStatusSelect from './WorkflowStatusSelect';
 import PublishedUrlModal from './PublishedUrlModal';
 import Button from '../Button';
-import { Badge, Progress, Checkbox, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '../ui';
+import {
+  Badge,
+  Progress,
+  Checkbox,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  WorkItemCard,
+} from '../ui';
 
 interface BriefListCardProps {
   brief: BriefWithClient;
@@ -104,9 +114,9 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   const getPrimaryKeywords = () => {
     const keywords = brief.brief_data?.keyword_strategy?.primary_keywords;
     if (!keywords || keywords.length === 0) {
-      return brief.keywords?.slice(0, 3).map(k => k.kw) || [];
+      return brief.keywords?.slice(0, 3).map((k) => k.kw) || [];
     }
-    return keywords.slice(0, 3).map(k => k.keyword);
+    return keywords.slice(0, 3).map((k) => k.keyword);
   };
 
   const generationModel = getGenerationProgressModel({
@@ -119,7 +129,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   const showWorkflowSelect = !isGenerating && onWorkflowStatusChange && (brief.status === 'complete' || isWorkflowStatus(brief.status));
   const isWorkflow = isWorkflowStatus(brief.status);
 
-  // Status color for left border
   const getStatusBorderColor = () => {
     if (isGenerating) return 'border-l-amber-400';
     switch (brief.status) {
@@ -134,90 +143,110 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
     }
   };
 
-  const statusBorderColor = getStatusBorderColor();
-
   return (
-    <div
-      className={`
-        group relative bg-card border border-border rounded-lg shadow-card
-        transition-all duration-200 hover:shadow-card-hover hover:border-gray-300
-        border-l-4 ${statusBorderColor}
-        ${isSelected ? 'ring-2 ring-teal/40 border-teal/50' : ''}
-        ${isGenerating ? 'ring-1 ring-status-generating/30' : ''}
-      `}
-    >
-      {/* Card body */}
-      <div className="p-4">
-        {/* Top row: checkbox + name + status badge + menu */}
-        <div className="flex items-start gap-3">
-          {/* Checkbox — inline, not overlapping */}
-          {onToggleSelect && (
-            <div className="pt-0.5 flex-shrink-0">
-              <Checkbox
-                checked={isSelected}
-                onCheckedChange={() => onToggleSelect(brief.id)}
-                onClick={(e) => e.stopPropagation()}
-                className="data-[state=checked]:bg-teal data-[state=checked]:border-teal"
-              />
+    <>
+      <WorkItemCard
+        hover
+        accentClassName={getStatusBorderColor()}
+        selected={isSelected}
+        highlighted={isGenerating}
+        header={(
+          <div className="flex items-start gap-3">
+            {onToggleSelect && (
+              <div className="pt-0.5 flex-shrink-0">
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => onToggleSelect(brief.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="data-[state=checked]:bg-teal data-[state=checked]:border-teal"
+                />
+              </div>
+            )}
+
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-heading font-semibold text-foreground leading-snug truncate">
+                {brief.name}
+              </h3>
+              {brief.client && (
+                <p className="text-xs text-muted-foreground mt-0.5">{brief.client.name}</p>
+              )}
             </div>
-          )}
 
-          {/* Title + client */}
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-heading font-semibold text-foreground leading-snug truncate">
-              {brief.name}
-            </h3>
-            {brief.client && (
-              <p className="text-xs text-muted-foreground mt-0.5">{brief.client.name}</p>
-            )}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {isGenerating ? (
+                <Badge variant="warning" size="sm" pulse>
+                  {getGenerationStatusBadgeLabel(generationStatus)}
+                </Badge>
+              ) : showWorkflowSelect ? (
+                <WorkflowStatusSelect
+                  entityType="brief"
+                  entityId={brief.id}
+                  currentStatus={brief.status}
+                  publishedUrl={brief.published_url}
+                  onStatusChange={(newStatus, metadata) => onWorkflowStatusChange!(brief.id, newStatus, metadata)}
+                  onPublishClick={() => setShowPublishModal(true)}
+                />
+              ) : (
+                <BriefStatusBadge status={brief.status} />
+              )}
+              {!isGenerating && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground opacity-100">
+                      <MoreHorizontalIcon className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onUseAsTemplate(brief.id)}>
+                      <CopyIcon className="h-4 w-4 mr-2" />
+                      Use as Template
+                    </DropdownMenuItem>
+                    {brief.status !== 'archived' && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onArchive(brief.id)} className="text-red-500 focus:text-red-500">
+                          <ArchiveIcon className="h-4 w-4 mr-2" />
+                          Archive
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
-
-          {/* Status + menu */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {isGenerating ? (
-              <Badge variant="warning" size="sm" pulse>
-                {getGenerationStatusBadgeLabel(generationStatus)}
-              </Badge>
-            ) : showWorkflowSelect ? (
-              <WorkflowStatusSelect
-                entityType="brief"
-                entityId={brief.id}
-                currentStatus={brief.status}
-                publishedUrl={brief.published_url}
-                onStatusChange={(newStatus, metadata) => onWorkflowStatusChange!(brief.id, newStatus, metadata)}
-                onPublishClick={() => setShowPublishModal(true)}
-              />
-            ) : (
-              <BriefStatusBadge status={brief.status} />
-            )}
-            {!isGenerating && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <MoreHorizontalIcon className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onUseAsTemplate(brief.id)}>
-                    <CopyIcon className="h-4 w-4 mr-2" />
-                    Use as Template
-                  </DropdownMenuItem>
-                  {brief.status !== 'archived' && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => onArchive(brief.id)} className="text-red-500 focus:text-red-500">
-                        <ArchiveIcon className="h-4 w-4 mr-2" />
-                        Archive
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </div>
-
-        {/* Keywords */}
+        )}
+        footer={
+          isGenerating ? (
+            <div className="flex items-center gap-2">
+              <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
+                View Progress
+              </Button>
+              <span className="flex items-center text-xs text-amber-500">
+                <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Runs in background
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              {brief.status !== 'complete' && brief.status !== 'archived' && !isWorkflow && (
+                <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
+                  Continue
+                </Button>
+              )}
+              {(brief.status === 'complete' || isWorkflow) && (
+                <Button variant="primary" size="sm" onClick={() => onEdit(brief.id)}>
+                  View / Edit
+                </Button>
+              )}
+              {brief.status === 'archived' && <span />}
+            </div>
+          )
+        }
+      >
         {primaryKeywords.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2.5">
             {primaryKeywords.map((keyword, index) => (
@@ -233,7 +262,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
           </div>
         )}
 
-        {/* Progress bar for generation */}
         {isGenerating && (
           <div className="mt-3">
             <Progress
@@ -246,21 +274,20 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
           </div>
         )}
 
-        {/* Meta row: progress + updated date */}
         {!isGenerating && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
             <span>{getProgressText()}</span>
-            <span className="text-border">·</span>
+            <span className="text-border">|</span>
             <span>{formatDate(brief.updated_at)}, {formatTime(brief.updated_at)}</span>
             {articleCount !== undefined && articleCount > 0 && (
               <>
-                <span className="text-border">·</span>
+                <span className="text-border">|</span>
                 <span className="text-teal font-medium">{articleCount} article{articleCount > 1 ? 's' : ''}</span>
               </>
             )}
             {brief.published_url && (
               <>
-                <span className="text-border">·</span>
+                <span className="text-border">|</span>
                 <a
                   href={brief.published_url}
                   target="_blank"
@@ -275,41 +302,8 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
             )}
           </div>
         )}
-      </div>
+      </WorkItemCard>
 
-      {/* Footer: action button */}
-      <div className="px-4 py-2.5 border-t border-border bg-secondary/30 rounded-b-lg flex items-center justify-between">
-        {isGenerating ? (
-          <div className="flex items-center gap-2">
-            <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
-              View Progress
-            </Button>
-            <span className="flex items-center text-xs text-amber-500">
-              <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              Runs in background
-            </span>
-          </div>
-        ) : (
-          <>
-            {brief.status !== 'complete' && brief.status !== 'archived' && !isWorkflow && (
-              <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
-                Continue
-              </Button>
-            )}
-            {(brief.status === 'complete' || isWorkflow) && (
-              <Button variant="primary" size="sm" onClick={() => onEdit(brief.id)}>
-                View / Edit
-              </Button>
-            )}
-            {brief.status === 'archived' && <div />}
-          </>
-        )}
-      </div>
-
-      {/* Published URL Modal */}
       <PublishedUrlModal
         isOpen={showPublishModal}
         onClose={() => setShowPublishModal(false)}
@@ -319,7 +313,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
         }}
         existingUrl={brief.published_url}
       />
-    </div>
+    </>
   );
 };
 

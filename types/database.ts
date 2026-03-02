@@ -156,6 +156,10 @@ export interface GenerationJob {
   error_message: string | null;
   retry_count: number;
   max_retries: number;
+  next_retry_at: string | null;
+  lease_expires_at: string | null;
+  claimed_by: string | null;
+  dead_lettered_at: string | null;
   batch_id: string | null;
   created_at: string;
   started_at: string | null;

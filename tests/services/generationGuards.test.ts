@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  computeRetryBackoffSeconds,
   isJobStaleForRecovery,
   resolveRecoveryPolicy,
   resolveQueueModelSettings,
@@ -103,6 +104,20 @@ describe('generation guards', () => {
 
       expect(policy.timeoutMinutes).toBe(4);
       expect(policy.maxRetries).toBe(3);
+    });
+  });
+
+  describe('computeRetryBackoffSeconds', () => {
+    it('uses exponential backoff starting at 15 seconds', () => {
+      expect(computeRetryBackoffSeconds(1)).toBe(15);
+      expect(computeRetryBackoffSeconds(2)).toBe(30);
+      expect(computeRetryBackoffSeconds(3)).toBe(60);
+      expect(computeRetryBackoffSeconds(4)).toBe(120);
+    });
+
+    it('caps backoff at 10 minutes', () => {
+      expect(computeRetryBackoffSeconds(8)).toBe(600);
+      expect(computeRetryBackoffSeconds(20)).toBe(600);
     });
   });
 

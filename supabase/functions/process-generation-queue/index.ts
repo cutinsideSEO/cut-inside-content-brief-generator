@@ -1,4 +1,4 @@
-// Edge Function: process-generation-queue
+﻿// Edge Function: process-generation-queue
 // Worker that processes generation jobs from the queue.
 // Invoked by pg_cron every 10-30 seconds or manually via POST.
 //
@@ -36,6 +36,7 @@ import {
 import { retryOperation } from '../_shared/gemini-client.ts'
 import { getSerpUrls, getOnPageElements } from '../_shared/dataforseo-client.ts'
 import {
+  computeRetryBackoffSeconds,
   isJobStaleForRecovery,
   resolveRecoveryPolicy,
   resolveQueueModelSettings,
@@ -52,6 +53,10 @@ const MAX_JOBS_PER_INVOCATION = 1;
 
 /** Keep article jobs alive while long section/model calls are in flight. */
 const ARTICLE_HEARTBEAT_INTERVAL_MS = 20_000;
+const DEFAULT_JOB_LEASE_MINUTES = 6;
+const SOFT_ARTICLE_CHECKPOINT_MS = 120_000;
+const SOFT_REQUEUE_DELAY_MS = 5_000;
+const SOFT_REQUEUE_CODE = 'soft_checkpoint_requeue';
 
 /** Workflow statuses that must not be overwritten by auto-computed statuses */
 const WORKFLOW_STATUSES = [
@@ -113,6 +118,26 @@ function getRankWeight(rank: number): number {
 
 // deno-lint-ignore no-explicit-any
 type JobRow = Record<string, any>;
+
+class SoftCheckpointRequeueError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SoftCheckpointRequeueError';
+  }
+}
+
+function isSoftCheckpointRequeueError(error: Error): boolean {
+  return error instanceof SoftCheckpointRequeueError || error.message.includes(SOFT_REQUEUE_CODE);
+}
+
+function getLeaseExpiryIso(minutes = DEFAULT_JOB_LEASE_MINUTES): string {
+  return new Date(Date.now() + minutes * 60 * 1000).toISOString();
+}
+
+function getRetryScheduleIso(nextRetryCount: number): string {
+  const delaySeconds = computeRetryBackoffSeconds(nextRetryCount);
+  return new Date(Date.now() + delaySeconds * 1000).toISOString();
+}
 
 // ============================================
 // Competitor & Context Helpers
@@ -285,6 +310,7 @@ async function updateJobProgress(
     .update({
       progress,
       updated_at: new Date().toISOString(),
+      lease_expires_at: getLeaseExpiryIso(),
     })
     .eq('id', jobId);
 }
@@ -300,7 +326,10 @@ function startRunningJobHeartbeat(
     updateInFlight = true;
     void supabase
       .from('generation_jobs')
-      .update({ updated_at: new Date().toISOString() })
+      .update({
+        updated_at: new Date().toISOString(),
+        lease_expires_at: getLeaseExpiryIso(),
+      })
       .eq('id', jobId)
       .eq('status', 'running')
       .then(({ error }) => {
@@ -328,6 +357,10 @@ async function markJobCompleted(
       status: 'completed',
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      lease_expires_at: null,
+      claimed_by: null,
+      next_retry_at: null,
+      dead_lettered_at: null,
     })
     .eq('id', jobId)
     .eq('status', 'running')
@@ -420,6 +453,9 @@ async function markJobCancelledIfActive(
       status: 'cancelled',
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      lease_expires_at: null,
+      claimed_by: null,
+      next_retry_at: null,
     })
     .eq('id', jobId)
     .in('status', ['pending', 'running']);
@@ -940,6 +976,7 @@ async function processRegenerate(supabase: SupabaseClient, job: JobRow): Promise
  */
 async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<void> {
   const stopHeartbeat = startRunningJobHeartbeat(supabase, job.id as string);
+  const startedAtMs = Date.now();
   try {
   const config = job.config as Record<string, unknown>;
   const briefId = job.brief_id as string;
@@ -1025,6 +1062,10 @@ async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<vo
     }
 
     await updateJobProgress(supabase, job.id, progressData);
+
+    if (Date.now() - startedAtMs >= SOFT_ARTICLE_CHECKPOINT_MS) {
+      throw new SoftCheckpointRequeueError(`${SOFT_REQUEUE_CODE}: checkpoint reached time budget`);
+    }
   };
 
   // Generate the full article (with resume support)
@@ -1331,7 +1372,7 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
 
   const { data: runningJobs, error } = await supabase
     .from('generation_jobs')
-    .select('id, brief_id, batch_id, retry_count, max_retries, job_type, step_number, started_at, updated_at, progress')
+    .select('id, brief_id, batch_id, retry_count, max_retries, job_type, step_number, started_at, updated_at, lease_expires_at, progress')
     .eq('status', 'running');
 
   if (error || !runningJobs || runningJobs.length === 0) return 0;
@@ -1339,8 +1380,11 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
   const staleJobs = runningJobs
     .map((job) => {
       const policy = resolveRecoveryPolicy(job);
+      const leaseExpiresMs = job.lease_expires_at ? Date.parse(job.lease_expires_at as string) : Number.NaN;
+      const leaseExpired = !Number.isNaN(leaseExpiresMs) && leaseExpiresMs <= nowMs;
       const cutoffIso = new Date(nowMs - policy.timeoutMinutes * 60 * 1000).toISOString();
-      if (!isJobStaleForRecovery(job, cutoffIso)) return null;
+      const staleByHeartbeat = isJobStaleForRecovery(job, cutoffIso);
+      if (!leaseExpired && !staleByHeartbeat) return null;
       return { job, policy };
     })
     .filter((entry): entry is { job: JobRow; policy: { timeoutMinutes: number; maxRetries: number } } => Boolean(entry));
@@ -1353,6 +1397,7 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
 
     if (retryCount < maxRetries) {
       // Return to pending for retry
+      const retryAt = getRetryScheduleIso(retryCount);
       await supabase
         .from('generation_jobs')
         .update({
@@ -1360,9 +1405,12 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
           retry_count: retryCount,
           error_message: `Auto-reset: no heartbeat for >${policy.timeoutMinutes}min (likely timeout)`,
           updated_at: new Date().toISOString(),
+          next_retry_at: retryAt,
+          lease_expires_at: null,
+          claimed_by: null,
         })
         .eq('id', job.id);
-      console.log(`Reset stale job ${job.id} (type=${job.job_type}, step=${job.step_number}) to pending (retry ${retryCount}/${maxRetries})`);
+      console.log(`Reset stale job ${job.id} (type=${job.job_type}, step=${job.step_number}) to pending at ${retryAt} (retry ${retryCount}/${maxRetries})`);
     } else {
       // Max retries exhausted — mark as failed
       await supabase
@@ -1373,6 +1421,10 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
           error_message: `Failed: no heartbeat for >${policy.timeoutMinutes}min, max retries exhausted`,
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          next_retry_at: null,
+          lease_expires_at: null,
+          claimed_by: null,
+          dead_lettered_at: new Date().toISOString(),
         })
         .eq('id', job.id);
 
@@ -1433,17 +1485,21 @@ Deno.serve(async (req: Request) => {
   );
 
   try {
+    const workerId = `queue-worker-${crypto.randomUUID()}`;
+
     // Reset any stale jobs before processing new ones
     const staleCount = await resetStaleJobs(supabase);
     if (staleCount > 0) {
       console.log(`Reset ${staleCount} stale job(s)`);
     }
 
-    // Find pending jobs, ordered by creation time (FIFO)
+    // Find pending jobs that are eligible to run now, ordered by creation time (FIFO).
+    const nowIso = new Date().toISOString();
     const { data: pendingJobs, error: fetchError } = await supabase
       .from('generation_jobs')
       .select('*')
       .eq('status', 'pending')
+      .or(`next_retry_at.is.null,next_retry_at.lte.${nowIso}`)
       .order('created_at', { ascending: true })
       .limit(MAX_JOBS_PER_INVOCATION);
 
@@ -1465,13 +1521,21 @@ Deno.serve(async (req: Request) => {
     const results: Array<{ job_id: string; status: string; error?: string }> = [];
 
     for (const job of pendingJobs) {
+      const leasePolicy = resolveRecoveryPolicy(job);
+      const leaseExpiresAt = getLeaseExpiryIso(Math.max(DEFAULT_JOB_LEASE_MINUTES, leasePolicy.timeoutMinutes));
+      const claimStartedAt = (job.started_at as string | null) || nowIso;
+
       // Atomically claim this job — only succeeds if still pending
       const { data: claimed } = await supabase
         .from('generation_jobs')
         .update({
           status: 'running',
-          started_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          started_at: claimStartedAt,
+          updated_at: nowIso,
+          claimed_by: workerId,
+          lease_expires_at: leaseExpiresAt,
+          next_retry_at: null,
+          dead_lettered_at: null,
         })
         .eq('id', job.id)
         .eq('status', 'pending')
@@ -1484,75 +1548,92 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
-        await markJobCancelledIfActive(supabase, job.id, job.brief_id);
-        results.push({ job_id: job.id, status: 'cancelled' });
+      if (await isProcessingCancelled(supabase, claimed.id, claimed.batch_id)) {
+        await markJobCancelledIfActive(supabase, claimed.id, claimed.brief_id);
+        results.push({ job_id: claimed.id, status: 'cancelled' });
         continue;
       }
 
       try {
         // Route to the appropriate handler
-        switch (job.job_type) {
+        switch (claimed.job_type) {
           case 'competitors':
-            await processCompetitors(supabase, job);
+            await processCompetitors(supabase, claimed);
             break;
           case 'brief_step':
-            await processBriefStep(supabase, job);
+            await processBriefStep(supabase, claimed);
             break;
           case 'full_brief':
-            await processFullBrief(supabase, job);
+            await processFullBrief(supabase, claimed);
             break;
           case 'regenerate':
-            await processRegenerate(supabase, job);
+            await processRegenerate(supabase, claimed);
             break;
           case 'article':
-            await processArticle(supabase, job);
+            await processArticle(supabase, claimed);
             break;
           default:
-            throw new Error(`Unsupported job type: ${job.job_type}`);
+            throw new Error(`Unsupported job type: ${claimed.job_type}`);
         }
 
-        const finalStatus = await readJobStatus(supabase, job.id);
+        const finalStatus = await readJobStatus(supabase, claimed.id);
         if (finalStatus === 'cancelled') {
-          results.push({ job_id: job.id, status: 'cancelled' });
+          results.push({ job_id: claimed.id, status: 'cancelled' });
           continue;
         }
 
         if (finalStatus !== 'completed') {
-          results.push({ job_id: job.id, status: finalStatus });
+          results.push({ job_id: claimed.id, status: finalStatus });
           continue;
         }
 
         // Update batch counters if this job belongs to a batch.
         // For full_brief jobs, only count the final step (step 7) since intermediate
         // steps chain to the next step and shouldn't each count as a separate batch job.
-        if (job.batch_id) {
-          const isFullBrief = job.job_type === 'full_brief';
-          const currentStep = job.step_number as number;
+        if (claimed.batch_id) {
+          const isFullBrief = claimed.job_type === 'full_brief';
+          const currentStep = claimed.step_number as number;
           const lastStep = EXECUTION_ORDER[EXECUTION_ORDER.length - 1];
           const isIntermediateStep = isFullBrief && currentStep !== lastStep;
 
           if (!isIntermediateStep) {
-            await updateBatchCounters(supabase, job.batch_id, 'completed');
+            await updateBatchCounters(supabase, claimed.batch_id, 'completed');
           }
         }
 
-        results.push({ job_id: job.id, status: finalStatus });
+        results.push({ job_id: claimed.id, status: finalStatus });
       } catch (err) {
         const error = err as Error;
-        console.error(`Job ${job.id} failed:`, error.message);
+        console.error(`Job ${claimed.id} failed:`, error.message);
 
-        const liveStatus = await readJobStatus(supabase, job.id).catch(() => null);
+        const liveStatus = await readJobStatus(supabase, claimed.id).catch(() => null);
         if (liveStatus === 'cancelled') {
-          results.push({ job_id: job.id, status: 'cancelled' });
+          results.push({ job_id: claimed.id, status: 'cancelled' });
           continue;
         }
 
-        const retryCount = ((job.retry_count as number) || 0) + 1;
-        const maxRetries = (job.max_retries as number) || 3;
+        if (isSoftCheckpointRequeueError(error)) {
+          await supabase
+            .from('generation_jobs')
+            .update({
+              status: 'pending',
+              next_retry_at: new Date(Date.now() + SOFT_REQUEUE_DELAY_MS).toISOString(),
+              error_message: 'Auto-checkpoint: requeued before edge timeout',
+              updated_at: new Date().toISOString(),
+              lease_expires_at: null,
+              claimed_by: null,
+            })
+            .eq('id', claimed.id)
+            .eq('status', 'running');
+          results.push({ job_id: claimed.id, status: 'requeued' });
+          continue;
+        }
+
+        const retryCount = ((claimed.retry_count as number) || 0) + 1;
+        const maxRetries = (claimed.max_retries as number) || 3;
 
         if (retryCount < maxRetries) {
-          // Return to pending for retry
+          const retryAt = getRetryScheduleIso(retryCount);
           await supabase
             .from('generation_jobs')
             .update({
@@ -1560,11 +1641,13 @@ Deno.serve(async (req: Request) => {
               retry_count: retryCount,
               error_message: error.message,
               updated_at: new Date().toISOString(),
+              next_retry_at: retryAt,
+              lease_expires_at: null,
+              claimed_by: null,
             })
-            .eq('id', job.id)
+            .eq('id', claimed.id)
             .eq('status', 'running');
         } else {
-          // Max retries exceeded — mark as failed
           await supabase
             .from('generation_jobs')
             .update({
@@ -1573,23 +1656,23 @@ Deno.serve(async (req: Request) => {
               error_message: error.message,
               completed_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
+              next_retry_at: null,
+              lease_expires_at: null,
+              claimed_by: null,
+              dead_lettered_at: new Date().toISOString(),
             })
-            .eq('id', job.id)
+            .eq('id', claimed.id)
             .eq('status', 'running');
 
-          // Clear brief's active_job_id so user can retry
-          await clearActiveJobPointer(supabase, job.brief_id, job.id);
+          await clearActiveJobPointer(supabase, claimed.brief_id, claimed.id);
 
-          // Update batch counters for permanently failed job
-          if (job.batch_id) {
-            // For full_pipeline competitors: count both the failed competitors slot
-            // and the never-created chained full_brief slot
-            const failCount = job.job_type === 'competitors' ? 2 : 1;
-            await updateBatchCounters(supabase, job.batch_id, 'failed', failCount);
+          if (claimed.batch_id) {
+            const failCount = claimed.job_type === 'competitors' ? 2 : 1;
+            await updateBatchCounters(supabase, claimed.batch_id, 'failed', failCount);
           }
         }
 
-        results.push({ job_id: job.id, status: 'error', error: error.message });
+        results.push({ job_id: claimed.id, status: 'error', error: error.message });
       }
     }
 
@@ -1605,3 +1688,4 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+

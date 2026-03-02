@@ -44,6 +44,8 @@ const ARTICLE_LATE_STAGE_TIMEOUT_MINUTES = 12
 const DEFAULT_MAX_RETRIES = 3
 const ARTICLE_MAX_RETRIES = 6
 const ARTICLE_LATE_STAGE_MAX_RETRIES = 8
+const RETRY_BACKOFF_BASE_SECONDS = 15
+const RETRY_BACKOFF_MAX_SECONDS = 600
 
 function normalizeString(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback
@@ -119,6 +121,16 @@ export function resolveRecoveryPolicy(job: RecoveryPolicyJob): RecoveryPolicy {
     timeoutMinutes: DEFAULT_STALE_TIMEOUT_MINUTES,
     maxRetries: Math.max(DEFAULT_MAX_RETRIES, Number(job.max_retries) || 0),
   }
+}
+
+/**
+ * Exponential retry backoff in seconds:
+ * attempt 1 -> 15s, 2 -> 30s, 3 -> 60s ... capped at 10 minutes.
+ */
+export function computeRetryBackoffSeconds(nextRetryCount: number): number {
+  const safeRetryCount = Number.isFinite(nextRetryCount) ? Math.max(1, Math.floor(nextRetryCount)) : 1
+  const computed = RETRY_BACKOFF_BASE_SECONDS * Math.pow(2, safeRetryCount - 1)
+  return Math.min(RETRY_BACKOFF_MAX_SECONDS, Math.max(RETRY_BACKOFF_BASE_SECONDS, computed))
 }
 
 export function resolveQueueModelSettings(

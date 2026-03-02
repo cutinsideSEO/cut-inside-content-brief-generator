@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useBriefLoader } from './hooks/useBriefLoader';
 import type { Brief, AppView as DatabaseAppView, GenerationJob, GenerationJobProgress } from './types/database';
 import type { SaveStatus } from './types/appState';
+import type { GeneratingBrief, GenerationStatus } from './types/generationActivity';
 
 // Import screens
 import LoginScreen from './components/screens/LoginScreen';
@@ -28,22 +29,6 @@ import OriginalApp from './App';
 import { TooltipProvider } from './components/ui/primitives/tooltip';
 import { ToastProvider } from './contexts/ToastContext';
 import { Tooltip, TooltipTrigger, TooltipContent } from './components/ui/primitives/tooltip';
-
-// Generation status type
-type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
-
-// Type for tracking individual generation
-interface GeneratingBrief {
-  clientId: string;
-  clientName: string;
-  status: GenerationStatus;
-  step: number | null;
-  saveStatus?: SaveStatus;
-  // Backend job tracking
-  jobId?: string;
-  jobProgress?: GenerationJobProgress;
-  isBackend?: boolean;
-}
 
 // Types for the wrapper state
 interface WrapperState {
@@ -156,9 +141,11 @@ const AppWrapperInner: React.FC = () => {
             clientName: prev.selectedClientName || '',
             status: statusMap[job.job_type] || 'generating_brief',
             step: progress.current_step || null,
+            terminalStatus: undefined,
             isBackend: true,
             jobId: job.id,
             jobProgress: progress,
+            updatedAt: job.updated_at,
           };
         });
         return {
@@ -195,9 +182,11 @@ const AppWrapperInner: React.FC = () => {
                     clientName: prev.selectedClientName || '',
                     status: statusMap[job.job_type] || 'generating_brief',
                     step: progress.current_step || null,
+                    terminalStatus: undefined,
                     isBackend: true,
                     jobId: job.id,
                     jobProgress: progress,
+                    updatedAt: job.updated_at,
                   },
                 },
               };
@@ -215,8 +204,10 @@ const AppWrapperInner: React.FC = () => {
                     clientName: prev.selectedClientName || '',
                     status: 'idle',
                     step: null,
+                    terminalStatus: job.status,
                     isBackend: true,
                     jobId: job.id,
+                    updatedAt: job.updated_at,
                   },
                 },
               };
@@ -293,6 +284,8 @@ const AppWrapperInner: React.FC = () => {
           clientName: clientName || prev.selectedClientName || '',
           status: statusMap[type],
           step: type === 'brief' ? 1 : null,
+          terminalStatus: undefined,
+          updatedAt: new Date().toISOString(),
         },
       },
     }));
@@ -316,6 +309,8 @@ const AppWrapperInner: React.FC = () => {
           [briefId]: {
             ...brief,
             step,
+            terminalStatus: undefined,
+            updatedAt: new Date().toISOString(),
           },
         },
       };
@@ -344,7 +339,12 @@ const AppWrapperInner: React.FC = () => {
         ...prev,
         generatingBriefs: {
           ...prev.generatingBriefs,
-          [briefId]: { ...brief, status: 'idle' },
+          [briefId]: {
+            ...brief,
+            status: 'idle',
+            terminalStatus: success ? 'completed' : 'failed',
+            updatedAt: new Date().toISOString(),
+          },
         },
       };
     });

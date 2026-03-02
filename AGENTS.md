@@ -6,6 +6,7 @@ This is a Vite + React + TypeScript app with Supabase-backed backend generation.
 - UI and app orchestration: `App.tsx`, `AppWrapper.tsx`, `components/`, `hooks/`, `contexts/`
 - Domain services: `services/` (Supabase, batch jobs, generation, articles, auth)
 - Shared types/utilities: `types/`, `utils/`, `lib/`, `constants.ts`
+- Generation activity UX: `components/briefs/GenerationActivityPanel.tsx`, `utils/generationActivity.ts`, `utils/generationActivitySummary.ts`, `utils/articleGenerationActivity.ts`
 - Backend functions: `supabase/functions/` (Edge Functions and shared backend modules)
 - Tests: unit tests in `tests/`, end-to-end tests in `e2e/`
 - QA and operational scripts: `scripts/qa/`, docs in `docs/`
@@ -24,7 +25,7 @@ Use npm scripts from `package.json`:
 ## Coding Style & Naming Conventions
 - Language: TypeScript (`.ts`/`.tsx`)
 - Indentation: 2 spaces; keep semicolon usage consistent with surrounding files
-- Components: `PascalCase` filenames (e.g., `BatchProgressPanel.tsx`)
+- Components: `PascalCase` filenames (e.g., `GenerationActivityPanel.tsx`)
 - Hooks: `useXxx` naming in `hooks/`
 - Services/utilities: `camelCase` module names in `services/` and `utils/`
 - UI standard: always use `shadcn/ui` components and conventions for new UI work; avoid introducing parallel component systems
@@ -37,6 +38,8 @@ Use npm scripts from `package.json`:
 - Before merging backend-generation changes, run:
   - `npm run qa:gate:core`
   - Relevant E2E flow(s), or `npm run qa:gate:e2e:migration`
+- When changing generation activity/progress UX, also run targeted unit tests:
+  - `npm run test:unit -- tests/services/generationActivity.test.ts tests/services/generationActivitySummary.test.ts tests/services/articleGenerationActivity.test.ts`
 
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commit style seen in history: `feat:`, `fix:`, `chore:`

@@ -444,7 +444,7 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
           })}
 
           <FloatingPanelFooter>
-            Keep this tab open to continue
+            Runs in background. You can switch pages safely.
           </FloatingPanelFooter>
         </FloatingPanel>
       )}

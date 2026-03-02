@@ -5,27 +5,18 @@ import { getArticlesForClient, deleteArticle, getArticleCountForClient, updateAr
 import { cancelBatch } from '../../services/batchService';
 import { toast } from 'sonner';
 import type { BriefWithClient, ArticleWithBrief, BriefStatus, ArticleStatus } from '../../types/database';
-import { isWorkflowStatus } from '../../types/database';
+import type { GeneratingBrief } from '../../types/generationActivity';
+import { getGenerationProgressModel } from '../../utils/generationActivity';
+import { getActiveArticleGenerationItems } from '../../utils/articleGenerationActivity';
 import { getEffectiveBriefStatusForList, isBriefActivelyGenerating } from '../../utils/generationStatus';
 import { useBatchSubscription } from '../../hooks/useBatchSubscription';
 import { useAuth } from '../../contexts/AuthContext';
 import BriefListCard from '../briefs/BriefListCard';
 import ArticleListCard from '../articles/ArticleListCard';
 import BulkGenerationModal from '../briefs/BulkGenerationModal';
-import BatchProgressPanel from '../briefs/BatchProgressPanel';
+import GenerationActivityPanel from '../briefs/GenerationActivityPanel';
 import Button from '../Button';
-import { Card, Input, Alert, Tabs, Skeleton, Modal } from '../ui';
-
-// Generation status type (matches AppWrapper)
-type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
-
-// Type for tracking individual generation (matches AppWrapper)
-interface GeneratingBrief {
-  clientId: string;
-  clientName: string;
-  status: GenerationStatus;
-  step: number | null;
-}
+import { Card, Input, Alert, Tabs, Skeleton, Modal, Badge, Progress } from '../ui';
 
 interface BriefListScreenProps {
   clientId: string;
@@ -369,6 +360,24 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     ...(counts.published > 0 ? [{ id: 'published', label: 'Published', count: counts.published }] : []),
   ];
 
+  const briefNamesById = useMemo(() => {
+    return Object.fromEntries(briefs.map((brief) => [brief.id, brief.name]));
+  }, [briefs]);
+
+  const articleGenerationItems = useMemo(() => {
+    return getActiveArticleGenerationItems(generatingBriefs).map((item) => {
+      return {
+        ...item,
+        briefName: briefNamesById[item.briefId] || `Brief ${item.briefId.slice(0, 8)}`,
+        model: getGenerationProgressModel({
+          status: item.generation.status,
+          generationStep: item.generation.step,
+          jobProgress: item.generation.jobProgress,
+        }),
+      };
+    });
+  }, [briefNamesById, generatingBriefs]);
+
   return (
     <div>
       {/* Header */}
@@ -415,6 +424,15 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         </div>
       </div>
 
+      <GenerationActivityPanel
+        generatingBriefs={generatingBriefs}
+        briefNamesById={briefNamesById}
+        batches={activeBatches}
+        liveProgressByBatch={liveProgressByBatch}
+        onViewBrief={onContinueBrief}
+        onCancelBatch={handleCancelBatch}
+      />
+
 
       {/* Top-level Briefs / Articles toggle */}
       <div className="flex items-center gap-4 mb-6">
@@ -432,6 +450,31 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       {/* Articles tab */}
       {activeTab === 'articles' && (
         <div>
+          {articleGenerationItems.length > 0 && (
+            <Card variant="default" padding="md" className="mb-4 border-teal/30 bg-teal-50/40">
+              <div className="flex items-center gap-2 mb-3">
+                <h3 className="text-sm font-heading font-semibold text-foreground">Articles In Progress</h3>
+                <Badge variant="teal" size="sm">{articleGenerationItems.length}</Badge>
+              </div>
+              <div className="space-y-3">
+                {articleGenerationItems.map((item) => (
+                  <div key={item.briefId} className="rounded-md border border-border bg-card p-3">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{item.briefName}</p>
+                        <p className="text-xs text-muted-foreground truncate">{item.model.label}</p>
+                      </div>
+                      <Button variant="secondary" size="sm" onClick={() => onContinueBrief(item.briefId)}>
+                        View Brief
+                      </Button>
+                    </div>
+                    <Progress value={item.model.percentage} size="sm" color="teal" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
           {articlesLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map(i => (
@@ -640,6 +683,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       isGenerating={isGenerating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
+                      generationProgress={generating?.jobProgress}
+                      generationUpdatedAt={generating?.updatedAt}
                     />
                   );
                 })}
@@ -671,6 +716,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       isGenerating={isGenerating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
+                      generationProgress={generating?.jobProgress}
+                      generationUpdatedAt={generating?.updatedAt}
                     />
                   );
                 })}
@@ -702,6 +749,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       isGenerating={isGenerating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
+                      generationProgress={generating?.jobProgress}
+                      generationUpdatedAt={generating?.updatedAt}
                       onWorkflowStatusChange={handleWorkflowStatusChange}
                     />
                   );
@@ -734,6 +783,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       isGenerating={isGenerating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
+                      generationProgress={generating?.jobProgress}
+                      generationUpdatedAt={generating?.updatedAt}
                       onWorkflowStatusChange={handleWorkflowStatusChange}
                     />
                   );
@@ -766,6 +817,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                       isGenerating={isGenerating}
                       generationStatus={generating?.status}
                       generationStep={generating?.step}
+                      generationProgress={generating?.jobProgress}
+                      generationUpdatedAt={generating?.updatedAt}
                       onWorkflowStatusChange={handleWorkflowStatusChange}
                     />
                   );
@@ -841,13 +894,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         clientId={clientId}
         userId={userId || ''}
         onBatchCreated={() => { loadBriefs(); setSelectedBriefs(new Set()); }}
-      />
-
-      {/* Batch Progress Panel (fixed position, auto-hides when empty) */}
-      <BatchProgressPanel
-        batches={activeBatches}
-        onCancel={handleCancelBatch}
-        liveProgressByBatch={liveProgressByBatch}
       />
     </div>
   );

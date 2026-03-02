@@ -36,7 +36,7 @@ npm run test:coverage # Run tests with coverage report
 npx vitest run tests/services/dataforseoService.test.ts
 ```
 
-Unit tests are in `tests/services/` (currently 93 tests across 6 files). `test:run` only collects `tests/**` and excludes Playwright specs under `e2e/`.
+Unit tests are in `tests/services/`. `test:run` only collects `tests/**` and excludes Playwright specs under `e2e/`.
 
 ## Environment Variables
 
@@ -130,7 +130,7 @@ components/
 │   └── index.ts       # Barrel export — import everything from '../ui'
 ├── briefs/      # Brief list cards, status badges, workflow select, publish modal,
 │                #   BulkGenerationModal (keyword/existing-brief batch creation),
-│                #   BatchProgressPanel (floating panel for active batch progress)
+│                #   GenerationActivityPanel (floating panel for active batch progress)
 ├── articles/    # Article list cards, article status badges
 └── clients/     # Client selection cards, client profile sections
 ```
@@ -183,14 +183,16 @@ pg_cron (every 10-30s) → process-generation-queue Edge Function
 - User provides keyword groups (each group = one brief with multiple keywords) or selects existing briefs
 - `create-generation-batch` creates a `generation_batches` row + N brief rows + N competitor jobs (for `full_pipeline`) or N full_brief/article jobs
 - `process-generation-queue` processes jobs, updates batch counters atomically via `increment_batch_counter()` RPC, and chains `full_brief` jobs after `competitors` jobs complete
-- `generation_batches` table has Realtime enabled for live progress updates to `BatchProgressPanel`
+- `generation_batches` table has Realtime enabled for live progress updates to `GenerationActivityPanel`
 
 **Frontend hooks for backend generation:**
 - `hooks/useGenerationSubscription.ts` — Realtime subscription to `generation_jobs` table changes
 - `hooks/useBriefRealtimeSync.ts` — Realtime subscription to `briefs` table for step completion updates
 - `hooks/useBatchSubscription.ts` — Realtime subscription to `generation_batches` table for batch progress
 - `services/generationJobService.ts` — CRUD for generation jobs (create, cancel, get active)
-- `services/batchService.ts` — Batch operations (createGenerationBatch, cancelBatch, getBatchesForClient, getJobsForBatch)
+- `utils/generationActivity.ts` - Shared progress and status label model for generation surfaces
+- `utils/generationActivitySummary.ts` - Batch progress summary model for activity UI
+- `utils/articleGenerationActivity.ts` - Filters/sorts active article-generation items for Articles tab
 
 **All job types implemented:** `competitors`, `brief_step`, `full_brief`, `regenerate`, `article`
 
@@ -283,9 +285,9 @@ The `@/` alias maps to project root: `import { Card } from '@/components/ui'`
 - **`GenerationJobProgress` type sync:** The `GenerationJobProgress` interface in `types/database.ts` must match the JSONB shape written by edge functions. Backend writes `total_sections`, `percentage`, `word_count` — keep the interface in sync when adding new progress fields.
 - **Article thinking budget:** `buildArticleGenerationConfig()` uses a fixed `ARTICLE_THINKING_BUDGET` (8192) regardless of user's thinking level preference. This is intentional — do not wire `thinkingLevel` through for articles.
 - **`cancelGenerationJob()` clears `active_job_id`:** After cancelling a job, the service also clears `briefs.active_job_id` to prevent stale pointers. This is best-effort (warns on failure, doesn't throw).
-- **Regenerate Realtime race:** When a regenerate job completes, `App.tsx` does a one-time `getBrief()` fetch to catch brief data that may have been dropped by the Realtime subscription guard. This is necessary because the job status event can arrive before the brief data event.
+- **Manual step-by-step generation is foreground-only:** `generateBriefStep()` flow runs in the frontend (non-queued). Leaving during an in-flight step aborts it and it will not continue as a background `generation_jobs` task.
 - **Resumable article generation:** Articles with 20+ sections survive EF timeouts via checkpoint-based resume. After each section, `contentParts[]` and `completed_section_index` are saved to `job.progress` JSONB. Critical: the `onProgress` callback must always carry forward the last checkpoint state (`lastCheckpointContent`/`lastCheckpointIndex`), because `updateJobProgress` replaces the entire JSONB — non-checkpoint progress calls (e.g., trim notifications) would otherwise wipe checkpoint data. Stale job timeout is 4 minutes.
 
 ## Deployment
 
-Deployed to Vercel. Environment variables set in Vercel dashboard. Push to `master` triggers auto-deploy.
+Deployed to Vercel. Environment variables set in Vercel dashboard. Push to `main` triggers auto-deploy.

@@ -1,15 +1,14 @@
 // Brief List Card - Card component for displaying briefs in a list
 import React, { useState } from 'react';
-import type { BriefWithClient, BriefStatus } from '../../types/database';
+import type { BriefWithClient, GenerationJobProgress } from '../../types/database';
+import type { GenerationStatus } from '../../types/generationActivity';
 import { isWorkflowStatus } from '../../types/database';
+import { getGenerationProgressModel, getGenerationStatusBadgeLabel } from '../../utils/generationActivity';
 import BriefStatusBadge from './BriefStatusBadge';
 import WorkflowStatusSelect from './WorkflowStatusSelect';
 import PublishedUrlModal from './PublishedUrlModal';
 import Button from '../Button';
 import { Badge, Progress, Checkbox, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '../ui';
-
-// Generation status type
-type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
 
 interface BriefListCardProps {
   brief: BriefWithClient;
@@ -23,6 +22,8 @@ interface BriefListCardProps {
   isGenerating?: boolean;
   generationStatus?: GenerationStatus;
   generationStep?: number | null;
+  generationProgress?: GenerationJobProgress;
+  generationUpdatedAt?: string;
   // Article indicator
   articleCount?: number;
   // Workflow status
@@ -65,6 +66,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   isGenerating = false,
   generationStatus = 'idle',
   generationStep = null,
+  generationProgress,
   articleCount,
   onWorkflowStatusChange,
 }) => {
@@ -88,11 +90,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   };
 
   const getProgressText = () => {
-    if (isGenerating) {
-      if (generationStatus === 'analyzing_competitors') return 'Analyzing Competitors...';
-      if (generationStatus === 'generating_brief') return `Generating Brief... Step ${generationStep || 1}/7`;
-      if (generationStatus === 'generating_content') return 'Generating Content...';
-    }
     const viewLabels: Record<string, string> = {
       initial_input: 'Initial Input',
       context_input: 'Adding Context',
@@ -112,12 +109,11 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
     return keywords.slice(0, 3).map(k => k.keyword);
   };
 
-  const getGenerationProgress = () => {
-    if (generationStatus === 'analyzing_competitors') return 15;
-    if (generationStatus === 'generating_brief' && generationStep) return 20 + (generationStep / 7) * 60;
-    if (generationStatus === 'generating_content') return 85;
-    return 0;
-  };
+  const generationModel = getGenerationProgressModel({
+    status: generationStatus,
+    generationStep,
+    jobProgress: generationProgress,
+  });
 
   const primaryKeywords = getPrimaryKeywords();
   const showWorkflowSelect = !isGenerating && onWorkflowStatusChange && (brief.status === 'complete' || isWorkflowStatus(brief.status));
@@ -180,8 +176,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {isGenerating ? (
               <Badge variant="warning" size="sm" pulse>
-                {generationStatus === 'analyzing_competitors' ? 'Analyzing' :
-                 generationStatus === 'generating_brief' ? 'Generating' : 'Writing'}
+                {getGenerationStatusBadgeLabel(generationStatus)}
               </Badge>
             ) : showWorkflowSelect ? (
               <WorkflowStatusSelect
@@ -242,10 +237,10 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
         {isGenerating && (
           <div className="mt-3">
             <Progress
-              value={getGenerationProgress()}
+              value={generationModel.percentage}
               size="sm"
               color="yellow"
-              label={getProgressText()}
+              label={generationModel.label}
               showLabel
             />
           </div>
@@ -294,7 +289,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              Keep this tab open
+              Runs in background
             </span>
           </div>
         ) : (

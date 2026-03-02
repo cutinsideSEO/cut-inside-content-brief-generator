@@ -11,6 +11,7 @@ export interface BriefKeywordGroup {
 /** Options for creating a generation batch */
 export interface CreateBatchOptions {
   clientId: string;
+  projectId?: string;
   userId: string;
   batchName?: string;
   generationType: 'full_pipeline' | 'full_brief' | 'article';
@@ -43,6 +44,7 @@ export async function createGenerationBatch(
     {
       body: {
         client_id: options.clientId,
+        project_id: options.projectId,
         user_id: options.userId,
         batch_name: options.batchName,
         generation_type: options.generationType,

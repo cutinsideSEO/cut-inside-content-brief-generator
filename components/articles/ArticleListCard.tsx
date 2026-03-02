@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ArticleWithBrief, ArticleStatus } from '../../types/database';
-import { Badge, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, WorkItemCard } from '../ui';
+import { Badge, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, WorkItemCard } from '../ui';
 import Button from '../Button';
 import { FileTextIcon } from '../Icon';
 import ArticleStatusBadge from './ArticleStatusBadge';
@@ -19,6 +19,12 @@ const TrashIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const FolderIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+  </svg>
+);
+
 const LinkIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
@@ -31,9 +37,11 @@ interface ArticleListCardProps {
   onView: (articleId: string) => void;
   onDelete: (articleId: string) => void;
   onStatusChange?: (articleId: string, newStatus: string, metadata?: { published_url?: string }) => void;
+  onAssignProject?: (articleId: string, currentProjectId: string | null) => void;
+  projectName?: string | null;
 }
 
-const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDelete, onStatusChange }) => {
+const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDelete, onStatusChange, onAssignProject, projectName }) => {
   const wordCount = article.content.trim().split(/\s+/).filter(Boolean).length;
   const [showPublishModal, setShowPublishModal] = useState(false);
 
@@ -75,6 +83,11 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
               <p className="text-xs text-muted-foreground mt-0.5">
                 From: {article.brief_name}
               </p>
+              {projectName && (
+                <div className="mt-1">
+                  <Badge variant="default" size="sm">{projectName}</Badge>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -99,6 +112,15 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {onAssignProject && (
+                    <>
+                      <DropdownMenuItem onClick={() => onAssignProject(article.id, article.project_id)}>
+                        <FolderIcon className="h-4 w-4 mr-2" />
+                        Assign Project
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem
                     onClick={() => { if (window.confirm('Delete this article version?')) onDelete(article.id); }}
                     className="text-red-500 focus:text-red-500"

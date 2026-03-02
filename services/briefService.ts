@@ -15,19 +15,34 @@ import type {
 import { isWorkflowStatus } from '../types/database';
 import type { ContentBrief, ModelSettings, LengthConstraints, ExtractedTemplate } from '../types';
 
+export interface GetBriefsForClientOptions {
+  projectId?: string | 'unassigned';
+}
+
 /**
  * Get all briefs for a specific client
  */
-export async function getBriefsForClient(clientId: string): Promise<ApiResponse<BriefWithClient[]>> {
+export async function getBriefsForClient(
+  clientId: string,
+  options?: GetBriefsForClientOptions
+): Promise<ApiResponse<BriefWithClient[]>> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('briefs')
       .select(`
         *,
         client:clients(*)
       `)
       .eq('client_id', clientId)
-      .neq('status', 'archived')
+      .neq('status', 'archived');
+
+    if (options?.projectId === 'unassigned') {
+      query = query.is('project_id', null);
+    } else if (options?.projectId) {
+      query = query.eq('project_id', options.projectId);
+    }
+
+    const { data, error } = await query
       .order('updated_at', { ascending: false });
 
     if (error) {
@@ -133,6 +148,7 @@ export async function createBrief(
   try {
     const newBrief: BriefInsert = {
       client_id: clientId,
+      project_id: null,
       created_by: userId,
       name,
       status: 'draft',
@@ -387,6 +403,7 @@ export async function cloneBriefAsTemplate(
     // Create new brief with structure from source
     const newBrief: BriefInsert = {
       client_id: newClientId,
+      project_id: null,
       created_by: userId,
       name: newName,
       status: 'draft',

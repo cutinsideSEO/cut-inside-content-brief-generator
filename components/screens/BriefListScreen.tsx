@@ -1,11 +1,12 @@
 // Brief List Screen - View and manage briefs for a client
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { getBriefsForClient, archiveBrief, deleteBrief, updateBriefWorkflowStatus } from '../../services/briefService';
-import { getArticlesForClient, deleteArticle, getArticleCountForClient, updateArticleStatus } from '../../services/articleService';
+import { getArticlesForClient, deleteArticle, updateArticleStatus } from '../../services/articleService';
 import { cancelBatch } from '../../services/batchService';
 import { createGenerationJob } from '../../services/generationJobService';
+import { getProjectsForClient, createProject, assignBriefToProject, assignArticleToProject } from '../../services/projectService';
 import { toast } from 'sonner';
-import type { BriefWithClient, ArticleWithBrief, BriefStatus, ArticleStatus } from '../../types/database';
+import type { BriefWithClient, ArticleWithBrief, BriefStatus, ArticleStatus, ClientProject } from '../../types/database';
 import type { GeneratingBrief } from '../../types/generationActivity';
 import { getGenerationProgressModel, getGenerationStatusBadgeLabel } from '../../utils/generationActivity';
 import { getActiveArticleGenerationItems } from '../../utils/articleGenerationActivity';
@@ -39,6 +40,11 @@ interface BriefListScreenProps {
 
 type FilterStatus = 'all' | 'draft' | 'in_progress' | 'complete' | 'workflow' | 'published';
 type BriefViewMode = 'smart' | 'grouped';
+type AssignmentTarget = {
+  entityType: 'brief' | 'article';
+  entityId: string;
+  entityName: string;
+} | null;
 
 const BriefListScreen: React.FC<BriefListScreenProps> = ({
   clientId,
@@ -59,11 +65,19 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [projectFilter, setProjectFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'briefs' | 'articles'>('briefs');
   const [articles, setArticles] = useState<ArticleWithBrief[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [archiveConfirm, setArchiveConfirm] = useState<string | null>(null);
   const [articleCount, setArticleCount] = useState(0);
+  const [projects, setProjects] = useState<ClientProject[]>([]);
+  const [assignmentTarget, setAssignmentTarget] = useState<AssignmentTarget>(null);
+  const [assignmentProjectId, setAssignmentProjectId] = useState('');
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [articleGenerateConfirmBriefId, setArticleGenerateConfirmBriefId] = useState<string | null>(null);
   const [startingArticleBriefIds, setStartingArticleBriefIds] = useState<Set<string>>(new Set());
   const startingArticleBriefIdsRef = useRef<Set<string>>(new Set());
@@ -81,17 +95,73 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
   // Bulk generation state
   const [showBulkModal, setShowBulkModal] = useState<'keywords' | 'existing' | null>(null);
+  const [bulkProjectId, setBulkProjectId] = useState('');
   const { activeBatches, liveProgressByBatch } = useBatchSubscription(clientId);
 
   // Load-more pagination
   const [visibleCount, setVisibleCount] = useState(20);
   const BRIEF_PAGE_SIZE = 20;
 
-  // Fetch briefs and article count on mount and when clientId changes
+  useEffect(() => {
+    setProjectFilter('all');
+    setBulkProjectId('');
+  }, [clientId]);
+
+  const loadProjects = useCallback(async () => {
+    const { data, error: fetchError } = await getProjectsForClient(clientId);
+
+    if (fetchError) {
+      toast.error(`Failed to load projects: ${fetchError}`);
+      return;
+    }
+
+    setProjects((data || []).filter((project) => project.status === 'active'));
+  }, [clientId]);
+
+  const loadBriefs = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    const projectOptions = projectFilter === 'all' ? undefined : { projectId: projectFilter as string | 'unassigned' };
+    const { data, error: fetchError } = await getBriefsForClient(clientId, projectOptions);
+
+    if (fetchError) {
+      setError(fetchError);
+    } else {
+      setBriefs(data || []);
+    }
+
+    setIsLoading(false);
+  }, [clientId, projectFilter]);
+
+  const loadArticleCount = useCallback(async () => {
+    const projectOptions = projectFilter === 'all' ? undefined : { projectId: projectFilter as string | 'unassigned' };
+    const { data, error: fetchError } = await getArticlesForClient(clientId, projectOptions);
+
+    if (!fetchError && data) {
+      setArticleCount(data.length);
+    }
+  }, [clientId, projectFilter]);
+
+  const loadArticles = useCallback(async () => {
+    setArticlesLoading(true);
+    const projectOptions = projectFilter === 'all' ? undefined : { projectId: projectFilter as string | 'unassigned' };
+    const { data, error: fetchError } = await getArticlesForClient(clientId, projectOptions);
+    if (!fetchError && data) {
+      setArticles(data);
+    }
+    setArticlesLoading(false);
+  }, [clientId, projectFilter]);
+
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
+  // Fetch briefs and article count when client or project filter changes
   useEffect(() => {
     loadBriefs();
-    getArticleCountForClient(clientId).then(setArticleCount);
-  }, [clientId]);
+    loadArticleCount();
+  }, [loadBriefs, loadArticleCount]);
 
   // Reload briefs when a background generation finishes (brief removed from generatingBriefs)
   const prevGeneratingIdsRef = useRef<Set<string>>(new Set(Object.keys(generatingBriefs)));
@@ -102,10 +172,10 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     const anyRemoved = [...prevIds].some(id => !currentIds.has(id));
     if (anyRemoved) {
       loadBriefs();
-      getArticleCountForClient(clientId).then(setArticleCount);
+      loadArticleCount();
     }
     prevGeneratingIdsRef.current = currentIds;
-  }, [generatingBriefs, clientId]);
+  }, [generatingBriefs, loadArticleCount, loadBriefs]);
 
   // If realtime generation state arrives, stop showing "starting" on those cards.
   useEffect(() => {
@@ -149,21 +219,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       return next;
     });
   }, []);
-
-  const loadBriefs = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    const { data, error: fetchError } = await getBriefsForClient(clientId);
-
-    if (fetchError) {
-      setError(fetchError);
-    } else {
-      setBriefs(data || []);
-    }
-
-    setIsLoading(false);
-  };
 
   const handleArchiveClick = (briefId: string) => {
     setArchiveConfirm(briefId);
@@ -246,26 +301,17 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     const anyRemoved = [...prevIds].some(id => !currentIds.has(id));
     if (anyRemoved) {
       loadBriefs();
-      getArticleCountForClient(clientId).then(setArticleCount);
+      loadArticleCount();
     }
     prevBatchIdsRef.current = currentIds;
-  }, [activeBatches, clientId]);
+  }, [activeBatches, loadArticleCount, loadBriefs]);
 
   // Load articles when articles tab is active
   useEffect(() => {
     if (activeTab === 'articles') {
       loadArticles();
     }
-  }, [activeTab, clientId]);
-
-  const loadArticles = async () => {
-    setArticlesLoading(true);
-    const { data, error: fetchError } = await getArticlesForClient(clientId);
-    if (!fetchError && data) {
-      setArticles(data);
-    }
-    setArticlesLoading(false);
-  };
+  }, [activeTab, loadArticles]);
 
   const handleDeleteArticle = async (articleId: string) => {
     const { error: deleteError } = await deleteArticle(articleId);
@@ -274,6 +320,82 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       setArticleCount(prev => Math.max(0, prev - 1));
     }
   };
+
+  const handleOpenBulkModal = useCallback((tab: 'keywords' | 'existing') => {
+    setBulkProjectId(projectFilter !== 'all' && projectFilter !== 'unassigned' ? projectFilter : '');
+    setShowBulkModal(tab);
+  }, [projectFilter]);
+
+  const handleOpenBriefAssignProject = useCallback((briefId: string, currentProjectId: string | null) => {
+    const brief = briefs.find((item) => item.id === briefId);
+    setAssignmentTarget({
+      entityType: 'brief',
+      entityId: briefId,
+      entityName: brief?.name || 'this brief',
+    });
+    setAssignmentProjectId(currentProjectId || '');
+  }, [briefs]);
+
+  const handleOpenArticleAssignProject = useCallback((articleId: string, currentProjectId: string | null) => {
+    const article = articles.find((item) => item.id === articleId);
+    setAssignmentTarget({
+      entityType: 'article',
+      entityId: articleId,
+      entityName: article?.title || 'this article',
+    });
+    setAssignmentProjectId(currentProjectId || '');
+  }, [articles]);
+
+  const handleConfirmProjectAssignment = useCallback(async () => {
+    if (!assignmentTarget) return;
+
+    const selectedProjectId = assignmentProjectId || null;
+    const { error: assignError } = assignmentTarget.entityType === 'brief'
+      ? await assignBriefToProject(assignmentTarget.entityId, selectedProjectId)
+      : await assignArticleToProject(assignmentTarget.entityId, selectedProjectId);
+
+    if (assignError) {
+      toast.error(`Failed to assign project: ${assignError}`);
+      return;
+    }
+
+    setAssignmentTarget(null);
+    toast.success(selectedProjectId ? 'Project assigned' : 'Project unassigned');
+    await loadBriefs();
+    await loadArticleCount();
+    if (activeTab === 'articles') {
+      await loadArticles();
+    }
+  }, [activeTab, assignmentProjectId, assignmentTarget, loadArticleCount, loadArticles, loadBriefs]);
+
+  const handleCreateProject = useCallback(async () => {
+    if (!newProjectName.trim()) {
+      toast.error('Project name is required');
+      return;
+    }
+
+    setIsCreatingProject(true);
+    const { data, error: createError } = await createProject(
+      clientId,
+      newProjectName.trim(),
+      newProjectDescription.trim() || undefined
+    );
+
+    setIsCreatingProject(false);
+
+    if (createError || !data) {
+      toast.error(createError || 'Failed to create project');
+      return;
+    }
+
+    toast.success('Project created');
+    setShowCreateProjectModal(false);
+    setNewProjectName('');
+    setNewProjectDescription('');
+    await loadProjects();
+    setProjectFilter(data.id);
+    setBulkProjectId(data.id);
+  }, [clientId, loadProjects, newProjectDescription, newProjectName]);
 
   // Workflow status change handler
   const handleWorkflowStatusChange = async (briefId: string, newStatus: string, metadata?: { published_url?: string; published_at?: string }) => {
@@ -462,6 +584,31 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     ...(counts.published > 0 ? [{ id: 'published', label: 'Published', count: counts.published }] : []),
   ];
 
+  const projectFilterOptions = useMemo(() => {
+    return [
+      { value: 'all', label: 'All Projects' },
+      { value: 'unassigned', label: 'Unassigned' },
+      ...projects.map((project) => ({
+        value: project.id,
+        label: project.name,
+      })),
+    ];
+  }, [projects]);
+
+  const projectAssignmentOptions = useMemo(() => {
+    return [
+      { value: '', label: 'Unassigned' },
+      ...projects.map((project) => ({
+        value: project.id,
+        label: project.name,
+      })),
+    ];
+  }, [projects]);
+
+  const projectNamesById = useMemo(() => {
+    return Object.fromEntries(projects.map((project) => [project.id, project.name]));
+  }, [projects]);
+
   const briefNamesById = useMemo(() => {
     return Object.fromEntries(briefs.map((brief) => [brief.id, brief.name]));
   }, [briefs]);
@@ -491,8 +638,10 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         onContinue={onContinueBrief}
         onEdit={onEditBrief}
         onGenerateArticle={handleOpenGenerateArticleConfirm}
+        onAssignProject={handleOpenBriefAssignProject}
         onUseAsTemplate={onUseAsTemplate}
         onArchive={handleArchiveClick}
+        projectName={brief.project_id ? projectNamesById[brief.project_id] || null : null}
         isSelected={selectedBriefs.has(brief.id)}
         onToggleSelect={toggleBriefSelection}
         isGenerating={isGenerating}
@@ -529,7 +678,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => setShowBulkModal('keywords')}
+            onClick={() => handleOpenBulkModal('keywords')}
             icon={
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -563,16 +712,31 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
 
       {/* Top-level Briefs / Articles toggle */}
-      <div className="flex items-center gap-4 mb-6 rounded-lg border border-border bg-card px-3 py-2">
-        <Tabs
-          items={[
-            { id: 'briefs', label: 'Briefs', count: briefs.length },
-            { id: 'articles', label: 'Articles', count: activeTab === 'articles' ? articles.length : articleCount },
-          ]}
-          activeId={activeTab}
-          onChange={(id) => setActiveTab(id as 'briefs' | 'articles')}
-          variant="pills"
-        />
+      <div className="mb-6 rounded-lg border border-border bg-card px-3 py-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Tabs
+            items={[
+              { id: 'briefs', label: 'Briefs', count: briefs.length },
+              { id: 'articles', label: 'Articles', count: activeTab === 'articles' ? articles.length : articleCount },
+            ]}
+            activeId={activeTab}
+            onChange={(id) => setActiveTab(id as 'briefs' | 'articles')}
+            variant="pills"
+          />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowCreateProjectModal(true)}>
+              New Project
+            </Button>
+          <Select
+            size="sm"
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+            options={projectFilterOptions}
+            className="w-full sm:w-64"
+            aria-label="Filter by project"
+          />
+          </div>
+        </div>
       </div>
 
       {/* Articles tab */}
@@ -633,6 +797,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
                   onView={onViewArticle}
                   onDelete={handleDeleteArticle}
                   onStatusChange={handleArticleStatusChange}
+                  onAssignProject={handleOpenArticleAssignProject}
+                  projectName={article.project_id ? projectNamesById[article.project_id] || null : null}
                 />
               ))}
             </div>
@@ -703,7 +869,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
             {selectedBriefs.size} selected
           </span>
           <div className="flex-1" />
-          <Button variant="outline" size="sm" onClick={() => setShowBulkModal('existing')}>
+          <Button variant="outline" size="sm" onClick={() => handleOpenBulkModal('existing')}>
             Generate ({selectedBriefs.size})
           </Button>
           <Button variant="secondary" size="sm" onClick={handleBulkArchive}>
@@ -799,6 +965,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
             onClick={() => {
               setSearchQuery('');
               setFilterStatus('all');
+              setProjectFilter('all');
             }}
             className="mt-4"
           >
@@ -929,6 +1096,75 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       </Modal>
 
       <Modal
+        isOpen={!!assignmentTarget}
+        onClose={() => setAssignmentTarget(null)}
+        title="Assign Project"
+        size="sm"
+        footer={(
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setAssignmentTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleConfirmProjectAssignment}>
+              Save
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-sm text-muted-foreground mb-4">
+          Assign {assignmentTarget?.entityType === 'brief' ? 'brief' : 'article'}{' '}
+          <span className="font-medium text-foreground">{assignmentTarget?.entityName}</span> to a project.
+        </p>
+        {assignmentTarget?.entityType === 'article' && (
+          <p className="text-xs text-muted-foreground mb-3">
+            Article assignment moves the parent brief to the selected project to keep article and brief projects aligned.
+          </p>
+        )}
+        <Select
+          label="Project"
+          size="sm"
+          value={assignmentProjectId}
+          onChange={(e) => setAssignmentProjectId(e.target.value)}
+          options={projectAssignmentOptions}
+        />
+      </Modal>
+
+      <Modal
+        isOpen={showCreateProjectModal}
+        onClose={() => {
+          setShowCreateProjectModal(false);
+          setNewProjectName('');
+          setNewProjectDescription('');
+        }}
+        title="Create Project"
+        size="sm"
+        footer={(
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setShowCreateProjectModal(false)} disabled={isCreatingProject}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleCreateProject} loading={isCreatingProject}>
+              Create
+            </Button>
+          </>
+        )}
+      >
+        <Input
+          label="Project Name"
+          placeholder="Q2 Content Campaign"
+          value={newProjectName}
+          onChange={(e) => setNewProjectName(e.target.value)}
+          className="mb-3"
+        />
+        <Input
+          label="Description (optional)"
+          placeholder="Internal notes for this project"
+          value={newProjectDescription}
+          onChange={(e) => setNewProjectDescription(e.target.value)}
+        />
+      </Modal>
+
+      <Modal
         isOpen={!!archiveConfirm}
         onClose={() => setArchiveConfirm(null)}
         title="Archive Brief"
@@ -977,7 +1213,17 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         selectedBriefIds={[...selectedBriefs]}
         clientId={clientId}
         userId={userId || ''}
-        onBatchCreated={() => { loadBriefs(); setSelectedBriefs(new Set()); }}
+        availableProjects={projects}
+        selectedProjectId={bulkProjectId}
+        onSelectedProjectChange={setBulkProjectId}
+        onBatchCreated={() => {
+          loadBriefs();
+          loadArticleCount();
+          if (activeTab === 'articles') {
+            loadArticles();
+          }
+          setSelectedBriefs(new Set());
+        }}
       />
     </div>
   );

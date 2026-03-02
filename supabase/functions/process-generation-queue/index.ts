@@ -486,10 +486,10 @@ async function readJobStatus(
 async function readCurrentBriefData(
   supabase: SupabaseClient,
   briefId: string
-): Promise<{ briefData: Partial<ContentBrief>; currentStatus: string }> {
+): Promise<{ briefData: Partial<ContentBrief>; currentStatus: string; projectId: string | null }> {
   const { data: brief, error } = await supabase
     .from('briefs')
-    .select('brief_data, status')
+    .select('brief_data, status, project_id')
     .eq('id', briefId)
     .single();
 
@@ -500,6 +500,7 @@ async function readCurrentBriefData(
   return {
     briefData: (brief.brief_data as Partial<ContentBrief>) || {},
     currentStatus: (brief.status as string) || 'draft',
+    projectId: (brief.project_id as string | null) || null,
   };
 }
 
@@ -695,6 +696,7 @@ async function chainFullBriefJob(
       length_constraints: brief.length_constraints,
       extracted_template: brief.extracted_template,
       user_feedbacks: brief.user_feedbacks || {},
+      project_id: (brief.project_id as string | null) || null,
 
       // Related data — use freshly saved competitors
       competitors: competitors || [],
@@ -1082,12 +1084,14 @@ async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<vo
 
   const latestVersion = existingArticles?.[0]?.version || 0;
   const newVersion = latestVersion + 1;
+  const { projectId: currentBriefProjectId } = await readCurrentBriefData(supabase, briefId);
 
   // Insert new article (mark_previous_articles_not_current trigger handles is_current)
   const { error: insertError } = await supabase
     .from('brief_articles')
     .insert({
       brief_id: briefId,
+      project_id: currentBriefProjectId,
       title: result.title,
       content: result.content,
       version: newVersion,

@@ -10,6 +10,10 @@ import type {
 } from '../types/database';
 import type { ModelSettings, LengthConstraints } from '../types';
 
+export interface GetArticlesForClientOptions {
+  projectId?: string | 'unassigned';
+}
+
 /**
  * Get all articles for a brief (all versions)
  */
@@ -121,6 +125,16 @@ export async function createArticle(
   }
 ): Promise<ApiResponse<BriefArticle>> {
   try {
+    const { data: brief, error: briefError } = await supabase
+      .from('briefs')
+      .select('project_id')
+      .eq('id', briefId)
+      .single();
+
+    if (briefError) {
+      return { data: null, error: briefError.message };
+    }
+
     // Get the latest version number for this brief
     const { data: existingArticles } = await supabase
       .from('brief_articles')
@@ -134,6 +148,7 @@ export async function createArticle(
 
     const newArticle: BriefArticleInsert = {
       brief_id: briefId,
+      project_id: brief?.project_id ?? null,
       title,
       content,
       version: newVersion,
@@ -295,15 +310,26 @@ export async function getArticleVersionCount(briefId: string): Promise<number> {
 /**
  * Get all articles for a client (across all briefs)
  */
-export async function getArticlesForClient(clientId: string): Promise<ApiResponse<ArticleWithBrief[]>> {
+export async function getArticlesForClient(
+  clientId: string,
+  options?: GetArticlesForClientOptions
+): Promise<ApiResponse<ArticleWithBrief[]>> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('brief_articles')
       .select(`
         *,
-        brief:briefs!inner(name, status, client_id)
+        brief:briefs!inner(name, status, client_id, project_id)
       `)
-      .eq('brief.client_id', clientId)
+      .eq('brief.client_id', clientId);
+
+    if (options?.projectId === 'unassigned') {
+      query = query.is('project_id', null);
+    } else if (options?.projectId) {
+      query = query.eq('project_id', options.projectId);
+    }
+
+    const { data, error } = await query
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -314,6 +340,7 @@ export async function getArticlesForClient(clientId: string): Promise<ApiRespons
     const articles: ArticleWithBrief[] = (data || []).map((item: any) => ({
       id: item.id,
       brief_id: item.brief_id,
+      project_id: item.project_id ?? item.brief?.project_id ?? null,
       title: item.title,
       content: item.content,
       version: item.version,

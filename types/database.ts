@@ -46,6 +46,25 @@ export type ClientInsert = Omit<Client, 'id' | 'created_at' | 'updated_at'>;
 export type ClientUpdate = Partial<Omit<Client, 'id' | 'created_at' | 'updated_at'>>;
 
 // ============================================
+// Client Projects
+// ============================================
+export type ClientProjectStatus = 'active' | 'archived';
+
+export interface ClientProject {
+  id: string;
+  client_id: string;
+  created_by: string;
+  name: string;
+  description: string | null;
+  status: ClientProjectStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ClientProjectInsert = Omit<ClientProject, 'id' | 'created_at' | 'updated_at'>;
+export type ClientProjectUpdate = Partial<Omit<ClientProject, 'id' | 'client_id' | 'created_by' | 'created_at' | 'updated_at'>>;
+
+// ============================================
 // Briefs
 // ============================================
 export type BriefStatus = 'draft' | 'in_progress' | 'complete' | 'sent_to_client' | 'approved' | 'changes_requested' | 'in_writing' | 'published' | 'archived';
@@ -68,6 +87,7 @@ export interface KeywordInput {
 export interface Brief {
   id: string;
   client_id: string;
+  project_id: string | null;
   created_by: string;
 
   // Metadata
@@ -170,6 +190,7 @@ export interface GenerationJob {
 export interface GenerationBatch {
   id: string;
   client_id: string;
+  project_id: string | null;
   created_by: string;
   name: string | null;
   total_jobs: number;
@@ -246,6 +267,7 @@ export type BriefContextUrlUpdate = Partial<Omit<BriefContextUrl, 'id' | 'create
 export interface BriefArticle {
   id: string;
   brief_id: string;
+  project_id: string | null;
   title: string;
   content: string;
   version: number;
@@ -265,8 +287,9 @@ export type BriefArticleUpdate = Partial<Omit<BriefArticle, 'id' | 'created_at' 
 
 // Article with parent brief info
 export interface ArticleWithBrief extends BriefArticle {
-    brief_name: string;
-    brief_status: BriefStatus;
+  project_id: string | null;
+  brief_name: string;
+  brief_status: BriefStatus;
 }
 
 // ============================================

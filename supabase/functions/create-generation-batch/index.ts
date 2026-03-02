@@ -27,6 +27,7 @@ interface BriefEntry {
 
 interface BatchRequestBody {
   client_id: string;
+  project_id?: string;
   user_id: string;
   batch_name?: string;
   generation_type: 'full_pipeline' | 'full_brief' | 'article';
@@ -157,6 +158,7 @@ Deno.serve(async (req: Request) => {
     const body: BatchRequestBody = await req.json()
     const {
       client_id,
+      project_id,
       user_id,
       batch_name,
       generation_type,
@@ -267,6 +269,29 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    if (project_id) {
+      const { data: project, error: projectError } = await supabase
+        .from('client_projects')
+        .select('id')
+        .eq('id', project_id)
+        .eq('client_id', client_id)
+        .maybeSingle()
+
+      if (projectError) {
+        return new Response(
+          JSON.stringify({ error: `Failed to validate project_id: ${projectError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (!project) {
+        return new Response(
+          JSON.stringify({ error: `project_id ${project_id} does not belong to client ${client_id}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     // ---- Determine total job count ----
     let totalJobs = 0
     if (generation_type === 'full_pipeline') {
@@ -282,6 +307,7 @@ Deno.serve(async (req: Request) => {
       .from('generation_batches')
       .insert({
         client_id,
+        project_id: project_id || null,
         created_by: user_id,
         name: batch_name || null,
         total_jobs: totalJobs,
@@ -316,6 +342,7 @@ Deno.serve(async (req: Request) => {
           .from('briefs')
           .insert({
             client_id,
+            project_id: project_id || null,
             created_by: user_id,
             name: subjectInfo,
             subject_info: subjectInfo,
@@ -353,6 +380,10 @@ Deno.serve(async (req: Request) => {
           country,
           serp_language,
           output_language,
+        }
+
+        if (project_id) {
+          competitorsConfig.project_id = project_id
         }
 
         // Create the competitors job
@@ -400,7 +431,7 @@ Deno.serve(async (req: Request) => {
         // Validate brief exists and has no active job
         const { data: brief, error: briefError } = await supabase
           .from('briefs')
-          .select('id, status, active_job_id, client_id')
+          .select('id, status, active_job_id, client_id, project_id')
           .eq('id', briefId)
           .eq('client_id', client_id)
           .single()
@@ -409,6 +440,8 @@ Deno.serve(async (req: Request) => {
           warnings.push(`Brief ${briefId} not found`)
           continue
         }
+
+        let effectiveProjectId = (brief.project_id as string | null) || null
 
         // Skip briefs with active jobs
         if (brief.active_job_id) {
@@ -425,9 +458,27 @@ Deno.serve(async (req: Request) => {
           }
         }
 
+        if (project_id && effectiveProjectId !== project_id) {
+          const { error: reassignError } = await supabase
+            .from('briefs')
+            .update({ project_id })
+            .eq('id', briefId)
+            .eq('client_id', client_id)
+
+          if (reassignError) {
+            warnings.push(`Failed to reassign brief ${briefId} to project ${project_id}: ${reassignError.message}`)
+            continue
+          }
+
+          effectiveProjectId = project_id
+        }
+
         // Snapshot config from the existing brief
         try {
-          const config = await snapshotBriefConfig(supabase, briefId)
+          const snapshottedConfig = await snapshotBriefConfig(supabase, briefId)
+          const config = effectiveProjectId
+            ? { ...snapshottedConfig, project_id: effectiveProjectId }
+            : snapshottedConfig
 
           const { data: job, error: jobError } = await supabase
             .from('generation_jobs')
@@ -473,7 +524,7 @@ Deno.serve(async (req: Request) => {
         // Validate brief exists and has complete brief_data
         const { data: brief, error: briefError } = await supabase
           .from('briefs')
-          .select('id, status, active_job_id, client_id, brief_data')
+          .select('id, status, active_job_id, client_id, project_id, brief_data')
           .eq('id', briefId)
           .eq('client_id', client_id)
           .single()
@@ -482,6 +533,8 @@ Deno.serve(async (req: Request) => {
           warnings.push(`Brief ${briefId} not found`)
           continue
         }
+
+        let effectiveProjectId = (brief.project_id as string | null) || null
 
         // Skip briefs with active jobs
         if (brief.active_job_id) {
@@ -505,9 +558,27 @@ Deno.serve(async (req: Request) => {
           continue
         }
 
+        if (project_id && effectiveProjectId !== project_id) {
+          const { error: reassignError } = await supabase
+            .from('briefs')
+            .update({ project_id })
+            .eq('id', briefId)
+            .eq('client_id', client_id)
+
+          if (reassignError) {
+            warnings.push(`Failed to reassign brief ${briefId} to project ${project_id}: ${reassignError.message}`)
+            continue
+          }
+
+          effectiveProjectId = project_id
+        }
+
         // Snapshot config from the existing brief
         try {
-          const config = await snapshotBriefConfig(supabase, briefId, writer_instructions)
+          const snapshottedConfig = await snapshotBriefConfig(supabase, briefId, writer_instructions)
+          const config = effectiveProjectId
+            ? { ...snapshottedConfig, project_id: effectiveProjectId }
+            : snapshottedConfig
 
           const { data: job, error: jobError } = await supabase
             .from('generation_jobs')

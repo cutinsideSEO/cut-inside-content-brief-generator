@@ -25,8 +25,10 @@ interface BriefListCardProps {
   onContinue: (briefId: string) => void;
   onEdit: (briefId: string) => void;
   onGenerateArticle?: (briefId: string) => void;
+  onAssignProject?: (briefId: string, currentProjectId: string | null) => void;
   onUseAsTemplate: (briefId: string) => void;
   onArchive: (briefId: string) => void;
+  projectName?: string | null;
   isSelected?: boolean;
   onToggleSelect?: (briefId: string) => void;
   // Background generation
@@ -60,6 +62,12 @@ const ArchiveIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const FolderIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+  </svg>
+);
+
 const LinkIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
@@ -72,8 +80,10 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   onContinue,
   onEdit,
   onGenerateArticle,
+  onAssignProject,
   onUseAsTemplate,
   onArchive,
+  projectName,
   isSelected = false,
   onToggleSelect,
   isGenerating = false,
@@ -175,6 +185,11 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
               {brief.client && (
                 <p className="text-xs text-muted-foreground mt-0.5">{brief.client.name}</p>
               )}
+              {projectName && (
+                <div className="mt-1">
+                  <Badge variant="default" size="sm">{projectName}</Badge>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -206,6 +221,12 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
                       <CopyIcon className="h-4 w-4 mr-2" />
                       Use as Template
                     </DropdownMenuItem>
+                    {onAssignProject && (
+                      <DropdownMenuItem onClick={() => onAssignProject(brief.id, brief.project_id)}>
+                        <FolderIcon className="h-4 w-4 mr-2" />
+                        Assign Project
+                      </DropdownMenuItem>
+                    )}
                     {brief.status !== 'archived' && (
                       <>
                         <DropdownMenuSeparator />

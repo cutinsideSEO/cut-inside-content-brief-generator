@@ -3,6 +3,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { createGenerationBatch } from '../../services/batchService';
 import type { BriefKeywordGroup } from '../../services/batchService';
+import type { ClientProject } from '../../types/database';
 import Button from '../Button';
 import { Modal, Tabs, Textarea, Select, Card, Badge, Alert } from '../ui';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,9 @@ interface BulkGenerationModalProps {
   selectedBriefIds: string[];
   clientId: string;
   userId: string;
+  availableProjects: ClientProject[];
+  selectedProjectId: string;
+  onSelectedProjectChange: (projectId: string) => void;
   onBatchCreated: () => void;
 }
 
@@ -71,6 +75,9 @@ const BulkGenerationModal: React.FC<BulkGenerationModalProps> = ({
   selectedBriefIds,
   clientId,
   userId,
+  availableProjects,
+  selectedProjectId,
+  onSelectedProjectChange,
   onBatchCreated,
 }) => {
   // Tab state
@@ -118,6 +125,16 @@ const BulkGenerationModal: React.FC<BulkGenerationModalProps> = ({
     },
   ], [selectedBriefIds.length]);
 
+  const projectOptions = useMemo(() => {
+    return [
+      { value: '', label: 'Unassigned' },
+      ...availableProjects.map((project) => ({
+        value: project.id,
+        label: project.name,
+      })),
+    ];
+  }, [availableProjects]);
+
   // Handle batch creation
   const handleStart = useCallback(async () => {
     if (!isValid) return;
@@ -127,6 +144,7 @@ const BulkGenerationModal: React.FC<BulkGenerationModalProps> = ({
       if (activeTab === 'keywords') {
         const result = await createGenerationBatch({
           clientId,
+          projectId: selectedProjectId || undefined,
           userId,
           generationType: 'full_pipeline',
           briefEntries: parsedGroups,
@@ -138,6 +156,7 @@ const BulkGenerationModal: React.FC<BulkGenerationModalProps> = ({
       } else {
         const result = await createGenerationBatch({
           clientId,
+          projectId: selectedProjectId || undefined,
           userId,
           generationType: existingAction,
           briefIds: selectedBriefIds,
@@ -157,7 +176,7 @@ const BulkGenerationModal: React.FC<BulkGenerationModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, isValid, clientId, userId, parsedGroups, country, serpLanguage, outputLanguage, existingAction, selectedBriefIds, writerInstructions, onBatchCreated, onClose]);
+  }, [activeTab, isValid, clientId, selectedProjectId, userId, parsedGroups, country, serpLanguage, outputLanguage, existingAction, selectedBriefIds, writerInstructions, onBatchCreated, onClose]);
 
   // Reset tab when modal opens
   React.useEffect(() => {
@@ -203,6 +222,15 @@ const BulkGenerationModal: React.FC<BulkGenerationModalProps> = ({
           onChange={setActiveTab}
           variant="pills"
           size="sm"
+        />
+      </div>
+      <div className="mb-5">
+        <Select
+          label="Project"
+          size="sm"
+          value={selectedProjectId}
+          onChange={(e) => onSelectedProjectChange(e.target.value)}
+          options={projectOptions}
         />
       </div>
 

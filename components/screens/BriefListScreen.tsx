@@ -14,9 +14,16 @@ import { getEffectiveBriefStatusForList, isBriefActivelyGenerating } from '../..
 import { useBatchSubscription } from '../../hooks/useBatchSubscription';
 import { useAuth } from '../../contexts/AuthContext';
 import BriefListCard from '../briefs/BriefListCard';
+import BriefListToolbar from '../briefs/BriefListToolbar';
 import ArticleListCard from '../articles/ArticleListCard';
 import BulkGenerationModal from '../briefs/BulkGenerationModal';
 import GenerationActivityPanel from '../briefs/GenerationActivityPanel';
+import type {
+  BriefListActiveTab,
+  BriefListFilterStatus,
+  BriefListSortBy,
+  BriefListViewMode,
+} from '../../types/briefListUi';
 import Button from '../Button';
 import { Card, Input, Select, Alert, Tabs, Skeleton, Modal, Badge, Progress } from '../ui';
 
@@ -36,10 +43,19 @@ interface BriefListScreenProps {
   onViewArticle: (articleId: string) => void;
   // Callback to sync counts with parent (sidebar)
   onCountsChange?: (counts: { draft: number; in_progress: number; complete: number; workflow: number; published: number; articles: number }) => void;
+  activeTab: BriefListActiveTab;
+  filterStatus: BriefListFilterStatus;
+  sortBy: BriefListSortBy;
+  briefViewMode: BriefListViewMode;
+  projectFilter: string;
+  onActiveTabChange: (activeTab: BriefListActiveTab) => void;
+  onFilterStatusChange: (filterStatus: BriefListFilterStatus) => void;
+  onSortByChange: (sortBy: BriefListSortBy) => void;
+  onBriefViewModeChange: (briefViewMode: BriefListViewMode) => void;
+  onProjectFilterChange: (projectFilter: string) => void;
+  onProjectFilterOptionsChange?: (options: Array<{ value: string; label: string }>) => void;
 }
 
-type FilterStatus = 'all' | 'draft' | 'in_progress' | 'complete' | 'workflow' | 'published';
-type BriefViewMode = 'smart' | 'grouped';
 type AssignmentTarget = {
   entityType: 'brief' | 'article';
   entityId: string;
@@ -59,14 +75,22 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   generatingBriefs = {},
   onViewArticle,
   onCountsChange,
+  activeTab,
+  filterStatus,
+  sortBy,
+  briefViewMode,
+  projectFilter,
+  onActiveTabChange,
+  onFilterStatusChange,
+  onSortByChange,
+  onBriefViewModeChange,
+  onProjectFilterChange,
+  onProjectFilterOptionsChange,
 }) => {
   const [briefs, setBriefs] = useState<BriefWithClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
-  const [projectFilter, setProjectFilter] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'briefs' | 'articles'>('briefs');
   const [articles, setArticles] = useState<ArticleWithBrief[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [archiveConfirm, setArchiveConfirm] = useState<string | null>(null);
@@ -75,16 +99,13 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const [assignmentTarget, setAssignmentTarget] = useState<AssignmentTarget>(null);
   const [assignmentProjectId, setAssignmentProjectId] = useState('');
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [articleGenerateConfirmBriefId, setArticleGenerateConfirmBriefId] = useState<string | null>(null);
   const [startingArticleBriefIds, setStartingArticleBriefIds] = useState<Set<string>>(new Set());
   const startingArticleBriefIdsRef = useRef<Set<string>>(new Set());
-
-  // Sort state
-  const [sortBy, setSortBy] = useState<'smart' | 'newest' | 'oldest' | 'modified' | 'name'>('smart');
-  const [briefViewMode, setBriefViewMode] = useState<BriefViewMode>('smart');
 
   // Bulk selection state
   const [selectedBriefs, setSelectedBriefs] = useState<Set<string>>(new Set());
@@ -103,7 +124,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const BRIEF_PAGE_SIZE = 20;
 
   useEffect(() => {
-    setProjectFilter('all');
     setBulkProjectId('');
   }, [clientId]);
 
@@ -393,9 +413,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     setNewProjectName('');
     setNewProjectDescription('');
     await loadProjects();
-    setProjectFilter(data.id);
+    onProjectFilterChange(data.id);
     setBulkProjectId(data.id);
-  }, [clientId, loadProjects, newProjectDescription, newProjectName]);
+  }, [clientId, loadProjects, newProjectDescription, newProjectName, onProjectFilterChange]);
 
   // Workflow status change handler
   const handleWorkflowStatusChange = async (briefId: string, newStatus: string, metadata?: { published_url?: string; published_at?: string }) => {
@@ -574,16 +594,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const workflowBriefs = paginatedBriefs.filter((b) => workflowStatuses.includes(b.status));
   const publishedBriefs = paginatedBriefs.filter((b) => b.status === 'published');
 
-  // Tab items with counts
-  const tabItems = [
-    { id: 'all', label: 'All', count: counts.all },
-    { id: 'draft', label: 'Draft', count: counts.draft },
-    { id: 'in_progress', label: 'In Progress', count: counts.in_progress },
-    { id: 'complete', label: 'Complete', count: counts.complete },
-    ...(counts.workflow > 0 ? [{ id: 'workflow', label: 'In Workflow', count: counts.workflow }] : []),
-    ...(counts.published > 0 ? [{ id: 'published', label: 'Published', count: counts.published }] : []),
-  ];
-
   const projectFilterOptions = useMemo(() => {
     return [
       { value: 'all', label: 'All Projects' },
@@ -595,6 +605,10 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     ];
   }, [projects]);
 
+  useEffect(() => {
+    onProjectFilterOptionsChange?.(projectFilterOptions);
+  }, [onProjectFilterOptionsChange, projectFilterOptions]);
+
   const projectAssignmentOptions = useMemo(() => {
     return [
       { value: '', label: 'Unassigned' },
@@ -604,6 +618,17 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       })),
     ];
   }, [projects]);
+
+  const mobileStatusFilterItems = useMemo(() => {
+    return [
+      { id: 'all', label: 'All', count: counts.all },
+      { id: 'draft', label: 'Draft', count: counts.draft },
+      { id: 'in_progress', label: 'In Progress', count: counts.in_progress },
+      { id: 'complete', label: 'Complete', count: counts.complete },
+      ...(counts.workflow > 0 ? [{ id: 'workflow', label: 'Workflow', count: counts.workflow }] : []),
+      ...(counts.published > 0 ? [{ id: 'published', label: 'Published', count: counts.published }] : []),
+    ];
+  }, [counts.all, counts.complete, counts.draft, counts.in_progress, counts.published, counts.workflow]);
 
   const projectNamesById = useMemo(() => {
     return Object.fromEntries(projects.map((project) => [project.id, project.name]));
@@ -657,49 +682,21 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div
-          className={clientBrandColor ? 'pl-3 border-l-[3px]' : ''}
-          style={clientBrandColor ? { borderLeftColor: clientBrandColor } : undefined}
-        >
-          <div className="flex items-center gap-3">
-            {clientLogoUrl && (
-              <img
-                src={clientLogoUrl}
-                alt=""
-                className="h-8 w-8 rounded-lg object-contain border border-gray-100"
-              />
-            )}
-            <h1 className="text-2xl font-heading font-bold text-gray-900">{clientName}</h1>
-          </div>
-          <p className="text-gray-600 mt-0.5">{briefs.length} {briefs.length === 1 ? 'brief' : 'briefs'}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => handleOpenBulkModal('keywords')}
-            icon={
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            }
-          >
-            Bulk Generate Briefs
-          </Button>
-          <Button
-            variant="primary"
-            onClick={onCreateBrief}
-            icon={
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            }
-          >
-            New Brief
-          </Button>
-        </div>
-      </div>
+      <BriefListToolbar
+        clientName={clientName}
+        clientLogoUrl={clientLogoUrl}
+        clientBrandColor={clientBrandColor}
+        briefCount={briefs.length}
+        showSearchControls={activeTab === 'briefs'}
+        searchQuery={searchQuery}
+        sortBy={sortBy}
+        onSearchQueryChange={setSearchQuery}
+        onSortByChange={onSortByChange}
+        onCreateBrief={onCreateBrief}
+        onOpenBulkGenerate={() => handleOpenBulkModal('keywords')}
+        onOpenCreateProject={() => setShowCreateProjectModal(true)}
+        onOpenMobileFilters={() => setShowMobileFilters(true)}
+      />
 
       <GenerationActivityPanel
         generatingBriefs={generatingBriefs}
@@ -720,22 +717,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
               { id: 'articles', label: 'Articles', count: activeTab === 'articles' ? articles.length : articleCount },
             ]}
             activeId={activeTab}
-            onChange={(id) => setActiveTab(id as 'briefs' | 'articles')}
+            onChange={(id) => onActiveTabChange(id as BriefListActiveTab)}
             variant="pills"
           />
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowCreateProjectModal(true)}>
-              New Project
-            </Button>
-          <Select
-            size="sm"
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-            options={projectFilterOptions}
-            className="w-full sm:w-64"
-            aria-label="Filter by project"
-          />
-          </div>
         </div>
       </div>
 
@@ -808,60 +792,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
       {/* Briefs tab content */}
       {activeTab === 'briefs' && (<>
-      {/* Search, Sort, and Filter */}
-      <div className="mb-6 space-y-3 rounded-lg border border-border bg-card px-4 py-3">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <Input
-              placeholder="Search briefs by name or keywords..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              icon={
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              }
-            />
-          </div>
-          <Select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            options={[
-              { value: 'smart', label: 'Smart Queue (Recommended)' },
-              { value: 'newest', label: 'Newest First' },
-              { value: 'oldest', label: 'Oldest First' },
-              { value: 'modified', label: 'Last Modified' },
-              { value: 'name', label: 'Name A-Z' },
-            ]}
-            size="sm"
-            className="sm:w-56"
-            aria-label="Sort briefs"
-          />
-          <Tabs
-            items={[
-              { id: 'smart', label: 'Smart Queue' },
-              { id: 'grouped', label: 'Grouped by Status' },
-            ]}
-            activeId={briefViewMode}
-            onChange={(id) => setBriefViewMode(id as BriefViewMode)}
-            variant="pills"
-            size="sm"
-          />
-        </div>
-        <Tabs
-          items={tabItems}
-          activeId={filterStatus}
-          onChange={(id) => setFilterStatus(id as FilterStatus)}
-          variant="pills"
-          size="sm"
-        />
-      </div>
-
       {/* Bulk Action Bar */}
       {selectedBriefs.size > 0 && (
         <div className="flex items-center gap-3 mb-4 px-4 py-2.5 bg-teal/5 border border-teal/20 rounded-lg">
@@ -964,8 +894,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
             variant="secondary"
             onClick={() => {
               setSearchQuery('');
-              setFilterStatus('all');
-              setProjectFilter('all');
+              onFilterStatusChange('all');
+              onProjectFilterChange('all');
             }}
             className="mt-4"
           >
@@ -1162,6 +1092,54 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           value={newProjectDescription}
           onChange={(e) => setNewProjectDescription(e.target.value)}
         />
+      </Modal>
+
+      <Modal
+        isOpen={showMobileFilters}
+        onClose={() => setShowMobileFilters(false)}
+        title="Filters"
+        size="sm"
+        footer={(
+          <Button variant="primary" size="sm" onClick={() => setShowMobileFilters(false)}>
+            Done
+          </Button>
+        )}
+      >
+        <div data-testid="brief-list-sidebar-controls" className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Status</p>
+            <Tabs
+              items={mobileStatusFilterItems}
+              activeId={filterStatus}
+              onChange={(id) => onFilterStatusChange(id as BriefListFilterStatus)}
+              variant="pills"
+              size="sm"
+            />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Project</p>
+            <Select
+              size="sm"
+              value={projectFilter}
+              onChange={(event) => onProjectFilterChange(event.target.value)}
+              options={projectFilterOptions}
+              aria-label="Mobile project filter"
+            />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">View</p>
+            <Tabs
+              items={[
+                { id: 'smart', label: 'Smart Queue' },
+                { id: 'grouped', label: 'Grouped' },
+              ]}
+              activeId={briefViewMode}
+              onChange={(id) => onBriefViewModeChange(id as BriefListViewMode)}
+              variant="pills"
+              size="sm"
+            />
+          </div>
+        </div>
       </Modal>
 
       <Modal

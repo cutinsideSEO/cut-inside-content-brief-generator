@@ -38,11 +38,15 @@ test.describe('Bulk Generation E2E', () => {
     await selectClient(page, TEST_CLIENT_NAME);
 
     // ============================================
-    // STEP 2: Click "Bulk Generate" button
+    // STEP 2: Open toolbar "More" menu and click "Bulk Generate Briefs"
     // ============================================
-    const bulkBtn = page.getByRole('button', { name: /Bulk Generate/i });
-    await expect(bulkBtn).toBeVisible({ timeout: 10_000 });
-    await bulkBtn.click();
+    const moreBtn = page.getByRole('button', { name: /^More$/i });
+    await expect(moreBtn).toBeVisible({ timeout: 10_000 });
+    await moreBtn.click();
+
+    const bulkMenuItem = page.getByRole('menuitem', { name: /Bulk Generate Briefs/i });
+    await expect(bulkMenuItem).toBeVisible({ timeout: 5_000 });
+    await bulkMenuItem.click();
 
     // ============================================
     // STEP 3: Fill in keywords in the bulk modal

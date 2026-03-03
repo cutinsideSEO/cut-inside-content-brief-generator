@@ -12,6 +12,8 @@ import { useBriefLoader } from './hooks/useBriefLoader';
 import type { Brief, AppView as DatabaseAppView, GenerationJob, GenerationJobProgress } from './types/database';
 import type { SaveStatus } from './types/appState';
 import type { GeneratingBrief, GenerationStatus } from './types/generationActivity';
+import type { BriefListUiState } from './types/briefListUi';
+import { createDefaultBriefListUiState, normalizeBriefListUiState } from './utils/briefListUiState';
 import {
   isOutOfOrderTerminalUpdate,
   isPipelinePhaseTransition,
@@ -58,6 +60,11 @@ interface WrapperState {
   selectedArticleId: string | null;
 }
 
+const DEFAULT_PROJECT_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Projects' },
+  { value: 'unassigned', label: 'Unassigned' },
+];
+
 // Inner component that uses auth context
 const AppWrapperInner: React.FC = () => {
   const { isAuthenticated, isLoading: authLoading, logout, userName } = useAuth();
@@ -78,6 +85,43 @@ const AppWrapperInner: React.FC = () => {
     generatingBriefs: {},
     selectedArticleId: null,
   });
+  const [briefListUiState, setBriefListUiState] = useState<BriefListUiState>(() => createDefaultBriefListUiState());
+  const [briefListProjectFilterOptions, setBriefListProjectFilterOptions] = useState(DEFAULT_PROJECT_FILTER_OPTIONS);
+
+  const applyBriefListUiState = useCallback((
+    partial: Partial<BriefListUiState>,
+    options?: { resetProjectFilter?: boolean }
+  ) => {
+    setBriefListUiState((prev) => normalizeBriefListUiState({ ...prev, ...partial }, options));
+  }, []);
+
+  const normalizeCurrentBriefListUiState = useCallback(() => {
+    setBriefListUiState((prev) => normalizeBriefListUiState(prev));
+  }, []);
+
+  const handleBriefListActiveTabChange = useCallback((activeTab: BriefListUiState['activeTab']) => {
+    applyBriefListUiState({ activeTab });
+  }, [applyBriefListUiState]);
+
+  const handleBriefListFilterStatusChange = useCallback((filterStatus: BriefListUiState['filterStatus']) => {
+    applyBriefListUiState({ filterStatus });
+  }, [applyBriefListUiState]);
+
+  const handleBriefListSortByChange = useCallback((sortBy: BriefListUiState['sortBy']) => {
+    applyBriefListUiState({ sortBy });
+  }, [applyBriefListUiState]);
+
+  const handleBriefListViewModeChange = useCallback((briefViewMode: BriefListUiState['briefViewMode']) => {
+    applyBriefListUiState({ briefViewMode });
+  }, [applyBriefListUiState]);
+
+  const handleBriefListProjectFilterChange = useCallback((projectFilter: string) => {
+    applyBriefListUiState({ projectFilter });
+  }, [applyBriefListUiState]);
+
+  const handleBriefListProjectFilterOptionsChange = useCallback((options: Array<{ value: string; label: string }>) => {
+    setBriefListProjectFilterOptions(options.length > 0 ? options : DEFAULT_PROJECT_FILTER_OPTIONS);
+  }, []);
 
   // Article count for sidebar
   const [articleCount, setArticleCount] = useState(0);
@@ -404,6 +448,8 @@ const AppWrapperInner: React.FC = () => {
 
   // Handle client selection
   const handleSelectClient = useCallback((clientId: string, clientName: string, logoUrl?: string, brandColor?: string) => {
+    applyBriefListUiState({}, { resetProjectFilter: true });
+    setBriefListProjectFilterOptions(DEFAULT_PROJECT_FILTER_OPTIONS);
     setState((prev) => ({
       ...prev,
       mode: 'brief_list',
@@ -412,10 +458,12 @@ const AppWrapperInner: React.FC = () => {
       selectedClientLogoUrl: logoUrl || null,
       selectedClientBrandColor: brandColor || null,
     }));
-  }, []);
+  }, [applyBriefListUiState]);
 
   // Handle switching client from dropdown (stays in brief_list mode)
   const handleSwitchClient = useCallback((clientId: string, clientName: string, logoUrl?: string, brandColor?: string) => {
+    applyBriefListUiState({}, { resetProjectFilter: true });
+    setBriefListProjectFilterOptions(DEFAULT_PROJECT_FILTER_OPTIONS);
     setState((prev) => ({
       ...prev,
       mode: 'brief_list',
@@ -426,7 +474,7 @@ const AppWrapperInner: React.FC = () => {
       currentBriefId: null,
       selectedArticleId: null,
     }));
-  }, []);
+  }, [applyBriefListUiState]);
 
   // Handle back to client selection
   const handleBackToClients = useCallback(() => {
@@ -533,6 +581,7 @@ const AppWrapperInner: React.FC = () => {
           selectedClientLogoUrl: logoUrl,
           selectedClientBrandColor: brandColor,
         }));
+        normalizeCurrentBriefListUiState();
         return;
       }
     }
@@ -540,7 +589,8 @@ const AppWrapperInner: React.FC = () => {
       ...prev,
       mode: prev.selectedClientId ? 'brief_list' : 'client_select',
     }));
-  }, [state.selectedClientId]);
+    normalizeCurrentBriefListUiState();
+  }, [normalizeCurrentBriefListUiState, state.selectedClientId]);
 
   // Handle save status changes from the brief editor (foreground)
   const handleSaveStatusChange = useCallback((status: SaveStatus, savedAt?: Date) => {
@@ -653,6 +703,17 @@ const AppWrapperInner: React.FC = () => {
               clients={allClients}
               onSwitchClient={handleSwitchClient}
               selectedClientId={state.selectedClientId}
+              activeTab={briefListUiState.activeTab}
+              filterStatus={briefListUiState.filterStatus}
+              sortBy={briefListUiState.sortBy}
+              briefViewMode={briefListUiState.briefViewMode}
+              projectFilter={briefListUiState.projectFilter}
+              onActiveTabChange={handleBriefListActiveTabChange}
+              onFilterStatusChange={handleBriefListFilterStatusChange}
+              onSortByChange={handleBriefListSortByChange}
+              onBriefViewModeChange={handleBriefListViewModeChange}
+              onProjectFilterChange={handleBriefListProjectFilterChange}
+              projectFilterOptions={briefListProjectFilterOptions}
             />
             <main className="flex-1 overflow-y-auto">
               <div className="px-6 lg:px-8 py-8">
@@ -675,6 +736,17 @@ const AppWrapperInner: React.FC = () => {
                     generatingBriefs={state.generatingBriefs}
                     onViewArticle={handleViewArticle}
                     onCountsChange={handleCountsChange}
+                    activeTab={briefListUiState.activeTab}
+                    filterStatus={briefListUiState.filterStatus}
+                    sortBy={briefListUiState.sortBy}
+                    briefViewMode={briefListUiState.briefViewMode}
+                    projectFilter={briefListUiState.projectFilter}
+                    onActiveTabChange={handleBriefListActiveTabChange}
+                    onFilterStatusChange={handleBriefListFilterStatusChange}
+                    onSortByChange={handleBriefListSortByChange}
+                    onBriefViewModeChange={handleBriefListViewModeChange}
+                    onProjectFilterChange={handleBriefListProjectFilterChange}
+                    onProjectFilterOptionsChange={handleBriefListProjectFilterOptionsChange}
                   />
                 )}
               </div>
@@ -720,6 +792,7 @@ const AppWrapperInner: React.FC = () => {
             toast.warning('Changes may not have been saved. Please check your work.');
           }
         }
+        normalizeCurrentBriefListUiState();
         setState((prev) => ({
           ...prev,
           mode: 'brief_list',

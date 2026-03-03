@@ -3,6 +3,9 @@ import { FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircle
 import { ClientSwitcherDropdown } from './PreWizardHeader';
 import type { ContentBrief } from '../types';
 import type { ClientWithBriefCount } from '../types/database';
+import type { BriefListActiveTab, BriefListFilterStatus, BriefListSortBy, BriefListViewMode } from '../types/briefListUi';
+import { Select, Tabs } from './ui';
+import { buildSidebarBriefListModel } from '../utils/sidebarBriefListModel';
 
 type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_upload' | 'brief_list';
 
@@ -45,6 +48,17 @@ interface SidebarProps {
   clients?: ClientWithBriefCount[];
   onSwitchClient?: (clientId: string, clientName: string, logoUrl?: string, brandColor?: string) => void;
   selectedClientId?: string | null;
+  activeTab?: BriefListActiveTab;
+  filterStatus?: BriefListFilterStatus;
+  sortBy?: BriefListSortBy;
+  briefViewMode?: BriefListViewMode;
+  projectFilter?: string;
+  onActiveTabChange?: (activeTab: BriefListActiveTab) => void;
+  onFilterStatusChange?: (filterStatus: BriefListFilterStatus) => void;
+  onSortByChange?: (sortBy: BriefListSortBy) => void;
+  onBriefViewModeChange?: (briefViewMode: BriefListViewMode) => void;
+  onProjectFilterChange?: (projectFilter: string) => void;
+  projectFilterOptions?: Array<{ value: string; label: string }>;
 }
 
 const ClientIdentityBlock: React.FC<{
@@ -96,11 +110,45 @@ const Sidebar: React.FC<SidebarProps> = ({
   clients,
   onSwitchClient,
   selectedClientId,
+  filterStatus,
+  briefViewMode,
+  projectFilter,
+  onFilterStatusChange,
+  onBriefViewModeChange,
+  onProjectFilterChange,
+  projectFilterOptions,
 }) => {
   // Brief list sidebar
   if (currentView === 'brief_list') {
+    const resolvedFilter = filterStatus || 'all';
+    const resolvedViewMode = briefViewMode || 'smart';
+    const resolvedProjectFilter = projectFilter && projectFilter.trim() ? projectFilter : 'all';
+    const totalBriefCount =
+      (briefCounts?.draft || 0) +
+      (briefCounts?.in_progress || 0) +
+      (briefCounts?.complete || 0) +
+      (briefCounts?.workflow || 0) +
+      (briefCounts?.published || 0);
+    const sidebarModel = buildSidebarBriefListModel({
+      counts: {
+        all: totalBriefCount,
+        draft: briefCounts?.draft || 0,
+        in_progress: briefCounts?.in_progress || 0,
+        complete: briefCounts?.complete || 0,
+        workflow: briefCounts?.workflow || 0,
+        published: briefCounts?.published || 0,
+      },
+      activeFilter: resolvedFilter,
+    });
+    const resolvedProjectOptions = projectFilterOptions && projectFilterOptions.length > 0
+      ? projectFilterOptions
+      : [
+          { value: 'all', label: 'All Projects' },
+          { value: 'unassigned', label: 'Unassigned' },
+        ];
+
     return (
-      <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
+      <aside className="hidden lg:block w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
           {onBackToClients && (
             <button onClick={onBackToClients} className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal transition-colors mb-6 group">
@@ -142,46 +190,49 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           <h4 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-3">Overview</h4>
           <nav className="space-y-1">
-            <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-gray-300" />
-                Drafts
-              </span>
-              <span className="text-gray-400">{briefCounts?.draft || 0}</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                In Progress
-              </span>
-              <span className="text-gray-400">{briefCounts?.in_progress || 0}</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Complete
-              </span>
-              <span className="text-gray-400">{briefCounts?.complete || 0}</span>
-            </div>
-            {(briefCounts?.workflow || 0) > 0 && (
-              <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
+            {sidebarModel.statusRows.map((row) => (
+              <button
+                key={row.id}
+                onClick={() => onFilterStatusChange?.(row.id)}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${
+                  row.isActive
+                    ? 'bg-teal-50 text-teal'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
                 <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-teal-500" />
-                  In Workflow
+                  <span className={`w-2 h-2 rounded-full ${row.dotClassName}`} />
+                  {row.label}
                 </span>
-                <span className="text-gray-400">{briefCounts.workflow}</span>
-              </div>
-            )}
-            {(briefCounts?.published || 0) > 0 && (
-              <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Published
-                </span>
-                <span className="text-gray-400">{briefCounts.published}</span>
-              </div>
-            )}
+                <span className={row.isActive ? 'text-teal/80' : 'text-gray-400'}>{row.count}</span>
+              </button>
+            ))}
           </nav>
+
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <h4 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-2">Projects</h4>
+            <Select
+              size="sm"
+              value={resolvedProjectFilter}
+              onChange={(event) => onProjectFilterChange?.(event.target.value)}
+              options={resolvedProjectOptions}
+              aria-label="Sidebar project filter"
+            />
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <h4 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-2">View</h4>
+            <Tabs
+              items={[
+                { id: 'smart', label: 'Smart Queue' },
+                { id: 'grouped', label: 'Grouped' },
+              ]}
+              activeId={resolvedViewMode}
+              onChange={(id) => onBriefViewModeChange?.(id as BriefListViewMode)}
+              variant="pills"
+              size="sm"
+            />
+          </div>
 
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">

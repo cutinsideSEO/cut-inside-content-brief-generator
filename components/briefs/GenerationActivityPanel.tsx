@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { GenerationBatch } from '../../types/database';
 import type { BatchLiveProgress } from '../../hooks/useBatchSubscription';
 import type { GeneratingBrief } from '../../types/generationActivity';
 import { getGenerationProgressModel, getGenerationStatusBadgeLabel } from '../../utils/generationActivity';
-import { buildBatchActivityModel } from '../../utils/generationActivitySummary';
+import { buildBatchActivityModel, buildGenerationActivitySummary } from '../../utils/generationActivitySummary';
 import { isBriefActivelyGenerating } from '../../utils/generationStatus';
 import Button from '../Button';
 import {
@@ -50,7 +50,7 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
   onViewBrief,
   onCancelBatch,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [recentActivities, setRecentActivities] = useState<Record<string, RecentTerminalActivity>>({});
 
   const activeJobs = useMemo(() => {
@@ -116,10 +116,22 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
 
   const failedBatchJobs = batches.reduce((sum, batch) => sum + batch.failed_jobs, 0);
   const activeBatches = batches.filter((batch) => batch.status === 'running').length;
-  const totalActiveItems = activeJobs.length + activeBatches;
-  const hasActiveItems = totalActiveItems > 0;
+  const summary = buildGenerationActivitySummary({
+    activeJobs: activeJobs.length,
+    activeBatches,
+    failedJobs: failedBatchJobs,
+  });
+  const previousActiveItemsRef = useRef(0);
 
-  if (totalActiveItems === 0 && recentItems.length === 0) {
+  useEffect(() => {
+    const previous = previousActiveItemsRef.current;
+    if (summary.totalActiveItems > 0 && previous === 0) {
+      setIsExpanded(true);
+    }
+    previousActiveItemsRef.current = summary.totalActiveItems;
+  }, [summary.totalActiveItems]);
+
+  if (summary.totalActiveItems === 0 && recentItems.length === 0) {
     return null;
   }
 
@@ -130,12 +142,16 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-2.5 w-2.5 rounded-full bg-teal animate-pulse-subtle" />
-              <h2 className="text-sm font-heading font-semibold text-foreground">Generation Activity</h2>
-              <Badge variant="teal" size="sm">{activeJobs.length} jobs</Badge>
-              <Badge variant="default" size="sm">{activeBatches} batches</Badge>
-              {failedBatchJobs > 0 && (
-                <Badge variant="error" size="sm">{failedBatchJobs} failed</Badge>
-              )}
+              <h2 className="text-sm font-heading font-semibold text-foreground">{summary.title}</h2>
+              {summary.badges.map((badge) => (
+                <Badge
+                  key={badge.key}
+                  variant={badge.key === 'jobs' ? 'teal' : badge.key === 'failed' ? 'error' : 'default'}
+                  size="sm"
+                >
+                  {badge.value} {badge.key}
+                </Badge>
+              ))}
             </div>
             <CollapsibleTrigger asChild>
               <button className="text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -147,7 +163,7 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
 
         <CollapsibleContent>
           <div className="p-4 space-y-5">
-            {!hasActiveItems && (
+            {!summary.hasActiveItems && (
               <div className="rounded-md border border-border bg-secondary/20 px-3 py-2 text-sm text-muted-foreground">
                 No active generation jobs right now.
               </div>

@@ -40,6 +40,112 @@ interface BatchRequestBody {
   writer_instructions?: string;
 }
 
+const WORKFLOW_STATUSES = [
+  'sent_to_client',
+  'approved',
+  'changes_requested',
+  'in_writing',
+  'published',
+]
+
+const STALE_IN_PROGRESS_VIEWS = new Set([
+  undefined,
+  null,
+  'initial_input',
+  'context_input',
+  'visualization',
+  'brief_upload',
+])
+
+function hasTerminalBriefData(briefData: Record<string, unknown> | null | undefined): boolean {
+  if (!briefData) return false
+  return Boolean(
+    briefData.page_goal &&
+    briefData.target_audience &&
+    briefData.keyword_strategy &&
+    briefData.competitor_insights &&
+    briefData.content_gap_analysis &&
+    briefData.article_structure &&
+    briefData.faqs &&
+    briefData.on_page_seo
+  )
+}
+
+function hasGeneratedBriefData(briefData: Record<string, unknown> | null | undefined): boolean {
+  if (!briefData) return false
+  return Boolean(
+    briefData.page_goal ||
+    briefData.target_audience ||
+    briefData.keyword_strategy ||
+    briefData.competitor_insights ||
+    briefData.content_gap_analysis ||
+    briefData.article_structure ||
+    briefData.faqs ||
+    briefData.on_page_seo
+  )
+}
+
+// Repairs already-corrupted persisted rows when a bulk action touches them again.
+async function normalizeBriefPersistenceIfNeeded(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  brief: {
+    id: string
+    status?: string | null
+    current_view?: string | null
+    current_step?: number | null
+    brief_data?: Record<string, unknown> | null
+  }
+): Promise<void> {
+  const isTerminalStep = Number(brief.current_step || 0) >= 7
+  const hasTerminalData = hasTerminalBriefData(brief.brief_data)
+  const hasPartialProgress = Number(brief.current_step || 0) > 1 || hasGeneratedBriefData(brief.brief_data)
+
+  const updates: Record<string, unknown> = {}
+  const status = brief.status || 'draft'
+
+  if (isTerminalStep || hasTerminalData) {
+    if (brief.current_view !== 'dashboard') {
+      updates.current_view = 'dashboard'
+    }
+
+    if (brief.current_step !== 7) {
+      updates.current_step = 7
+    }
+
+    if (!WORKFLOW_STATUSES.includes(status) && status !== 'complete') {
+      updates.status = 'complete'
+    }
+  } else if (hasPartialProgress) {
+    if (STALE_IN_PROGRESS_VIEWS.has(brief.current_view)) {
+      updates.current_view = 'briefing'
+    }
+
+    if ((!brief.current_step || brief.current_step < 1) && hasGeneratedBriefData(brief.brief_data)) {
+      updates.current_step = 1
+    }
+
+    if (!WORKFLOW_STATUSES.includes(status) && status === 'draft') {
+      updates.status = 'in_progress'
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return
+  }
+
+  updates.updated_at = new Date().toISOString()
+
+  const { error } = await supabase
+    .from('briefs')
+    .update(updates)
+    .eq('id', brief.id)
+
+  if (error) {
+    throw new Error(`Failed to normalize brief ${brief.id}: ${error.message}`)
+  }
+}
+
 // ============================================
 // Helpers
 // ============================================
@@ -431,7 +537,7 @@ Deno.serve(async (req: Request) => {
         // Validate brief exists and has no active job
         const { data: brief, error: briefError } = await supabase
           .from('briefs')
-          .select('id, status, active_job_id, client_id, project_id')
+          .select('id, status, active_job_id, client_id, project_id, current_view, current_step, brief_data')
           .eq('id', briefId)
           .eq('client_id', client_id)
           .single()
@@ -442,6 +548,8 @@ Deno.serve(async (req: Request) => {
         }
 
         let effectiveProjectId = (brief.project_id as string | null) || null
+
+        await normalizeBriefPersistenceIfNeeded(supabase, brief)
 
         // Skip briefs with active jobs
         if (brief.active_job_id) {
@@ -524,7 +632,7 @@ Deno.serve(async (req: Request) => {
         // Validate brief exists and has complete brief_data
         const { data: brief, error: briefError } = await supabase
           .from('briefs')
-          .select('id, status, active_job_id, client_id, project_id, brief_data')
+          .select('id, status, active_job_id, client_id, project_id, current_view, current_step, brief_data')
           .eq('id', briefId)
           .eq('client_id', client_id)
           .single()
@@ -535,6 +643,8 @@ Deno.serve(async (req: Request) => {
         }
 
         let effectiveProjectId = (brief.project_id as string | null) || null
+
+        await normalizeBriefPersistenceIfNeeded(supabase, brief)
 
         // Skip briefs with active jobs
         if (brief.active_job_id) {

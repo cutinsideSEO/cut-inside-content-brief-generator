@@ -1,6 +1,6 @@
 // useBriefLoader Hook - Load a brief with all related data
 import { useState, useCallback } from 'react';
-import { getBriefWithRelations } from '../services/briefService';
+import { getBriefWithRelations, normalizeBriefPersistenceState } from '../services/briefService';
 import { toCompetitorPages } from '../services/competitorService';
 import type { BriefWithRelations, BriefStatus, AppView } from '../types/database';
 import type { AppState } from '../types/appState';
@@ -108,13 +108,20 @@ export function useBriefLoader(): UseBriefLoaderReturn {
         createdAt: a.created_at,
       }));
 
+      const normalizedPersistence = normalizeBriefPersistenceState({
+        currentView: brief.current_view as AppView,
+        currentStep: brief.current_step,
+        briefData: brief.brief_data || {},
+        currentStatus: brief.status as BriefStatus,
+      });
+
       // Build the loaded state
       const loadedState: LoadedBriefState = {
         briefId: brief.id,
         clientId: brief.client_id,
-        briefStatus: brief.status as BriefStatus,
-        currentView: brief.current_view as AppView,
-        briefingStep: brief.current_step,
+        briefStatus: normalizedPersistence.status,
+        currentView: normalizedPersistence.currentView,
+        briefingStep: normalizedPersistence.currentStep,
         briefData: brief.brief_data || {},
         staleSteps: new Set(brief.stale_steps || []),
         userFeedbacks: brief.user_feedbacks || {},

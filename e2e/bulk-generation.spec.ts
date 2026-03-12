@@ -1,36 +1,20 @@
 import { test, expect } from '@playwright/test';
-import { login, selectClient, waitForJobsToComplete, TEST_CLIENT_NAME, SUPABASE_URL, SUPABASE_ANON_KEY } from './helpers';
-
-/**
- * Poll the DB for briefs with names matching the given keywords.
- * Returns the count of matching briefs found.
- */
-async function findBatchBriefsByName(keywords: string[]): Promise<number> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/briefs?select=id,name&order=created_at.desc&limit=20`,
-    {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    }
-  );
-  if (!res.ok) return 0;
-  const briefs = await res.json();
-  if (!Array.isArray(briefs)) return 0;
-
-  let matched = 0;
-  for (const kw of keywords) {
-    const kwLower = kw.toLowerCase();
-    if (briefs.some((b: { name: string }) => b.name?.toLowerCase().includes(kwLower))) {
-      matched++;
-    }
-  }
-  return matched;
-}
+import {
+  fetchBriefData,
+  findRecentBriefsByNames,
+  login,
+  selectClient,
+  TEST_CLIENT_NAME,
+  waitForJobsToComplete,
+} from './helpers';
 
 test.describe('Bulk Generation E2E', () => {
   test('bulk generate briefs from keywords', async ({ page }) => {
+    const runSuffix = Date.now().toString().slice(-8);
+    const expectedBriefNames = [
+      `best content marketing tools 2026 ${runSuffix}`,
+    ];
+
     // ============================================
     // STEP 1: Login & Select Client
     // ============================================
@@ -51,18 +35,13 @@ test.describe('Bulk Generation E2E', () => {
     // ============================================
     // STEP 3: Fill in keywords in the bulk modal
     // ============================================
-    // Wait for modal to open
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 });
-
-    // Should be on "From Keywords" tab by default
     await expect(page.getByText(/From Keywords/i)).toBeVisible();
 
-    // Fill keyword textarea (one brief per line, keywords comma-separated, pipe for volumes)
     const textarea = page.getByRole('dialog').locator('textarea').first();
-    await textarea.fill('best content marketing tools 2026 | 1500\nseo audit checklist | 900');
+    await textarea.fill(`${expectedBriefNames[0]} | 1500`);
 
-    // Verify preview shows 2 briefs
-    await expect(page.getByText(/2/).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/1/).first()).toBeVisible({ timeout: 5_000 });
 
     // ============================================
     // STEP 4: Start the batch
@@ -71,76 +50,105 @@ test.describe('Bulk Generation E2E', () => {
     await expect(startBtn).toBeVisible();
     await startBtn.click();
 
-    // Modal should close
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
 
     // ============================================
     // STEP 5: Verify batch panel appears (batch was started)
     // ============================================
-    // The BatchProgressPanel appears after the batch is created.
-    // We check for any batch-related text OR the batch progress panel.
-    // Allow 30s for the edge function response + Realtime event to arrive.
     const batchStarted = await Promise.race([
       page.getByText(/Batch|Generating|Analyzing|Running/i).first().waitFor({ timeout: 30_000 }).then(() => true).catch(() => false),
       page.locator('[class*="batch"]').first().waitFor({ timeout: 30_000 }).then(() => true).catch(() => false),
     ]);
     console.log(`Batch started indicator visible: ${batchStarted}`);
 
+    let createdBriefs = await findRecentBriefsByNames(expectedBriefNames);
+    for (let attempt = 0; attempt < 12 && createdBriefs.length < expectedBriefNames.length; attempt++) {
+      await page.waitForTimeout(5_000);
+      createdBriefs = await findRecentBriefsByNames(expectedBriefNames);
+    }
+
+    expect(createdBriefs).toHaveLength(expectedBriefNames.length);
+
     // ============================================
-    // STEP 6: Wait for batch jobs to complete (polls DB directly)
+    // STEP 6: Wait for batch jobs to complete
     // ============================================
-    // Use 10 minutes — full_pipeline batches run: competitors + full_brief per brief
-    // 2 briefs = 4 jobs total. Each Gemini step takes ~30-90s.
-    console.log('Waiting for batch jobs to complete (up to 10 min)...');
-    await waitForJobsToComplete(600_000);
+    console.log('Waiting for batch jobs to complete (up to 15 min)...');
+    await waitForJobsToComplete(900_000, {
+      briefIds: createdBriefs.map((brief) => brief.id),
+      createdAfter: createdBriefs
+        .map((brief) => brief.created_at)
+        .filter((value): value is string => Boolean(value))
+        .sort()[0],
+    });
     console.log('Batch jobs completed (or timed out).');
 
     // ============================================
-    // STEP 7: Verify briefs were created in the DB
+    // STEP 7: Verify exact terminal brief state in the DB
     // ============================================
-    // Check the DB directly first — this is the most reliable check.
-    const matchedCount = await findBatchBriefsByName(['content marketing tools', 'seo audit checklist']);
-    console.log(`DB check: ${matchedCount} of 2 expected briefs found in DB.`);
+    createdBriefs = await findRecentBriefsByNames(expectedBriefNames);
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const allTerminal = createdBriefs.length === expectedBriefNames.length
+        && createdBriefs.every((brief) =>
+          brief.status === 'complete'
+          && brief.current_view === 'dashboard'
+          && brief.current_step === 7
+          && brief.active_job_id === null
+        );
 
-    if (matchedCount === 0) {
-      // Briefs not found in DB — this is a real failure (batch did not create briefs)
-      throw new Error('Batch did not create any briefs matching the keywords. Check Edge Function logs.');
+      if (allTerminal) {
+        break;
+      }
+
+      await page.waitForTimeout(5_000);
+      createdBriefs = await findRecentBriefsByNames(expectedBriefNames);
     }
 
+    expect(createdBriefs).toHaveLength(expectedBriefNames.length);
+
+    for (const expectedName of expectedBriefNames) {
+      const brief = createdBriefs.find((row) => row.name === expectedName);
+      expect(brief, `Missing created brief row for ${expectedName}`).toBeTruthy();
+      expect(brief?.status, `${expectedName} should finish as complete`).toBe('complete');
+      expect(brief?.current_view, `${expectedName} should finish on dashboard`).toBe('dashboard');
+      expect(brief?.current_step, `${expectedName} should finish at step 7`).toBe(7);
+      expect(brief?.active_job_id, `${expectedName} should clear active_job_id`).toBeNull();
+    }
+
+    const targetBrief = createdBriefs[0];
+    const beforeOpen = await fetchBriefData(targetBrief.id);
+
     // ============================================
-    // STEP 8: Verify briefs appear in the UI
+    // STEP 8: Verify CTA rendering and open behavior in the UI
     // ============================================
-    // Reload and re-navigate to the CI client brief list.
-    // page.reload() sends user back to ClientSelectScreen (nav state is not URL-based).
     await page.reload();
     await selectClient(page, TEST_CLIENT_NAME);
-
-    // Wait for brief list to fully load
     await expect(page.getByRole('button', { name: /New Brief/i })).toBeVisible({ timeout: 15_000 });
 
-    // Give the brief list a moment to render all cards
-    await page.waitForTimeout(2_000);
+    const searchInput = page.getByPlaceholder('Search briefs by name or keywords...');
+    await expect(searchInput).toBeVisible({ timeout: 10_000 });
+    await searchInput.fill(targetBrief.name);
 
-    // Check that the new briefs are visible (they should contain our keywords)
-    const contentMarketingBrief = page.getByText(/content marketing tools/i).first();
-    const seoAuditBrief = page.getByText(/seo audit checklist/i).first();
+    const briefHeading = page.getByRole('heading', { name: targetBrief.name, exact: true }).first();
+    await expect(briefHeading).toBeVisible({ timeout: 10_000 });
 
-    const brief1Visible = await contentMarketingBrief.isVisible().catch(() => false);
-    const brief2Visible = await seoAuditBrief.isVisible().catch(() => false);
+    const viewEditButton = page.getByRole('button', { name: /View \/ Edit/i }).first();
+    await expect(viewEditButton).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: /^Continue$/i })).toHaveCount(0);
 
-    if (!brief1Visible && !brief2Visible) {
-      // Briefs exist in DB but not visible in UI — could be pagination or a filtering issue
-      // Take a screenshot for debugging
-      await page.screenshot({ path: 'screenshots/bulk-briefs-not-visible.png' });
-      console.warn('Briefs found in DB but not visible in UI. Check screenshot: screenshots/bulk-briefs-not-visible.png');
-      // Still pass if DB check passed (UI rendering is secondary)
-      console.log('Bulk generation E2E test PASSED (DB confirmed, UI rendering may be delayed)');
-    } else {
-      console.log('Bulk generation E2E test PASSED (briefs visible in UI)');
-    }
+    await viewEditButton.click();
 
-    // The critical assertion: briefs must exist in the DB
-    expect(matchedCount).toBeGreaterThan(0);
+    await expect(page.getByRole('button', { name: /Generate Full Article/i })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Start Your Content Project/i)).toHaveCount(0);
+
+    // Autosave debounce is 500ms in App.tsx; give it enough time to persist if it regresses.
+    await page.waitForTimeout(3_000);
+
+    const afterOpen = await fetchBriefData(targetBrief.id);
+    expect(afterOpen?.status).toBe(beforeOpen?.status);
+    expect(afterOpen?.current_view).toBe(beforeOpen?.current_view);
+    expect(afterOpen?.current_step).toBe(beforeOpen?.current_step);
+
+    console.log('Bulk generation E2E test PASSED with strict DB + UI terminal-state assertions.');
   });
 
   test('bulk generate articles from selected briefs', async ({ page }) => {
@@ -153,10 +161,8 @@ test.describe('Bulk Generation E2E', () => {
     // ============================================
     // STEP 2: Select completed briefs using checkboxes
     // ============================================
-    // Wait for brief list to render
     await page.waitForTimeout(2_000);
 
-    // Find completed brief cards (emerald border) and click their checkboxes
     const briefCards = page.locator('[class*="border-l-emerald"]');
     const count = await briefCards.count();
     console.log(`Found ${count} completed brief cards.`);
@@ -166,7 +172,6 @@ test.describe('Bulk Generation E2E', () => {
       return;
     }
 
-    // Select up to 2 completed briefs
     const selectCount = Math.min(count, 2);
     for (let i = 0; i < selectCount; i++) {
       const checkbox = briefCards.nth(i).locator('input[type="checkbox"], [role="checkbox"]').first();
@@ -174,7 +179,6 @@ test.describe('Bulk Generation E2E', () => {
       if (checkboxVisible) {
         await checkbox.click();
       } else {
-        // Try clicking the selection area (top-left corner of the card)
         await briefCards.nth(i).locator('[class*="checkbox"], [class*="select"]').first().click().catch(() => {
           console.log(`Could not select brief ${i}`);
         });
@@ -199,17 +203,14 @@ test.describe('Bulk Generation E2E', () => {
     // ============================================
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 });
 
-    // Click the card button by role to avoid strict-mode collisions with heading + description text.
     const generateArticleOption = page.getByRole('button', { name: /Generate Article/i }).first();
     await expect(generateArticleOption).toBeVisible();
     await generateArticleOption.click();
 
-    // Click Start Batch
     const startBtn = page.getByRole('button', { name: /Start Batch/i });
     await expect(startBtn).toBeVisible();
     await startBtn.click();
 
-    // Modal should close
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10_000 });
 
     // ============================================
@@ -222,7 +223,7 @@ test.describe('Bulk Generation E2E', () => {
     console.log(`Article batch started: ${batchStarted}`);
 
     // ============================================
-    // STEP 6: Wait for completion (articles take longer — up to 15 min each)
+    // STEP 6: Wait for completion (articles take longer)
     // ============================================
     console.log('Waiting for article batch jobs to complete (up to 15 min)...');
     await waitForJobsToComplete(900_000);

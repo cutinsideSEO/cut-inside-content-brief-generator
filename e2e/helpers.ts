@@ -32,6 +32,23 @@ export const SUPABASE_ANON_KEY = envVars.VITE_SUPABASE_ANON_KEY;
 const FETCH_RETRY_ATTEMPTS = 5;
 const FETCH_RETRY_DELAY_MS = 2_000;
 
+interface JobWaitScope {
+  briefIds?: string[];
+  createdAfter?: string;
+}
+
+export interface BriefDbRow {
+  id: string;
+  name: string;
+  status: string;
+  current_view: string | null;
+  current_step: number | null;
+  active_job_id: string | null;
+  updated_at: string;
+  created_at?: string;
+  brief_data?: Record<string, unknown> | null;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -190,7 +207,26 @@ export async function waitForText(page: Page, text: string | RegExp, timeoutMs: 
  * Polls the Supabase REST API directly to avoid relying on flaky UI indicators.
  * Returns when no active jobs remain.
  */
-export async function waitForJobsToComplete(timeoutMs: number = 300_000): Promise<void> {
+function buildActiveJobsUrl(select: string, limit: number, scope?: JobWaitScope): string {
+  const params = new URLSearchParams({
+    'status': 'in.(pending,running)',
+    'select': select,
+    'limit': String(limit),
+    'order': 'created_at.desc',
+  });
+
+  if (scope?.briefIds && scope.briefIds.length > 0) {
+    params.set('brief_id', `in.(${scope.briefIds.join(',')})`);
+  }
+
+  if (scope?.createdAfter) {
+    params.set('created_at', `gte.${scope.createdAfter}`);
+  }
+
+  return `${SUPABASE_URL}/rest/v1/generation_jobs?${params.toString()}`;
+}
+
+export async function waitForJobsToComplete(timeoutMs: number = 300_000, scope?: JobWaitScope): Promise<void> {
   const start = Date.now();
   const pollInterval = 10_000; // check every 10s
 
@@ -202,7 +238,7 @@ export async function waitForJobsToComplete(timeoutMs: number = 300_000): Promis
     let checkRes: Response;
     try {
       checkRes = await fetchWithRetry(
-        `${SUPABASE_URL}/rest/v1/generation_jobs?status=in.(pending,running)&select=id&limit=1`,
+        buildActiveJobsUrl('id', 1, scope),
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -237,7 +273,7 @@ export async function waitForJobsToComplete(timeoutMs: number = 300_000): Promis
     let res: Response;
     try {
       res = await fetchWithRetry(
-        `${SUPABASE_URL}/rest/v1/generation_jobs?status=in.(pending,running)&select=id,status,job_type,progress&limit=5`,
+        buildActiveJobsUrl('id,brief_id,status,job_type,progress', 10, scope),
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -287,7 +323,7 @@ export async function waitForJobsToComplete(timeoutMs: number = 300_000): Promis
 
   // Timeout: force-cancel remaining jobs
   console.log('Job wait timed out. Force-cancelling remaining jobs...');
-  await cancelStaleJobs();
+  await cancelStaleJobs(scope);
 }
 
 /**
@@ -403,7 +439,7 @@ export async function setBriefDashboardView(briefId: string): Promise<void> {
  */
 export async function fetchBriefData(briefId: string): Promise<any> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/briefs?id=eq.${briefId}&select=id,name,status,brief_data,active_job_id`,
+    `${SUPABASE_URL}/rest/v1/briefs?id=eq.${briefId}&select=id,name,status,current_view,current_step,brief_data,active_job_id,updated_at,created_at`,
     {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
@@ -414,6 +450,46 @@ export async function fetchBriefData(briefId: string): Promise<any> {
   if (!res.ok) throw new Error(`Failed to fetch brief: ${res.status}`);
   const briefs = await res.json();
   return briefs?.[0] || null;
+}
+
+/**
+ * Fetch the most recent brief rows for the provided exact names.
+ * Returns at most one row per requested name, preferring the most recently created match.
+ */
+export async function findRecentBriefsByNames(names: string[]): Promise<BriefDbRow[]> {
+  if (names.length === 0) return [];
+
+  const res = await fetchWithRetry(
+    `${SUPABASE_URL}/rest/v1/briefs?select=id,name,status,current_view,current_step,active_job_id,updated_at,created_at,brief_data&order=created_at.desc&limit=60`,
+    {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    },
+    { label: 'findRecentBriefsByNames' }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch recent briefs: ${res.status}`);
+  }
+
+  const rows = await res.json();
+  if (!Array.isArray(rows)) return [];
+
+  const requestedNames = new Set(names);
+  const latestByName = new Map<string, BriefDbRow>();
+
+  for (const row of rows as BriefDbRow[]) {
+    if (!requestedNames.has(row.name) || latestByName.has(row.name)) {
+      continue;
+    }
+    latestByName.set(row.name, row);
+  }
+
+  return names
+    .map((name) => latestByName.get(name))
+    .filter((row): row is BriefDbRow => Boolean(row));
 }
 
 /**
@@ -477,12 +553,12 @@ export async function callCreateGenerationJob(
  * leaving the competitors job stuck in 'running' status. This blocks creating new jobs (409).
  * Returns the number of jobs cancelled.
  */
-export async function cancelStaleJobs(): Promise<number> {
+export async function cancelStaleJobs(scope?: JobWaitScope): Promise<number> {
   // Find all active jobs
   let findRes: Response;
   try {
     findRes = await fetchWithRetry(
-      `${SUPABASE_URL}/rest/v1/generation_jobs?status=in.(pending,running)&order=created_at.desc&limit=10&select=id,brief_id,status,job_type`,
+      buildActiveJobsUrl('id,brief_id,status,job_type', 10, scope),
       {
         headers: {
           'apikey': SUPABASE_ANON_KEY,

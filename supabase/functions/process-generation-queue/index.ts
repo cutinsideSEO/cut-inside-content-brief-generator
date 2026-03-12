@@ -67,6 +67,74 @@ const WORKFLOW_STATUSES = [
   'published',
 ];
 
+const STALE_IN_PROGRESS_VIEWS = new Set([
+  undefined,
+  null,
+  'initial_input',
+  'context_input',
+  'visualization',
+  'brief_upload',
+]);
+
+function hasGeneratedBriefData(briefData: Partial<ContentBrief>): boolean {
+  return Boolean(
+    briefData.page_goal ||
+    briefData.target_audience ||
+    briefData.keyword_strategy ||
+    briefData.competitor_insights ||
+    briefData.content_gap_analysis ||
+    briefData.article_structure ||
+    briefData.faqs ||
+    briefData.on_page_seo
+  );
+}
+
+function hasTerminalBriefData(briefData: Partial<ContentBrief>): boolean {
+  return Boolean(
+    briefData.page_goal &&
+    briefData.target_audience &&
+    briefData.keyword_strategy &&
+    briefData.competitor_insights &&
+    briefData.content_gap_analysis &&
+    briefData.article_structure &&
+    briefData.faqs &&
+    briefData.on_page_seo
+  );
+}
+
+function buildTerminalBriefUpdate(currentStatus: string): Record<string, unknown> {
+  const update: Record<string, unknown> = {
+    current_step: 7,
+    current_view: 'dashboard',
+    updated_at: new Date().toISOString(),
+  };
+
+  if (!WORKFLOW_STATUSES.includes(currentStatus)) {
+    update.status = 'complete';
+  }
+
+  return update;
+}
+
+function buildInProgressBriefUpdate(
+  currentStatus: string,
+  currentView: string | null | undefined
+): Record<string, unknown> {
+  const update: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (STALE_IN_PROGRESS_VIEWS.has(currentView)) {
+    update.current_view = 'briefing';
+  }
+
+  if (!WORKFLOW_STATUSES.includes(currentStatus)) {
+    update.status = 'in_progress';
+  }
+
+  return update;
+}
+
 /** Which downstream steps become stale when a given step is regenerated */
 const STEP_DEPENDENCIES: Record<number, number[]> = {
   1: [2, 3, 4, 5, 6, 7],
@@ -486,10 +554,10 @@ async function readJobStatus(
 async function readCurrentBriefData(
   supabase: SupabaseClient,
   briefId: string
-): Promise<{ briefData: Partial<ContentBrief>; currentStatus: string; projectId: string | null }> {
+): Promise<{ briefData: Partial<ContentBrief>; currentStatus: string; currentView: string | null; projectId: string | null }> {
   const { data: brief, error } = await supabase
     .from('briefs')
-    .select('brief_data, status, project_id')
+    .select('brief_data, status, current_view, project_id')
     .eq('id', briefId)
     .single();
 
@@ -500,6 +568,7 @@ async function readCurrentBriefData(
   return {
     briefData: (brief.brief_data as Partial<ContentBrief>) || {},
     currentStatus: (brief.status as string) || 'draft',
+    currentView: (brief.current_view as string | null) || null,
     projectId: (brief.project_id as string | null) || null,
   };
 }
@@ -516,7 +585,7 @@ async function mergeAndSaveBriefData(
   additionalUpdates?: Record<string, unknown>
 ): Promise<void> {
   // Fresh read to avoid overwriting concurrent edits
-  const { briefData: currentData, currentStatus } = await readCurrentBriefData(supabase, briefId);
+  const { briefData: currentData, currentStatus, currentView } = await readCurrentBriefData(supabase, briefId);
 
   // Merge the step result into existing brief data
   const mergedData = { ...currentData, ...stepResult };
@@ -530,6 +599,13 @@ async function mergeAndSaveBriefData(
   // Only update status if it's not a manually-set workflow status
   if (newStatus && !WORKFLOW_STATUSES.includes(currentStatus)) {
     updatePayload.status = newStatus;
+  }
+
+  const requestedStep = Number(additionalUpdates?.current_step ?? 0);
+  if (requestedStep >= 7 && hasTerminalBriefData(mergedData)) {
+    Object.assign(updatePayload, buildTerminalBriefUpdate(currentStatus));
+  } else if ((requestedStep > 1 || hasGeneratedBriefData(mergedData))) {
+    Object.assign(updatePayload, buildInProgressBriefUpdate(currentStatus, currentView));
   }
 
   await supabase
@@ -913,14 +989,7 @@ async function processFullBrief(supabase: SupabaseClient, job: JobRow): Promise<
     // Step 7 — final step. Mark brief as complete (with workflow guard)
     const { currentStatus } = await readCurrentBriefData(supabase, briefId);
 
-    const briefUpdate: Record<string, unknown> = {
-      current_step: 7,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (!WORKFLOW_STATUSES.includes(currentStatus)) {
-      briefUpdate.status = 'complete';
-    }
+    const briefUpdate = buildTerminalBriefUpdate(currentStatus);
 
     await supabase
       .from('briefs')

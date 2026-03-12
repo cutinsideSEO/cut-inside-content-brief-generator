@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import type { ContentBrief } from '../types';
+import type { AppView } from '../types/database';
 
 /**
  * Subscribes to changes on a specific brief row.
@@ -15,6 +16,7 @@ export function useBriefRealtimeSync(
     onStaleStepsUpdated?: (staleSteps: number[]) => void;
     onStatusUpdated?: (status: string) => void;
     onStepUpdated?: (step: number) => void;
+    onViewUpdated?: (view: AppView) => void;
   }
 ) {
   const callbacksRef = useRef(callbacks);
@@ -47,6 +49,9 @@ export function useBriefRealtimeSync(
         }
         if (cb.onStepUpdated && newRecord.current_step !== oldRecord.current_step) {
           cb.onStepUpdated(newRecord.current_step as number);
+        }
+        if (cb.onViewUpdated && newRecord.current_view !== oldRecord.current_view) {
+          cb.onViewUpdated(newRecord.current_view as AppView);
         }
       })
       .subscribe();

@@ -19,6 +19,98 @@ export interface GetBriefsForClientOptions {
   projectId?: string | 'unassigned';
 }
 
+const STALE_TERMINAL_VIEWS = new Set<AppView | undefined>([
+  undefined,
+  'initial_input',
+  'context_input',
+  'visualization',
+  'briefing',
+  'brief_upload',
+]);
+
+const STALE_IN_PROGRESS_VIEWS = new Set<AppView | undefined>([
+  undefined,
+  'initial_input',
+  'context_input',
+  'visualization',
+  'brief_upload',
+]);
+
+export interface NormalizedBriefPersistenceState {
+  currentView: AppView;
+  currentStep: number;
+  status: BriefStatus;
+  isTerminal: boolean;
+}
+
+export function hasCompleteBriefData(
+  briefData: Partial<ContentBrief> | undefined
+): boolean {
+  return Boolean(
+    briefData?.page_goal &&
+    briefData?.target_audience &&
+    briefData?.keyword_strategy &&
+    briefData?.competitor_insights &&
+    briefData?.content_gap_analysis &&
+    briefData?.article_structure &&
+    briefData?.faqs &&
+    briefData?.on_page_seo
+  );
+}
+
+export function hasGeneratedBriefData(
+  briefData: Partial<ContentBrief> | undefined
+): boolean {
+  return Boolean(
+    briefData?.page_goal ||
+    briefData?.target_audience ||
+    briefData?.keyword_strategy ||
+    briefData?.competitor_insights ||
+    briefData?.content_gap_analysis ||
+    briefData?.article_structure ||
+    briefData?.faqs ||
+    briefData?.on_page_seo
+  );
+}
+
+function hasStartedBriefGeneration(
+  currentStep: number | undefined,
+  briefData: Partial<ContentBrief> | undefined
+): boolean {
+  return (currentStep ?? 0) > 1 || hasGeneratedBriefData(briefData);
+}
+
+export function normalizeBriefPersistenceState({
+  currentView,
+  currentStep,
+  briefData,
+  currentStatus,
+}: {
+  currentView?: AppView;
+  currentStep?: number;
+  briefData?: Partial<ContentBrief>;
+  currentStatus?: BriefStatus;
+}): NormalizedBriefPersistenceState {
+  const hasStartedGeneration = hasStartedBriefGeneration(currentStep, briefData);
+  const nextStatus = currentStatus && isWorkflowStatus(currentStatus)
+    ? currentStatus
+    : computeBriefStatus(currentView, briefData, currentStep);
+  const isTerminal = nextStatus === 'complete' || Boolean(currentStatus && isWorkflowStatus(currentStatus));
+  const normalizedStep = isTerminal ? Math.max(currentStep ?? 0, 7) : (currentStep ?? 0);
+  const normalizedView = isTerminal
+    ? (STALE_TERMINAL_VIEWS.has(currentView) ? 'dashboard' : (currentView ?? 'dashboard'))
+    : (hasStartedGeneration && STALE_IN_PROGRESS_VIEWS.has(currentView)
+        ? 'briefing'
+        : (currentView ?? 'initial_input'));
+
+  return {
+    currentView: normalizedView,
+    currentStep: normalizedStep,
+    status: nextStatus,
+    isTerminal,
+  };
+}
+
 /**
  * Get all briefs for a specific client
  */
@@ -260,30 +352,22 @@ export async function saveBriefData(
  * Compute brief status from state
  * Status is derived from the current view and brief data completeness
  */
-function computeBriefStatus(
+export function computeBriefStatus(
   currentView: AppView | undefined,
-  briefData: Partial<ContentBrief> | undefined
+  briefData: Partial<ContentBrief> | undefined,
+  currentStep?: number
 ): BriefStatus {
-  // If at initial input, it's a draft
-  if (!currentView || currentView === 'initial_input') {
-    return 'draft';
+  if (hasCompleteBriefData(briefData)) {
+    return 'complete';
   }
 
-  // If brief data has all 7 steps completed, mark as complete
-  // Steps: 1=page_goal+target_audience, 2=keyword_strategy, 3=competitor_insights,
-  //        4=content_gap_analysis, 5=article_structure, 6=faqs, 7=on_page_seo
-  const hasAllSteps = briefData &&
-    briefData.page_goal &&
-    briefData.target_audience &&
-    briefData.keyword_strategy &&
-    briefData.competitor_insights &&
-    briefData.content_gap_analysis &&
-    briefData.article_structure &&
-    briefData.faqs &&
-    briefData.on_page_seo;
+  if (hasStartedBriefGeneration(currentStep, briefData)) {
+    return 'in_progress';
+  }
 
-  if (hasAllSteps && (currentView === 'dashboard' || currentView === 'content_generation')) {
-    return 'complete';
+  // If at initial input with no generated progress, it's a draft
+  if (!currentView || currentView === 'initial_input') {
+    return 'draft';
   }
 
   // Otherwise, it's in progress
@@ -316,20 +400,26 @@ export async function saveBriefState(
   },
   currentDbStatus?: BriefStatus
 ): Promise<ApiResponse<Brief>> {
+  const normalizedState = normalizeBriefPersistenceState({
+    currentView: state.current_view,
+    currentStep: state.current_step,
+    briefData: state.brief_data,
+    currentStatus: currentDbStatus,
+  });
+  const updates: BriefUpdate = {
+    ...state,
+    current_view: normalizedState.currentView,
+    current_step: normalizedState.currentStep,
+  };
+
   // If the brief is in a workflow status, preserve it
   if (currentDbStatus && isWorkflowStatus(currentDbStatus)) {
-    return updateBrief(briefId, {
-      ...state,
-      // Don't overwrite the workflow status
-    });
+    return updateBrief(briefId, updates);
   }
 
-  // Compute the status from state to ensure consistency
-  const computedStatus = computeBriefStatus(state.current_view, state.brief_data);
-
   return updateBrief(briefId, {
-    ...state,
-    status: computedStatus,
+    ...updates,
+    status: normalizedState.status,
   });
 }
 

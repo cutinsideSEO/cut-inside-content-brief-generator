@@ -371,6 +371,12 @@ const App: React.FC<AppProps> = ({
       // Update briefing step to show the latest completed step
       if (newStep > 0) setBriefingStep(newStep);
     }, []),
+    onViewUpdated: useCallback((newView: AppView) => {
+      if (newView !== 'dashboard') return;
+      setCurrentView((prev) => (
+        prev === 'content_generation' || prev === 'article_view' ? prev : 'dashboard'
+      ));
+    }, []),
   });
 
   // Derive effective loading state: either local or backend

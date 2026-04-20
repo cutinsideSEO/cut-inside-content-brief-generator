@@ -1412,6 +1412,8 @@ const App: React.FC<AppProps> = ({
                   clientName={clientName || undefined}
                   generationProgress={backendProgress || undefined}
                   isBackendGenerating={isBackendGenerating && activeJob?.job_type === 'competitors'}
+                  analysisComplete={activeJob?.job_type === 'competitors' && activeJob?.status === 'completed'}
+                  competitorCount={competitorData.length}
                  />;
       case 'visualization':
         return <CompetitionVizScreen 

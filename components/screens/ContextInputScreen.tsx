@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import Spinner from '../Spinner';
 import Button from '../Button';
-import { UploadCloudIcon, XIcon, FileTextIcon, MiniSpinner, CheckIcon, AlertTriangleIcon, LinkIcon } from '../Icon';
+import { UploadCloudIcon, XIcon, FileTextIcon, MiniSpinner, CheckIcon, AlertTriangleIcon, LinkIcon, ChevronRightIcon } from '../Icon';
 import { THEMED_LOADING_MESSAGES } from '../../constants';
 import { Card, Textarea, Input, Badge, Progress } from '../ui';
 
@@ -37,6 +37,10 @@ interface ContextInputScreenProps {
   };
   /** Whether a backend generation is active */
   isBackendGenerating?: boolean;
+  /** Whether the competitor analysis job has completed successfully */
+  analysisComplete?: boolean;
+  /** Number of competitors saved (shown in the completion card) */
+  competitorCount?: number;
 }
 
 const ThemedLoader: React.FC<{ header: string }> = ({ header }) => {
@@ -87,6 +91,8 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
   clientName,
   generationProgress,
   isBackendGenerating,
+  analysisComplete,
+  competitorCount,
 }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -169,6 +175,31 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                     {generationProgress.phase === 'onpage' &&
                       `Pages: ${generationProgress.completed_urls || 0}/${generationProgress.total_urls || 0}${generationProgress.current_domain ? ` — ${generationProgress.current_domain}` : ''}`}
                   </p>
+                </div>
+              </Card>
+            )}
+
+            {/* Sticky completion state — shown once competitor job finishes */}
+            {!isBackendGenerating && analysisComplete && (competitorCount ?? 0) > 0 && (
+              <Card variant="default" padding="lg" className="mb-6 border-emerald-200 bg-emerald-50/50">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                      <CheckIcon className="h-5 w-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-heading font-semibold text-foreground">
+                        Competitor analysis complete
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {competitorCount} competitor{competitorCount === 1 ? '' : 's'} analyzed. Add optional context below, or jump to the results.
+                      </p>
+                    </div>
+                  </div>
+                  <Button onClick={onContinue} variant="primary" size="sm">
+                    View Competitors
+                    <ChevronRightIcon className="h-4 w-4 ml-1" />
+                  </Button>
                 </div>
               </Card>
             )}

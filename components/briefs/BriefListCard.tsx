@@ -31,6 +31,8 @@ interface BriefListCardProps {
   onArchive: (briefId: string) => void;
   projectName?: string | null;
   isSelected?: boolean;
+  /** True when ANY card on the page is selected — keeps checkboxes visible while in selection mode. */
+  hasActiveSelection?: boolean;
   onToggleSelect?: (briefId: string) => void;
   // Background generation
   isGenerating?: boolean;
@@ -84,6 +86,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   onArchive,
   projectName,
   isSelected = false,
+  hasActiveSelection = false,
   onToggleSelect,
   isGenerating = false,
   generationStatus = 'idle',
@@ -161,7 +164,14 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
         header={(
           <div className="flex items-start gap-3">
             {onToggleSelect && (
-              <div className="pt-0.5 flex-shrink-0" onClick={stopClick}>
+              <div
+                className={`pt-0.5 flex-shrink-0 transition-opacity ${
+                  isSelected || hasActiveSelection
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+                }`}
+                onClick={stopClick}
+              >
                 <Checkbox
                   checked={isSelected}
                   onCheckedChange={() => onToggleSelect(brief.id)}
@@ -172,7 +182,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
             )}
 
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-heading font-semibold text-foreground leading-snug line-clamp-2">
+              <h3 className="text-base font-heading font-semibold text-foreground leading-snug line-clamp-2">
                 {brief.name}
               </h3>
               {projectName && (

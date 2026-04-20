@@ -74,9 +74,14 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
             </div>
 
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-heading font-semibold text-foreground leading-snug line-clamp-2">
+              <h3 className="text-base font-heading font-semibold text-foreground leading-snug line-clamp-2">
                 {article.title}
               </h3>
+              {article.brief_name && (
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  From: {article.brief_name}
+                </p>
+              )}
               {projectName && (
                 <div className="mt-1">
                   <Badge variant="default" size="sm">{projectName}</Badge>

@@ -639,6 +639,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         onArchive={handleArchiveClick}
         projectName={brief.project_id ? projectNamesById[brief.project_id] || null : null}
         isSelected={selectedBriefs.has(brief.id)}
+        hasActiveSelection={selectedBriefs.size > 0}
         onToggleSelect={toggleBriefSelection}
         isGenerating={isGenerating}
         isGeneratingArticle={startingArticleBriefIds.has(brief.id)}

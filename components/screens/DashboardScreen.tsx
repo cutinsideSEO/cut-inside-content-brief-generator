@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import type { ContentBrief, CompetitorPage, BriefValidation, EEATSignals, OutlineItem } from '../../types';
 import type { SaveStatus } from '../../types/appState';
-import type { BriefStatus } from '../../types/database';
+import type { BriefStatus, GenerationJobProgress, GenerationJobType } from '../../types/database';
 import { isWorkflowStatus } from '../../types/database';
 import WorkflowStatusSelect from '../briefs/WorkflowStatusSelect';
 import PublishedUrlModal from '../briefs/PublishedUrlModal';
@@ -9,8 +9,9 @@ import { exportBriefToMarkdown } from '../../services/markdownService';
 import { validateBrief, generateEEATSignals } from '../../services/geminiService';
 import Button from '../Button';
 import Spinner from '../Spinner';
-import { Badge, Callout, Textarea, Modal, Separator, Table, TableHeader, TableBody, TableHead, TableRow, TableCell, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../ui';
+import { Badge, Callout, Textarea, Modal, Separator, Table, TableHeader, TableBody, TableHead, TableRow, TableCell, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, Progress } from '../ui';
 import SaveStatusIndicator from '../SaveStatusIndicator';
+import { getGenerationProgressModel } from '../../utils/generationActivity';
 
 // Import stage components for inline rendering
 import Stage1Goal from '../stages/Stage1Goal';

@@ -1197,6 +1197,13 @@ const App: React.FC<AppProps> = ({
                   briefId={briefId || undefined}
                   briefStatus={briefStatus}
                   onWorkflowStatusChange={handleWorkflowStatusChange}
+                  // Backend generation state — drives the generation banner
+                  isBackendGenerating={isBackendGenerating}
+                  backendJobType={activeJob?.job_type || null}
+                  backendProgress={backendProgress}
+                  backendStepName={backendStepName}
+                  backendCurrentStep={backendCurrentStep}
+                  onCancelBackendGeneration={handleCancelGeneration}
                 />;
       case 'article_view':
           if (!generatedArticle) return null;

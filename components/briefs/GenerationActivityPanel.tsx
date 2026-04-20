@@ -100,6 +100,16 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
     }
   }, [generatingBriefs]);
 
+  // Prune monotonic batch clamps for batches that are no longer visible.
+  useEffect(() => {
+    const visibleBatchIds = new Set(batches.map((b) => b.id));
+    for (const key of Array.from(maxBatchPercentRef.current.keys())) {
+      if (!visibleBatchIds.has(key)) {
+        maxBatchPercentRef.current.delete(key);
+      }
+    }
+  }, [batches]);
+
   useEffect(() => {
     const nowIso = new Date().toISOString();
 

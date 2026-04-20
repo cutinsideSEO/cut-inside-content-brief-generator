@@ -1,5 +1,5 @@
 // Brief List Card - Card component for displaying briefs in a list
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { BriefWithClient, GenerationJobProgress } from '../../types/database';
 import type { GenerationStatus } from '../../types/generationActivity';
 import { isWorkflowStatus } from '../../types/database';
@@ -114,11 +114,30 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   const totalKeywords = brief.keywords?.length || 0;
   const hiddenKeywordCount = Math.max(0, totalKeywords - visibleKeywords.length);
 
-  const generationModel = getGenerationProgressModel({
+  const rawGenerationModel = getGenerationProgressModel({
     status: generationStatus,
     generationStep,
     jobProgress: generationProgress,
   });
+
+  // Clamp the card's progress bar monotonically across Realtime events so the
+  // bar never regresses during step or phase transitions.
+  const maxPercentageRef = useRef<number>(0);
+  const prevStatusRef = useRef<typeof generationStatus>(generationStatus);
+  useEffect(() => {
+    // Reset the clamp whenever this card returns to idle or changes generation phase.
+    if (!isGenerating || prevStatusRef.current !== generationStatus) {
+      maxPercentageRef.current = 0;
+    }
+    prevStatusRef.current = generationStatus;
+  }, [isGenerating, generationStatus]);
+  const clampedPercentage = isGenerating
+    ? Math.max(maxPercentageRef.current, rawGenerationModel.percentage)
+    : rawGenerationModel.percentage;
+  if (isGenerating && clampedPercentage > maxPercentageRef.current) {
+    maxPercentageRef.current = clampedPercentage;
+  }
+  const generationModel = { ...rawGenerationModel, percentage: clampedPercentage };
 
   const showWorkflowSelect = !isGenerating && onWorkflowStatusChange && (brief.status === 'complete' || isWorkflowStatus(brief.status));
   const isWorkflow = isWorkflowStatus(brief.status);

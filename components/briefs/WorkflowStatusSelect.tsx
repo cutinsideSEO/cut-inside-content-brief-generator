@@ -22,14 +22,14 @@ interface WorkflowStatusSelectProps {
   disabled?: boolean;
 }
 
-interface TransitionOption {
+export interface TransitionOption {
   status: string;
   label: string;
   isRevert: boolean;
 }
 
 // Brief workflow transitions: from -> available next statuses
-const BRIEF_TRANSITIONS: Record<string, TransitionOption[]> = {
+export const BRIEF_TRANSITIONS: Record<string, TransitionOption[]> = {
   complete: [
     { status: 'sent_to_client', label: 'Sent to Client', isRevert: false },
   ],
@@ -56,7 +56,7 @@ const BRIEF_TRANSITIONS: Record<string, TransitionOption[]> = {
 };
 
 // Article workflow transitions: from -> available next statuses
-const ARTICLE_TRANSITIONS: Record<string, TransitionOption[]> = {
+export const ARTICLE_TRANSITIONS: Record<string, TransitionOption[]> = {
   draft: [
     { status: 'sent_to_client', label: 'Sent to Client', isRevert: false },
   ],

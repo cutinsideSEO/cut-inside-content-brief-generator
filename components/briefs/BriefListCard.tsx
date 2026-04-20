@@ -1,14 +1,15 @@
 // Brief List Card - Card component for displaying briefs in a list
 import React, { useEffect, useRef, useState } from 'react';
-import type { BriefWithClient, GenerationJobProgress } from '../../types/database';
+import type { BriefStatus, BriefWithClient, GenerationJobProgress } from '../../types/database';
 import type { GenerationStatus } from '../../types/generationActivity';
 import { isWorkflowStatus } from '../../types/database';
 import { getGenerationProgressModel, getGenerationStatusBadgeLabel } from '../../utils/generationActivity';
 import { formatRelativeTime } from '../../utils/relativeTime';
-import BriefStatusBadge from './BriefStatusBadge';
-import WorkflowStatusSelect from './WorkflowStatusSelect';
+import { BRIEF_TRANSITIONS } from './WorkflowStatusSelect';
 import PublishedUrlModal from './PublishedUrlModal';
 import Button from '../Button';
+import { cn } from '../../lib/utils';
+import { FileCodeIcon } from '../Icon';
 import {
   Badge,
   Progress,
@@ -76,6 +77,30 @@ const LinkIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const STATUS_ICON_COLOR: Record<BriefStatus, string> = {
+  draft: 'text-gray-400',
+  in_progress: 'text-amber-500',
+  complete: 'text-emerald-500',
+  sent_to_client: 'text-teal-500',
+  changes_requested: 'text-amber-500',
+  in_writing: 'text-blue-500',
+  approved: 'text-emerald-500',
+  published: 'text-emerald-600',
+  archived: 'text-gray-300',
+};
+
+const STATUS_LABEL: Record<BriefStatus, string> = {
+  draft: 'Draft',
+  in_progress: 'In Progress',
+  complete: 'Complete',
+  sent_to_client: 'Sent to Client',
+  changes_requested: 'Changes Requested',
+  in_writing: 'In Writing',
+  approved: 'Approved',
+  published: 'Published',
+  archived: 'Archived',
+};
+
 const BriefListCard: React.FC<BriefListCardProps> = ({
   brief,
   onContinue,
@@ -111,9 +136,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
 
   const MAX_VISIBLE_KEYWORDS = 2;
   const visibleKeywords = primaryKeywords.slice(0, MAX_VISIBLE_KEYWORDS);
-  // Only count keywords that were actually hidden (post-dedup). If the only
-  // keyword equals the title we end up with zero candidates, so "+1" never
-  // appears on its own below the title.
   const hiddenKeywordCount = Math.max(0, primaryKeywords.length - visibleKeywords.length);
 
   const rawGenerationModel = getGenerationProgressModel({
@@ -127,7 +149,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   const maxPercentageRef = useRef<number>(0);
   const prevStatusRef = useRef<typeof generationStatus>(generationStatus);
   useEffect(() => {
-    // Reset the clamp whenever this card returns to idle or changes generation phase.
     if (!isGenerating || prevStatusRef.current !== generationStatus) {
       maxPercentageRef.current = 0;
     }
@@ -141,9 +162,26 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   }
   const generationModel = { ...rawGenerationModel, percentage: clampedPercentage };
 
-  const showWorkflowSelect = !isGenerating && onWorkflowStatusChange && (brief.status === 'complete' || isWorkflowStatus(brief.status));
   const isWorkflow = isWorkflowStatus(brief.status);
   const canGenerateArticle = !isGenerating && !!onGenerateArticle && (brief.status === 'complete' || isWorkflow);
+
+  // Status icon: color communicates state; amber during generation.
+  const iconColor = isGenerating ? 'text-amber-500' : STATUS_ICON_COLOR[brief.status];
+  const statusLabel = isGenerating
+    ? getGenerationStatusBadgeLabel(generationStatus)
+    : STATUS_LABEL[brief.status];
+  const availableTransitions = BRIEF_TRANSITIONS[brief.status] || [];
+  const forwardTransitions = availableTransitions.filter((t) => !t.isRevert);
+  const revertTransitions = availableTransitions.filter((t) => t.isRevert);
+  const showStatusMenu = !isGenerating && onWorkflowStatusChange && availableTransitions.length > 0;
+
+  const handleTransitionSelect = (statusValue: string) => {
+    if (statusValue === 'published') {
+      setShowPublishModal(true);
+    } else {
+      onWorkflowStatusChange?.(brief.id, statusValue);
+    }
+  };
 
   // Primary action — clicking the card body goes here.
   const handleCardClick = () => {
@@ -161,6 +199,12 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   };
 
   const stopClick = (event: React.MouseEvent) => event.stopPropagation();
+
+  const statusIconNode = (
+    <FileCodeIcon
+      className={cn('h-4 w-4 transition-colors', iconColor, isGenerating && 'animate-pulse')}
+    />
+  );
 
   return (
     <>
@@ -189,6 +233,52 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
               </div>
             )}
 
+            {/* Status icon — color communicates status; click to change workflow status (if available) */}
+            <div className="pt-0.5 flex-shrink-0" onClick={stopClick}>
+              {showStatusMenu ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      title={statusLabel}
+                      aria-label={`Status: ${statusLabel}. Change status.`}
+                      className="p-0.5 rounded hover:bg-secondary transition-colors"
+                      onClick={stopClick}
+                    >
+                      {statusIconNode}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[180px]">
+                    {forwardTransitions.map((option) => (
+                      <DropdownMenuItem
+                        key={option.status}
+                        onSelect={() => handleTransitionSelect(option.status)}
+                        className="cursor-pointer"
+                      >
+                        {option.label}
+                      </DropdownMenuItem>
+                    ))}
+                    {forwardTransitions.length > 0 && revertTransitions.length > 0 && (
+                      <DropdownMenuSeparator />
+                    )}
+                    {revertTransitions.map((option) => (
+                      <DropdownMenuItem
+                        key={option.status}
+                        onSelect={() => handleTransitionSelect(option.status)}
+                        className="cursor-pointer text-muted-foreground"
+                      >
+                        {option.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <span title={statusLabel} aria-label={`Status: ${statusLabel}`} className="p-0.5">
+                  {statusIconNode}
+                </span>
+              )}
+            </div>
+
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-heading font-semibold text-foreground leading-snug line-clamp-2">
                 {brief.name}
@@ -201,28 +291,13 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 flex-shrink-0" onClick={stopClick}>
-              {isGenerating ? (
-                <Badge variant="warning" size="sm" pulse>
-                  {getGenerationStatusBadgeLabel(generationStatus)}
-                </Badge>
-              ) : showWorkflowSelect ? (
-                <WorkflowStatusSelect
-                  entityType="brief"
-                  entityId={brief.id}
-                  currentStatus={brief.status}
-                  publishedUrl={brief.published_url}
-                  onStatusChange={(newStatus, metadata) => onWorkflowStatusChange!(brief.id, newStatus, metadata)}
-                  onPublishClick={() => setShowPublishModal(true)}
-                />
-              ) : (
-                <BriefStatusBadge status={brief.status} />
-              )}
               {!isGenerating && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
                       onClick={stopClick}
                       className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                      aria-label="More actions"
                     >
                       <MoreHorizontalIcon className="h-4 w-4" />
                     </button>
@@ -259,35 +334,16 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
             onClick={stopClick}
           >
             <div className="flex items-center gap-2 flex-wrap">
-              {isGenerating ? (
-                <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
-                  View Progress
+              {canGenerateArticle && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => onGenerateArticle(brief.id)}
+                  loading={isGeneratingArticle}
+                  disabled={isGeneratingArticle}
+                >
+                  Generate Article
                 </Button>
-              ) : null}
-              {!isGenerating && (
-                <>
-                  {brief.status !== 'complete' && brief.status !== 'archived' && !isWorkflow && (
-                    <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
-                      Continue
-                    </Button>
-                  )}
-                  {(brief.status === 'complete' || isWorkflow) && (
-                    <Button variant="primary" size="sm" onClick={() => onEdit(brief.id)}>
-                      View / Edit
-                    </Button>
-                  )}
-                  {canGenerateArticle && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => onGenerateArticle(brief.id)}
-                      loading={isGeneratingArticle}
-                      disabled={isGeneratingArticle}
-                    >
-                      Generate Article
-                    </Button>
-                  )}
-                </>
               )}
             </div>
             <span className="text-xs text-muted-foreground whitespace-nowrap">

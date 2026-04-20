@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
-import type { ArticleWithBrief, ArticleStatus } from '../../types/database';
-import { Badge, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, WorkItemCard } from '../ui';
+import type { ArticleStatus, ArticleWithBrief } from '../../types/database';
+import {
+  Badge,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  WorkItemCard,
+} from '../ui';
 import { FileTextIcon } from '../Icon';
 import { formatRelativeTime } from '../../utils/relativeTime';
-import ArticleStatusBadge from './ArticleStatusBadge';
-import WorkflowStatusSelect from '../briefs/WorkflowStatusSelect';
+import { cn } from '../../lib/utils';
+import { ARTICLE_TRANSITIONS } from '../briefs/WorkflowStatusSelect';
 import PublishedUrlModal from '../briefs/PublishedUrlModal';
 
 const MoreHorizontalIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -41,12 +49,51 @@ interface ArticleListCardProps {
   projectName?: string | null;
 }
 
-const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDelete, onStatusChange, onAssignProject, projectName }) => {
+const STATUS_ICON_COLOR: Record<ArticleStatus, string> = {
+  draft: 'text-gray-400',
+  sent_to_client: 'text-teal-500',
+  approved: 'text-emerald-500',
+  published: 'text-emerald-600',
+};
+
+const STATUS_LABEL: Record<ArticleStatus, string> = {
+  draft: 'Draft',
+  sent_to_client: 'Sent to Client',
+  approved: 'Approved',
+  published: 'Published',
+};
+
+const ArticleListCard: React.FC<ArticleListCardProps> = ({
+  article,
+  onView,
+  onDelete,
+  onStatusChange,
+  onAssignProject,
+  projectName,
+}) => {
   const wordCount = article.content.trim().split(/\s+/).filter(Boolean).length;
   const [showPublishModal, setShowPublishModal] = useState(false);
 
-  const articleStatus = article.status || 'draft';
+  const articleStatus = (article.status || 'draft') as ArticleStatus;
+  const iconColor = STATUS_ICON_COLOR[articleStatus];
+  const statusLabel = STATUS_LABEL[articleStatus];
+
+  const availableTransitions = ARTICLE_TRANSITIONS[articleStatus] || [];
+  const forwardTransitions = availableTransitions.filter((t) => !t.isRevert);
+  const revertTransitions = availableTransitions.filter((t) => t.isRevert);
+  const showStatusMenu = Boolean(onStatusChange) && availableTransitions.length > 0;
+
+  const handleTransitionSelect = (statusValue: string) => {
+    if (statusValue === 'published') {
+      setShowPublishModal(true);
+    } else {
+      onStatusChange?.(article.id, statusValue);
+    }
+  };
+
   const stopClick = (event: React.MouseEvent) => event.stopPropagation();
+
+  const statusIconNode = <FileTextIcon className={cn('h-4 w-4 transition-colors', iconColor)} />;
 
   return (
     <>
@@ -55,8 +102,49 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
         onClick={() => onView(article.id)}
         header={(
           <div className="flex items-start gap-3">
-            <div className="pt-0.5 flex-shrink-0">
-              <FileTextIcon className="h-4 w-4 text-teal" />
+            <div className="pt-0.5 flex-shrink-0" onClick={stopClick}>
+              {showStatusMenu ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      title={statusLabel}
+                      aria-label={`Status: ${statusLabel}. Change status.`}
+                      className="p-0.5 rounded hover:bg-secondary transition-colors"
+                      onClick={stopClick}
+                    >
+                      {statusIconNode}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[180px]">
+                    {forwardTransitions.map((option) => (
+                      <DropdownMenuItem
+                        key={option.status}
+                        onSelect={() => handleTransitionSelect(option.status)}
+                        className="cursor-pointer"
+                      >
+                        {option.label}
+                      </DropdownMenuItem>
+                    ))}
+                    {forwardTransitions.length > 0 && revertTransitions.length > 0 && (
+                      <DropdownMenuSeparator />
+                    )}
+                    {revertTransitions.map((option) => (
+                      <DropdownMenuItem
+                        key={option.status}
+                        onSelect={() => handleTransitionSelect(option.status)}
+                        className="cursor-pointer text-muted-foreground"
+                      >
+                        {option.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <span title={statusLabel} aria-label={`Status: ${statusLabel}`} className="p-0.5">
+                  {statusIconNode}
+                </span>
+              )}
             </div>
 
             <div className="flex-1 min-w-0">
@@ -76,23 +164,12 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
             </div>
 
             <div className="flex items-center gap-1.5 flex-shrink-0" onClick={stopClick}>
-              {onStatusChange ? (
-                <WorkflowStatusSelect
-                  entityType="article"
-                  entityId={article.id}
-                  currentStatus={articleStatus}
-                  publishedUrl={article.published_url}
-                  onStatusChange={(newStatus, metadata) => onStatusChange(article.id, newStatus, metadata)}
-                  onPublishClick={() => setShowPublishModal(true)}
-                />
-              ) : (
-                <ArticleStatusBadge status={articleStatus} />
-              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     onClick={stopClick}
                     className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                    aria-label="More actions"
                   >
                     <MoreHorizontalIcon className="h-4 w-4" />
                   </button>

@@ -25,7 +25,6 @@ const STALE_TERMINAL_VIEWS = new Set<AppView | undefined>([
   'context_input',
   'visualization',
   'briefing',
-  'brief_upload',
 ]);
 
 const STALE_IN_PROGRESS_VIEWS = new Set<AppView | undefined>([
@@ -33,7 +32,6 @@ const STALE_IN_PROGRESS_VIEWS = new Set<AppView | undefined>([
   'initial_input',
   'context_input',
   'visualization',
-  'brief_upload',
 ]);
 
 export interface NormalizedBriefPersistenceState {

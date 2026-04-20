@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Button from '../Button';
-import { AlertTriangleIcon, UploadCloudIcon, XIcon, FileCodeIcon, BrainCircuitIcon, ChevronDownIcon, LinkIcon, SettingsIcon } from '../Icon';
+import { UploadCloudIcon, XIcon, FileCodeIcon, ChevronDownIcon, LinkIcon, SettingsIcon } from '../Icon';
 import ModelSelector from '../ModelSelector';
 import LengthSettings from '../LengthSettings';
 import KeywordTableInput from '../KeywordTableInput';
 import { Card, Input, Alert, Tabs, Select, Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui';
-import type { ModelSettings, LengthConstraints, ExtractedTemplate } from '../../types';
+import type { ModelSettings, LengthConstraints } from '../../types';
 
 interface KeywordRow {
   id: string;
@@ -25,7 +25,6 @@ interface InitialInputScreenProps {
   ) => void;
   isLoading: boolean;
   error: string | null;
-  onStartUpload: () => void;
 }
 
 const countries = [
@@ -81,7 +80,7 @@ const StepDots = ({ current, total }: { current: number; total: number }) => (
   </div>
 );
 
-const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis, isLoading, error, onStartUpload }) => {
+const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis, isLoading, error }) => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [keywordColumn, setKeywordColumn] = useState('');
@@ -90,7 +89,6 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   const [serpLanguage, setSerpLanguage] = useState('English');
   const [outputLanguage, setOutputLanguage] = useState('English');
   const [localError, setLocalError] = useState('');
-  const [flow, setFlow] = useState<'create' | null>(null);
   const [inputMethod, setInputMethod] = useState<'csv' | 'manual'>('csv');
   const [manualKeywordRows, setManualKeywordRows] = useState<KeywordRow[]>([
     { id: '1', keyword: '', volume: '' }
@@ -375,18 +373,10 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
         </div>
       )}
 
-      <div className="mt-6 flex items-center gap-4">
-        <button
-          onClick={() => { setLocalError(''); setFlow(null); setSetupStep(1); }}
-          className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          Back
-        </button>
-        <div className="flex-1">
-          <Button onClick={handleNextFromStep1} fullWidth size="lg">
-            Next
-          </Button>
-        </div>
+      <div className="mt-6">
+        <Button onClick={handleNextFromStep1} fullWidth size="lg">
+          Next
+        </Button>
       </div>
     </div>
   );
@@ -548,47 +538,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
 
   return (
     <div className="animate-fade-in">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-heading font-bold text-foreground">Start Your Content Project</h1>
-        <p className="text-lg text-gray-600 mt-2">Choose your starting point.</p>
-      </div>
-
-      {/* Flow Selection */}
-      {!flow && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-          <Card
-            variant="interactive"
-            padding="lg"
-            hover
-            glow="teal"
-            onClick={() => setFlow('create')}
-            className="text-center cursor-pointer"
-          >
-            <div className="w-14 h-14 mx-auto mb-4 rounded-lg bg-teal/10 flex items-center justify-center">
-              <FileCodeIcon className="h-7 w-7 text-teal" />
-            </div>
-            <h2 className="text-lg font-heading font-semibold text-foreground">Create New Brief</h2>
-            <p className="text-sm text-muted-foreground mt-2">Start with keywords to generate a data-driven brief from scratch.</p>
-          </Card>
-          <Card
-            variant="interactive"
-            padding="lg"
-            hover
-            glow="teal"
-            onClick={onStartUpload}
-            className="text-center cursor-pointer"
-          >
-            <div className="w-14 h-14 mx-auto mb-4 rounded-lg bg-teal/10 flex items-center justify-center">
-              <BrainCircuitIcon className="h-7 w-7 text-teal" />
-            </div>
-            <h2 className="text-lg font-heading font-semibold text-foreground">Use Existing Brief</h2>
-            <p className="text-sm text-muted-foreground mt-2">Upload a pre-made brief in Markdown to generate the article content.</p>
-          </Card>
-        </div>
-      )}
-
-      {flow === 'create' && renderCreateFlow()}
+      {renderCreateFlow()}
     </div>
   );
 };

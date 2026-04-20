@@ -7,7 +7,7 @@ import type { BriefListActiveTab, BriefListFilterStatus, BriefListSortBy, BriefL
 import { Select, Tabs } from './ui';
 import { buildSidebarBriefListModel } from '../utils/sidebarBriefListModel';
 
-type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_upload' | 'brief_list';
+type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_list';
 
 const BRIEFING_STEPS = [
   { uiStep: 1, title: 'Goal & Audience', icon: <FlagIcon className="h-4 w-4" /> },
@@ -36,7 +36,6 @@ interface SidebarProps {
   onSelectSection?: (section: number | null) => void;
   onGoToStep?: (step: number) => void;
   staleSteps?: Set<number>;
-  isUploadedBrief?: boolean;
   clientName?: string;
   clientLogoUrl?: string | null;
   clientBrandColor?: string | null;
@@ -99,7 +98,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectSection,
   onGoToStep,
   staleSteps = new Set(),
-  isUploadedBrief = false,
   clientName,
   clientLogoUrl,
   clientBrandColor,
@@ -357,36 +355,32 @@ const Sidebar: React.FC<SidebarProps> = ({
             </a>
           </nav>
 
-          {!isUploadedBrief && (
-            <>
-              <h3 className="mt-6 text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider">Brief Sections</h3>
-              <nav className="mt-2 space-y-1">
-                {DASHBOARD_SECTIONS.map(section => (
-                  <a
-                    key={section.logicalStep}
-                    href="#"
-                    onClick={(e) => { e.preventDefault(); onSelectSection?.(section.logicalStep); }}
-                    className={`flex items-center px-3 py-2 text-sm font-semibold rounded-md transition-colors ${
-                      selectedSection === section.logicalStep
-                        ? 'bg-teal-50 text-teal'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    }`}
-                  >
-                    <span className="mr-3">{section.icon}</span>
-                    <span className="flex-1">{section.title}</span>
-                    {staleSteps.has(section.logicalStep) && (
-                      <div className="relative group">
-                        <AlertTriangleIcon className="h-4 w-4 text-amber-500" />
-                        <span className="absolute right-0 -top-8 w-max bg-white text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg border border-gray-200">
-                          This section is stale
-                        </span>
-                      </div>
-                    )}
-                  </a>
-                ))}
-              </nav>
-            </>
-          )}
+          <h3 className="mt-6 text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider">Brief Sections</h3>
+          <nav className="mt-2 space-y-1">
+            {DASHBOARD_SECTIONS.map(section => (
+              <a
+                key={section.logicalStep}
+                href="#"
+                onClick={(e) => { e.preventDefault(); onSelectSection?.(section.logicalStep); }}
+                className={`flex items-center px-3 py-2 text-sm font-semibold rounded-md transition-colors ${
+                  selectedSection === section.logicalStep
+                    ? 'bg-teal-50 text-teal'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
+                <span className="mr-3">{section.icon}</span>
+                <span className="flex-1">{section.title}</span>
+                {staleSteps.has(section.logicalStep) && (
+                  <div className="relative group">
+                    <AlertTriangleIcon className="h-4 w-4 text-amber-500" />
+                    <span className="absolute right-0 -top-8 w-max bg-white text-foreground text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg border border-gray-200">
+                      This section is stale
+                    </span>
+                  </div>
+                )}
+              </a>
+            ))}
+          </nav>
         </div>
       </aside>
     );

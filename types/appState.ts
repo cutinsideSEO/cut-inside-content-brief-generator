@@ -79,7 +79,6 @@ export interface AppState {
   generationProgress: { currentSection: string; currentIndex: number; total: number } | null;
 
   // Special modes
-  isUploadedBrief: boolean;
   writerInstructions: string;
   isFeelingLuckyFlow: boolean;
 

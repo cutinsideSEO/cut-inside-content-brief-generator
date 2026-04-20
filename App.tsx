@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect, useRef, createContext, useCont
 import Header from './components/Header';
 import { generateBriefStep, setModelSettings, regenerateParagraph } from './services/geminiService';
 import * as dataforseoService from './services/dataforseoService';
-import { parseMarkdownBrief } from './services/markdownParserService';
 import { extractTemplateFromUrl } from './services/templateExtractionService';
 import type { CompetitorPage, ContentBrief, OutlineItem, ModelSettings, LengthConstraints, ExtractedTemplate } from './types';
 import { UI_TO_LOGICAL_STEP_MAP, SOUND_EFFECTS } from './constants';
@@ -21,7 +20,6 @@ import BriefingScreen from './components/screens/BriefingScreen';
 import DashboardScreen from './components/screens/DashboardScreen';
 import ContentGenerationScreen from './components/screens/ContentGenerationScreen';
 import ArticleScreen from './components/screens/ArticleScreen';
-import BriefUploadScreen from './components/screens/BriefUploadScreen';
 
 // Import Supabase integration components
 import SaveStatusIndicator from './components/SaveStatusIndicator';
@@ -39,7 +37,7 @@ import type { SaveStatus } from './types/appState';
 import type { BriefStatus } from './types/database';
 import { shouldMarkBriefCompleteOnJobCompletion } from './utils/generationStatus';
 
-type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'article_view' | 'brief_upload';
+type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'article_view';
 type ToastMessage = { id: number; title: string; message: string };
 
 // Props for Supabase integration
@@ -199,7 +197,6 @@ const App: React.FC<AppProps> = ({
   const [staleSteps, setStaleSteps] = useState<Set<number>>(new Set());
   const [userFeedbacks, setUserFeedbacks] = useState<{ [key: number]: string }>({});
   const [loadingStep, setLoadingStep] = useState<number | null>(null);
-  const [isUploadedBrief, setIsUploadedBrief] = useState<boolean>(false);
   const [briefStatus, setBriefStatus] = useState<BriefStatus>('draft');
   const [writerInstructions, setWriterInstructions] = useState<string>('');
   const [dashboardSection, setDashboardSection] = useState<number | null>(null);
@@ -761,24 +758,6 @@ const App: React.FC<AppProps> = ({
       setIsLoading(false);
     }
   }, [hasCompletedFirstBrief, addToast, briefId, onGenerationStart, onGenerationComplete, saveNow, refreshJob]);
-
-  const handleBriefUpload = useCallback(async (briefFile: File) => {
-    setError(null);
-    setIsLoading(true);
-    try {
-      const markdownContent = await briefFile.text();
-      const parsedBrief = parseMarkdownBrief(markdownContent);
-      setBriefData(parsedBrief);
-      setIsUploadedBrief(true);
-      setCurrentView('dashboard');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred during parsing.';
-      setError(`Failed to parse brief: ${errorMessage}`);
-      setCurrentView('brief_upload'); // Stay on upload screen on error
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
 
   const parseFile = useCallback((file: File): Promise<{ content: string | null; error: string | null }> => {
     return new Promise((resolve) => {
@@ -1366,7 +1345,6 @@ const App: React.FC<AppProps> = ({
     setGeneratedArticle(null);
     setGeneratedArticleDbId(null);
     setGenerationProgress(null);
-    setIsUploadedBrief(false);
     setWriterInstructions('');
     setIsFeelingLuckyFlow(false);
     setHasAchievedDataMaven(false); // Reset achievement
@@ -1379,18 +1357,10 @@ const App: React.FC<AppProps> = ({
   const renderCurrentView = () => {
     switch (currentView) {
       case 'initial_input':
-        return <InitialInputScreen 
-                  onStartAnalysis={handleStartAnalysis} 
-                  isLoading={isLoading} 
-                  error={error}
-                  onStartUpload={() => setCurrentView('brief_upload')}
-                />;
-      case 'brief_upload':
-        return <BriefUploadScreen
-                  onFileUpload={handleBriefUpload}
+        return <InitialInputScreen
+                  onStartAnalysis={handleStartAnalysis}
                   isLoading={isLoading}
                   error={error}
-                  onBack={handleRestart}
                 />;
       case 'context_input':
         return <ContextInputScreen
@@ -1452,7 +1422,6 @@ const App: React.FC<AppProps> = ({
                   competitorData={competitorData}
                   keywordVolumeMap={keywordVolumeMap}
                   onStartContentGeneration={handleStartContentGeneration}
-                  isUploadedBrief={isUploadedBrief}
                   writerInstructions={writerInstructions}
                   setWriterInstructions={setWriterInstructions}
                   // Fun factor props
@@ -1500,11 +1469,10 @@ const App: React.FC<AppProps> = ({
               brandContext={brandContextForArticle}
           />
       default:
-        return <InitialInputScreen 
-                  onStartAnalysis={handleStartAnalysis} 
-                  isLoading={isLoading} 
-                  error={error} 
-                  onStartUpload={() => setCurrentView('brief_upload')}
+        return <InitialInputScreen
+                  onStartAnalysis={handleStartAnalysis}
+                  isLoading={isLoading}
+                  error={error}
                />;
     }
   };
@@ -1528,7 +1496,6 @@ const App: React.FC<AppProps> = ({
               onSelectSection={setDashboardSection}
               onGoToStep={handleGoToStep}
               staleSteps={staleSteps}
-              isUploadedBrief={isUploadedBrief}
               clientLogoUrl={clientLogoUrl}
               clientBrandColor={clientBrandColor}
               clientName={clientName || undefined}

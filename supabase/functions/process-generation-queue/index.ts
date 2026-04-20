@@ -73,7 +73,6 @@ const STALE_IN_PROGRESS_VIEWS = new Set([
   'initial_input',
   'context_input',
   'visualization',
-  'brief_upload',
 ]);
 
 function hasGeneratedBriefData(briefData: Partial<ContentBrief>): boolean {

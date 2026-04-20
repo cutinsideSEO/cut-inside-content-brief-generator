@@ -37,7 +37,6 @@ interface DashboardScreenProps {
   competitorData: CompetitorPage[];
   keywordVolumeMap: Map<string, number>;
   onStartContentGeneration: () => void;
-  isUploadedBrief?: boolean;
   writerInstructions: string;
   setWriterInstructions: (value: string) => void;
   subjectInfo: string;
@@ -163,8 +162,8 @@ const EEATSignalsDisplay: React.FC<{ signals: EEATSignals }> = ({ signals }) => 
 };
 
 // A new component for the "home" state of the dashboard
-const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'isUploadedBrief' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'briefId' | 'briefStatus' | 'onWorkflowStatusChange'>> = ({
-    briefData, setBriefData, staleSteps, isUploadedBrief, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, briefId, briefStatus, onWorkflowStatusChange,
+const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'briefId' | 'briefStatus' | 'onWorkflowStatusChange'>> = ({
+    briefData, setBriefData, staleSteps, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, briefId, briefStatus, onWorkflowStatusChange,
 }) => {
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingEEAT, setIsGeneratingEEAT] = useState(false);
@@ -300,27 +299,23 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                         <BrainCircuitIcon className="h-4 w-4 mr-1.5" />
                         Generate Full Article
                     </Button>
-                    {!isUploadedBrief && (
-                        <>
-                            <Button variant="secondary" size="sm" onClick={handleValidateBrief} disabled={isValidating}>
-                                {isValidating ? (
-                                    <><Spinner className="h-3.5 w-3.5 mr-1.5" /> Validating...</>
-                                ) : (
-                                    <><CheckIcon className="h-3.5 w-3.5 mr-1.5" /> Validate Brief</>
-                                )}
-                            </Button>
-                            <Button variant="secondary" size="sm" onClick={handleGenerateEEAT} disabled={isGeneratingEEAT}>
-                                {isGeneratingEEAT ? (
-                                    <><Spinner className="h-3.5 w-3.5 mr-1.5" /> Generating...</>
-                                ) : (
-                                    <><StarIcon className="h-3.5 w-3.5 mr-1.5" /> E-E-A-T Signals</>
-                                )}
-                            </Button>
-                        </>
-                    )}
+                    <Button variant="secondary" size="sm" onClick={handleValidateBrief} disabled={isValidating}>
+                        {isValidating ? (
+                            <><Spinner className="h-3.5 w-3.5 mr-1.5" /> Validating...</>
+                        ) : (
+                            <><CheckIcon className="h-3.5 w-3.5 mr-1.5" /> Validate Brief</>
+                        )}
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={handleGenerateEEAT} disabled={isGeneratingEEAT}>
+                        {isGeneratingEEAT ? (
+                            <><Spinner className="h-3.5 w-3.5 mr-1.5" /> Generating...</>
+                        ) : (
+                            <><StarIcon className="h-3.5 w-3.5 mr-1.5" /> E-E-A-T Signals</>
+                        )}
+                    </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="secondary" size="sm" disabled={isUploadedBrief}>
+                            <Button variant="secondary" size="sm">
                                 <ChevronDownIcon className="h-3.5 w-3.5 mr-1 transition-transform data-[state=open]:rotate-180" />
                                 Export Brief
                             </Button>
@@ -467,19 +462,6 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                 </div>
             </div>
 
-            {/* Writer Instructions for uploaded briefs */}
-            {isUploadedBrief && (
-                <div>
-                    <h3 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-2">Writer Instructions</h3>
-                    <Textarea
-                        value={writerInstructions}
-                        onChange={(e) => setWriterInstructions(e.target.value)}
-                        placeholder="e.g., 'Write in a witty and conversational tone.' or 'Ensure all examples are from the financial services industry.'"
-                        rows={4}
-                    />
-                </div>
-            )}
-
             {/* Validation results (if generated) */}
             {validationError && (
                 <Callout variant="error">
@@ -553,7 +535,7 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
 
 
 const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
-    const { briefData, setBriefData, staleSteps, userFeedbacks, onFeedbackChange, onRegenerate, isLoading, loadingStep, competitorData, keywordVolumeMap, isUploadedBrief, outputLanguage, saveStatus, lastSavedAt, selectedSection: externalSelectedSection, onSelectSection: externalOnSelectSection } = props;
+    const { briefData, setBriefData, staleSteps, userFeedbacks, onFeedbackChange, onRegenerate, isLoading, loadingStep, competitorData, keywordVolumeMap, outputLanguage, saveStatus, lastSavedAt, selectedSection: externalSelectedSection, onSelectSection: externalOnSelectSection } = props;
     const [internalSelectedSection, setInternalSelectedSection] = useState<number | null>(null);
     const selectedSection = externalSelectedSection !== undefined ? externalSelectedSection : internalSelectedSection;
     const setSelectedSection = externalOnSelectSection || setInternalSelectedSection;
@@ -590,37 +572,35 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
                 {section.component}
 
                 {/* Feedback — simple bottom section */}
-                {!isUploadedBrief && (
-                    <div className="mt-8 pt-6 border-t border-gray-100">
-                        <h3 className="text-sm font-heading font-semibold text-muted-foreground mb-2">Feedback / Notes for Regeneration</h3>
-                        <Textarea
-                            value={userFeedbacks[section.logicalStep] || ''}
-                            onChange={(e) => onFeedbackChange(section.logicalStep, e.target.value)}
-                            placeholder={`e.g., 'Make the tone more technical' or 'Focus on enterprise customers'`}
-                            rows={3}
+                <div className="mt-8 pt-6 border-t border-gray-100">
+                    <h3 className="text-sm font-heading font-semibold text-muted-foreground mb-2">Feedback / Notes for Regeneration</h3>
+                    <Textarea
+                        value={userFeedbacks[section.logicalStep] || ''}
+                        onChange={(e) => onFeedbackChange(section.logicalStep, e.target.value)}
+                        placeholder={`e.g., 'Make the tone more technical' or 'Focus on enterprise customers'`}
+                        rows={3}
+                        disabled={isLoadingThisSection}
+                    />
+                    <div className="mt-3">
+                        <Button
+                            onClick={() => onRegenerate(section.logicalStep)}
                             disabled={isLoadingThisSection}
-                        />
-                        <div className="mt-3">
-                            <Button
-                                onClick={() => onRegenerate(section.logicalStep)}
-                                disabled={isLoadingThisSection}
-                                variant="secondary" size="sm"
-                            >
-                                {isLoadingThisSection ? (
-                                    <>
-                                        <RefreshCwIcon className="h-4 w-4 mr-2 animate-spin"/>
-                                        Regenerating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <RefreshCwIcon className="h-4 w-4 mr-2"/>
-                                        Regenerate {section.title}
-                                    </>
-                                )}
-                            </Button>
-                        </div>
+                            variant="secondary" size="sm"
+                        >
+                            {isLoadingThisSection ? (
+                                <>
+                                    <RefreshCwIcon className="h-4 w-4 mr-2 animate-spin"/>
+                                    Regenerating...
+                                </>
+                            ) : (
+                                <>
+                                    <RefreshCwIcon className="h-4 w-4 mr-2"/>
+                                    Regenerate {section.title}
+                                </>
+                            )}
+                        </Button>
                     </div>
-                )}
+                </div>
             </div>
         )
     };

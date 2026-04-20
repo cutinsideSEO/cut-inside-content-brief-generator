@@ -7,9 +7,8 @@ import { getGenerationProgressModel, getGenerationStatusBadgeLabel } from '../..
 import { formatRelativeTime } from '../../utils/relativeTime';
 import { BRIEF_TRANSITIONS } from './WorkflowStatusSelect';
 import PublishedUrlModal from './PublishedUrlModal';
-import Button from '../Button';
 import { cn } from '../../lib/utils';
-import { FileCodeIcon } from '../Icon';
+import { FileTextIcon, ZapIcon } from '../Icon';
 import {
   Badge,
   Progress,
@@ -122,21 +121,25 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
 }) => {
   const [showPublishModal, setShowPublishModal] = useState(false);
 
-  const primaryKeywords = (() => {
+  const allKeywords = (() => {
     const strategyKeywords = brief.brief_data?.keyword_strategy?.primary_keywords;
     const candidates = strategyKeywords && strategyKeywords.length > 0
       ? strategyKeywords.map((k) => k.keyword)
       : (brief.keywords || []).map((k) => k.kw);
 
-    const title = brief.name.trim().toLowerCase();
-    return candidates
-      .filter((kw): kw is string => Boolean(kw && kw.trim()))
-      .filter((kw) => kw.trim().toLowerCase() !== title);
+    return candidates.filter((kw): kw is string => Boolean(kw && kw.trim()));
   })();
 
-  const MAX_VISIBLE_KEYWORDS = 2;
-  const visibleKeywords = primaryKeywords.slice(0, MAX_VISIBLE_KEYWORDS);
-  const hiddenKeywordCount = Math.max(0, primaryKeywords.length - visibleKeywords.length);
+  // Keyword subtitle line — mirrors the "From: {brief_name}" pattern article
+  // cards use, so every brief card has a consistent second line below the
+  // title. Intentionally does NOT dedup against the title — users want to
+  // see their keywords even if the brief is auto-named after one.
+  const keywordSubtitle = (() => {
+    if (allKeywords.length === 0) return null;
+    if (allKeywords.length === 1) return allKeywords[0];
+    if (allKeywords.length === 2) return `${allKeywords[0]}, ${allKeywords[1]}`;
+    return `${allKeywords[0]}, ${allKeywords[1]}, +${allKeywords.length - 2} more`;
+  })();
 
   const rawGenerationModel = getGenerationProgressModel({
     status: generationStatus,
@@ -201,7 +204,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   const stopClick = (event: React.MouseEvent) => event.stopPropagation();
 
   const statusIconNode = (
-    <FileCodeIcon
+    <FileTextIcon
       className={cn('h-4 w-4 transition-colors', iconColor, isGenerating && 'animate-pulse')}
     />
   );
@@ -283,6 +286,11 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
               <h3 className="text-base font-heading font-semibold text-foreground leading-snug line-clamp-2">
                 {brief.name}
               </h3>
+              {keywordSubtitle && (
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {keywordSubtitle}
+                </p>
+              )}
               {projectName && (
                 <div className="mt-1">
                   <Badge variant="default" size="sm">{projectName}</Badge>
@@ -303,6 +311,19 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {canGenerateArticle && onGenerateArticle && (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => onGenerateArticle(brief.id)}
+                          disabled={isGeneratingArticle}
+                          className="text-teal focus:text-teal"
+                        >
+                          <ZapIcon className="h-4 w-4 mr-2" />
+                          {isGeneratingArticle ? 'Generating…' : 'Generate Article'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <DropdownMenuItem onClick={() => onUseAsTemplate(brief.id)}>
                       <CopyIcon className="h-4 w-4 mr-2" />
                       Use as Template
@@ -330,43 +351,24 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
         )}
         footer={(
           <div
-            className="flex items-center justify-between gap-2 w-full"
+            className="flex items-center justify-between gap-2 w-full text-xs text-muted-foreground"
             onClick={stopClick}
           >
-            <div className="flex items-center gap-2 flex-wrap">
-              {canGenerateArticle && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => onGenerateArticle(brief.id)}
-                  loading={isGeneratingArticle}
-                  disabled={isGeneratingArticle}
-                >
-                  Generate Article
-                </Button>
+            <div className="flex items-center gap-2">
+              <span>
+                {allKeywords.length} {allKeywords.length === 1 ? 'keyword' : 'keywords'}
+              </span>
+              {isGenerating && (
+                <>
+                  <span className="text-border">·</span>
+                  <span className="text-amber-500 font-medium">{generationModel.label}</span>
+                </>
               )}
             </div>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              {formatRelativeTime(brief.updated_at)}
-            </span>
+            <span>{formatRelativeTime(brief.updated_at)}</span>
           </div>
         )}
       >
-        {(visibleKeywords.length > 0 || hiddenKeywordCount > 0) && (
-          <div className="flex flex-wrap items-center gap-1.5 mt-2.5 min-h-[1.5rem]">
-            {visibleKeywords.map((keyword, index) => (
-              <Badge key={index} variant="outline" size="sm" className="max-w-[12rem] truncate">
-                {keyword}
-              </Badge>
-            ))}
-            {hiddenKeywordCount > 0 && (
-              <span className="text-xs text-muted-foreground">
-                +{hiddenKeywordCount}
-              </span>
-            )}
-          </div>
-        )}
-
         {isGenerating && (
           <div className="mt-3">
             <Progress

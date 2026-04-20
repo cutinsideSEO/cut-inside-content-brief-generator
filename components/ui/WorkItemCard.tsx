@@ -41,7 +41,8 @@ const WorkItemCard: React.FC<WorkItemCardProps> = ({
       glow={glow}
       onClick={onClick}
       className={cn(
-        'group overflow-hidden border-l-4 border-l-transparent focus-within:ring-2 focus-within:ring-teal/40',
+        'group overflow-hidden focus-within:ring-2 focus-within:ring-teal/40',
+        accentClassName && 'border-l-4 border-l-transparent',
         accentClassName,
         selected && 'ring-2 ring-teal/40 border-teal/50',
         highlighted && 'ring-1 ring-status-generating/30 border-amber-400/50',

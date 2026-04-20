@@ -111,8 +111,10 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
 
   const MAX_VISIBLE_KEYWORDS = 2;
   const visibleKeywords = primaryKeywords.slice(0, MAX_VISIBLE_KEYWORDS);
-  const totalKeywords = brief.keywords?.length || 0;
-  const hiddenKeywordCount = Math.max(0, totalKeywords - visibleKeywords.length);
+  // Only count keywords that were actually hidden (post-dedup). If the only
+  // keyword equals the title we end up with zero candidates, so "+1" never
+  // appears on its own below the title.
+  const hiddenKeywordCount = Math.max(0, primaryKeywords.length - visibleKeywords.length);
 
   const rawGenerationModel = getGenerationProgressModel({
     status: generationStatus,
@@ -143,20 +145,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   const isWorkflow = isWorkflowStatus(brief.status);
   const canGenerateArticle = !isGenerating && !!onGenerateArticle && (brief.status === 'complete' || isWorkflow);
 
-  const getStatusBorderColor = () => {
-    if (isGenerating) return 'border-l-amber-400';
-    switch (brief.status) {
-      case 'complete': return 'border-l-emerald-400';
-      case 'in_progress': return 'border-l-amber-400';
-      case 'sent_to_client': return 'border-l-teal-400';
-      case 'changes_requested': return 'border-l-teal-400';
-      case 'in_writing': return 'border-l-blue-400';
-      case 'approved': return 'border-l-emerald-400';
-      case 'published': return 'border-l-emerald-500';
-      default: return 'border-l-gray-300';
-    }
-  };
-
   // Primary action — clicking the card body goes here.
   const handleCardClick = () => {
     if (isGenerating) {
@@ -178,7 +166,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
     <>
       <WorkItemCard
         hover
-        accentClassName={getStatusBorderColor()}
         selected={isSelected}
         highlighted={isGenerating}
         onClick={brief.status === 'archived' ? undefined : handleCardClick}
@@ -309,18 +296,20 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
           </div>
         )}
       >
-        <div className="flex flex-wrap items-center gap-1.5 mt-2.5 min-h-[1.5rem]">
-          {visibleKeywords.map((keyword, index) => (
-            <Badge key={index} variant="outline" size="sm" className="max-w-[12rem] truncate">
-              {keyword}
-            </Badge>
-          ))}
-          {hiddenKeywordCount > 0 && (
-            <span className="text-xs text-muted-foreground">
-              +{hiddenKeywordCount}
-            </span>
-          )}
-        </div>
+        {(visibleKeywords.length > 0 || hiddenKeywordCount > 0) && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-2.5 min-h-[1.5rem]">
+            {visibleKeywords.map((keyword, index) => (
+              <Badge key={index} variant="outline" size="sm" className="max-w-[12rem] truncate">
+                {keyword}
+              </Badge>
+            ))}
+            {hiddenKeywordCount > 0 && (
+              <span className="text-xs text-muted-foreground">
+                +{hiddenKeywordCount}
+              </span>
+            )}
+          </div>
+        )}
 
         {isGenerating && (
           <div className="mt-3">

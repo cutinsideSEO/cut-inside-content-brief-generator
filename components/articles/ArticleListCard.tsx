@@ -45,19 +45,6 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
   const wordCount = article.content.trim().split(/\s+/).filter(Boolean).length;
   const [showPublishModal, setShowPublishModal] = useState(false);
 
-  const getStatusBorderColor = (status: ArticleStatus) => {
-    switch (status) {
-      case 'published':
-        return 'border-l-emerald-500';
-      case 'approved':
-        return 'border-l-emerald-400';
-      case 'sent_to_client':
-        return 'border-l-teal-400';
-      default:
-        return 'border-l-gray-300';
-    }
-  };
-
   const articleStatus = article.status || 'draft';
   const stopClick = (event: React.MouseEvent) => event.stopPropagation();
 
@@ -65,7 +52,6 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
     <>
       <WorkItemCard
         hover
-        accentClassName={getStatusBorderColor(articleStatus)}
         onClick={() => onView(article.id)}
         header={(
           <div className="flex items-start gap-3">

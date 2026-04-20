@@ -54,7 +54,80 @@ interface DashboardScreenProps {
   briefId?: string | null;
   briefStatus?: BriefStatus;
   onWorkflowStatusChange?: (newStatus: string, metadata?: { published_url?: string; published_at?: string }) => void;
+  // Backend generation state — drives the in-flight generation banner
+  isBackendGenerating?: boolean;
+  backendJobType?: GenerationJobType | null;
+  backendProgress?: GenerationJobProgress;
+  backendStepName?: string | null;
+  backendCurrentStep?: number | null;
+  onCancelBackendGeneration?: () => void;
 }
+
+const BACKEND_STATUS_BY_JOB_TYPE: Record<GenerationJobType, 'analyzing_competitors' | 'generating_brief' | 'generating_content'> = {
+  competitors: 'analyzing_competitors',
+  full_brief: 'generating_brief',
+  brief_step: 'generating_brief',
+  regenerate: 'generating_brief',
+  article: 'generating_content',
+};
+
+const GenerationBanner: React.FC<{
+  jobType: GenerationJobType | null;
+  progress?: GenerationJobProgress;
+  currentStep: number | null;
+  onCancel?: () => void;
+}> = ({ jobType, progress, currentStep, onCancel }) => {
+  const status = jobType ? BACKEND_STATUS_BY_JOB_TYPE[jobType] || 'generating_brief' : 'generating_brief';
+  const model = getGenerationProgressModel({
+    status,
+    generationStep: currentStep,
+    jobProgress: progress || null,
+  });
+
+  // Monotonic clamp so the banner never shows a backwards progress value
+  // when Realtime events cross during step transitions.
+  const maxRef = useRef<number>(0);
+  useEffect(() => {
+    // Reset when the underlying job type changes (e.g. regenerate vs full_brief).
+    maxRef.current = 0;
+  }, [jobType]);
+  const clamped = Math.max(maxRef.current, model.percentage);
+  if (clamped > maxRef.current) maxRef.current = clamped;
+
+  const headline = jobType === 'article'
+    ? 'Generating article…'
+    : jobType === 'regenerate'
+      ? 'Regenerating section…'
+      : jobType === 'competitors'
+        ? 'Analyzing competitors…'
+        : 'Generating brief…';
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Spinner className="h-4 w-4 text-amber-600" />
+          <div className="min-w-0">
+            <p className="text-sm font-heading font-semibold text-amber-900 truncate">{headline}</p>
+            <p className="text-xs text-amber-800 truncate">{model.label}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-xs tabular-nums text-amber-900">{Math.round(clamped)}%</span>
+          {onCancel && (
+            <Button variant="secondary" size="sm" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      </div>
+      <Progress value={clamped} size="sm" color="yellow" />
+      <p className="text-xs text-amber-800/80 mt-2">
+        Your brief is being generated in the background. Sections will fill in as each step completes — you can wait here or come back later.
+      </p>
+    </div>
+  );
+};
 
 // Brief Validation Display Component
 const BriefValidationDisplay: React.FC<{ validation: BriefValidation }> = ({ validation }) => {
@@ -163,8 +236,8 @@ const EEATSignalsDisplay: React.FC<{ signals: EEATSignals }> = ({ signals }) => 
 };
 
 // A new component for the "home" state of the dashboard
-const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'briefId' | 'briefStatus' | 'onWorkflowStatusChange'>> = ({
-    briefData, setBriefData, staleSteps, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, briefId, briefStatus, onWorkflowStatusChange,
+const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'briefId' | 'briefStatus' | 'onWorkflowStatusChange' | 'isBackendGenerating' | 'backendJobType'>> = ({
+    briefData, setBriefData, staleSteps, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, briefId, briefStatus, onWorkflowStatusChange, isBackendGenerating, backendJobType,
 }) => {
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingEEAT, setIsGeneratingEEAT] = useState(false);
@@ -250,6 +323,10 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
             { key: 'og_description', label: 'OG Description', value: seo?.og_description?.value || '', maxLength: 200 },
         ];
     }, [briefData.on_page_seo]);
+
+    const isGeneratingBrief = Boolean(isBackendGenerating && (backendJobType === 'full_brief' || backendJobType === 'regenerate' || backendJobType === 'competitors'));
+    const structureEmptyLabel = isGeneratingBrief ? 'Generating article structure…' : 'No article structure generated yet.';
+    const seoEmptyLabel = isGeneratingBrief ? 'Generating on-page SEO…' : 'No SEO data generated yet.';
 
     return (
         <div className="animate-fade-in space-y-6">
@@ -377,7 +454,9 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                             </Table>
                         </div>
                     ) : (
-                        <p className="text-sm text-muted-foreground italic py-4 text-center border border-border rounded-lg">No article structure generated yet.</p>
+                        <p className={`text-sm ${isGeneratingBrief ? 'text-amber-800 bg-amber-50/60 border-amber-200' : 'text-muted-foreground border-border'} italic py-4 text-center border rounded-lg ${isGeneratingBrief ? 'animate-pulse-subtle' : ''}`}>
+                            {structureEmptyLabel}
+                        </p>
                     )}
                 </div>
 
@@ -414,7 +493,9 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                                 </Table>
                             </div>
                         ) : (
-                            <p className="text-sm text-muted-foreground italic py-4 text-center border border-border rounded-lg">No SEO data generated yet.</p>
+                            <p className={`text-sm ${isGeneratingBrief ? 'text-amber-800 bg-amber-50/60 border-amber-200' : 'text-muted-foreground border-border'} italic py-4 text-center border rounded-lg ${isGeneratingBrief ? 'animate-pulse-subtle' : ''}`}>
+                                {seoEmptyLabel}
+                            </p>
                         )}
                     </div>
 
@@ -536,10 +617,23 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
 
 
 const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
-    const { briefData, setBriefData, staleSteps, userFeedbacks, onFeedbackChange, onRegenerate, isLoading, loadingStep, competitorData, keywordVolumeMap, outputLanguage, saveStatus, lastSavedAt, selectedSection: externalSelectedSection, onSelectSection: externalOnSelectSection } = props;
+    const {
+        briefData, setBriefData, staleSteps, userFeedbacks, onFeedbackChange, onRegenerate, isLoading,
+        loadingStep, competitorData, keywordVolumeMap, outputLanguage, saveStatus, lastSavedAt,
+        selectedSection: externalSelectedSection, onSelectSection: externalOnSelectSection,
+        isBackendGenerating, backendJobType, backendProgress, backendCurrentStep, onCancelBackendGeneration,
+    } = props;
     const [internalSelectedSection, setInternalSelectedSection] = useState<number | null>(null);
     const selectedSection = externalSelectedSection !== undefined ? externalSelectedSection : internalSelectedSection;
     const setSelectedSection = externalOnSelectSection || setInternalSelectedSection;
+
+    // The regenerate flow uses a per-section spinner; the banner is reserved for
+    // full-brief or article-level generation where the user is waiting on a
+    // background job that touches the whole dashboard.
+    const shouldShowBanner = Boolean(
+        isBackendGenerating &&
+        (backendJobType === 'full_brief' || backendJobType === 'article' || backendJobType === 'competitors')
+    );
 
     const sections = [
         { logicalStep: 1, title: 'Goal & Audience', icon: <FlagIcon className="h-5 w-5" />, component: <Stage1Goal briefData={briefData} setBriefData={setBriefData} /> },
@@ -607,7 +701,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
     };
 
     return (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in space-y-4">
+            {shouldShowBanner && (
+                <GenerationBanner
+                    jobType={backendJobType || null}
+                    progress={backendProgress}
+                    currentStep={backendCurrentStep ?? null}
+                    onCancel={onCancelBackendGeneration}
+                />
+            )}
             {renderMainContent()}
         </div>
     );

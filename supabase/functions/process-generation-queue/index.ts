@@ -1468,7 +1468,9 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
     const maxRetries = policy.maxRetries;
 
     if (retryCount < maxRetries) {
-      // Return to pending for retry
+      // Return to pending for retry — guard with status='running' so a job
+      // that completed between the stale SELECT and this UPDATE is not
+      // clobbered back to pending.
       const retryAt = getRetryScheduleIso(retryCount);
       await supabase
         .from('generation_jobs')
@@ -1481,10 +1483,11 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
           lease_expires_at: null,
           claimed_by: null,
         })
-        .eq('id', job.id);
+        .eq('id', job.id)
+        .eq('status', 'running');
       console.log(`Reset stale job ${job.id} (type=${job.job_type}, step=${job.step_number}) to pending at ${retryAt} (retry ${retryCount}/${maxRetries})`);
     } else {
-      // Max retries exhausted — mark as failed
+      // Max retries exhausted — mark as failed (same status guard).
       await supabase
         .from('generation_jobs')
         .update({
@@ -1498,7 +1501,8 @@ async function resetStaleJobs(supabase: SupabaseClient): Promise<number> {
           claimed_by: null,
           dead_lettered_at: new Date().toISOString(),
         })
-        .eq('id', job.id);
+        .eq('id', job.id)
+        .eq('status', 'running');
 
       // Clear brief's active_job_id so user can retry manually
       await supabase

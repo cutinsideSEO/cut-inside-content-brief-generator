@@ -1,6 +1,6 @@
 // Brief List Screen - View and manage briefs for a client
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { getBriefsForClient, archiveBrief, deleteBrief, updateBriefWorkflowStatus } from '../../services/briefService';
+import { getBriefsForClient, archiveBrief, updateBriefWorkflowStatus } from '../../services/briefService';
 import { getArticlesForClient, deleteArticle, updateArticleStatus } from '../../services/articleService';
 import { cancelBatch } from '../../services/batchService';
 import { createGenerationJob } from '../../services/generationJobService';
@@ -102,10 +102,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const [articleGenerateConfirmBriefId, setArticleGenerateConfirmBriefId] = useState<string | null>(null);
   const [startingArticleBriefIds, setStartingArticleBriefIds] = useState<Set<string>>(new Set());
   const startingArticleBriefIdsRef = useRef<Set<string>>(new Set());
-
-  // Bulk selection state
-  const [selectedBriefs, setSelectedBriefs] = useState<Set<string>>(new Set());
-  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   // Auth
   const { userId } = useAuth();
@@ -266,49 +262,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     // Remove from local list
     setBriefs((prev) => prev.filter((b) => b.id !== briefId));
     loadArchivedBriefs();
-  };
-
-  // Bulk selection helpers
-  const toggleBriefSelection = (briefId: string) => {
-    setSelectedBriefs(prev => {
-      const next = new Set(prev);
-      if (next.has(briefId)) {
-        next.delete(briefId);
-      } else {
-        next.add(briefId);
-      }
-      return next;
-    });
-  };
-
-  const clearSelection = () => setSelectedBriefs(new Set());
-
-  const handleBulkArchive = async () => {
-    const ids: string[] = [...selectedBriefs];
-    let failed = 0;
-    for (const id of ids) {
-      const { error: archiveError } = await archiveBrief(id);
-      if (archiveError) failed++;
-    }
-    setBriefs(prev => prev.filter(b => !selectedBriefs.has(b.id) || failed > 0));
-    loadArchivedBriefs();
-    toast.success(`Archived ${ids.length - failed} brief${ids.length - failed !== 1 ? 's' : ''}`);
-    if (failed > 0) toast.error(`Failed to archive ${failed} brief${failed !== 1 ? 's' : ''}`);
-    clearSelection();
-  };
-
-  const handleBulkDelete = async () => {
-    const ids: string[] = [...selectedBriefs];
-    let failed = 0;
-    for (const id of ids) {
-      const { error: deleteError } = await deleteBrief(id);
-      if (deleteError) failed++;
-    }
-    setBriefs(prev => prev.filter(b => !selectedBriefs.has(b.id)));
-    toast.success(`Deleted ${ids.length - failed} brief${ids.length - failed !== 1 ? 's' : ''}`);
-    if (failed > 0) toast.error(`Failed to delete ${failed} brief${failed !== 1 ? 's' : ''}`);
-    clearSelection();
-    setShowBulkDeleteConfirm(false);
   };
 
   // Handle batch cancellation
@@ -683,9 +636,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         onUseAsTemplate={onUseAsTemplate}
         onArchive={handleArchiveClick}
         projectName={brief.project_id ? projectNamesById[brief.project_id] || null : null}
-        isSelected={selectedBriefs.has(brief.id)}
-        hasActiveSelection={selectedBriefs.size > 0}
-        onToggleSelect={toggleBriefSelection}
         isGenerating={isGenerating}
         isGeneratingArticle={startingArticleBriefIds.has(brief.id)}
         generationStatus={generating?.status}
@@ -796,31 +746,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
       {/* Briefs tab content */}
       {activeTab === 'briefs' && (<>
-      {/* Bulk Action Bar */}
-      {selectedBriefs.size > 0 && (
-        <div className="flex items-center gap-3 mb-4 px-4 py-2.5 bg-teal/5 border border-teal/20 rounded-lg">
-          <span className="text-sm font-semibold text-foreground">
-            {selectedBriefs.size} selected
-          </span>
-          <div className="flex-1" />
-          <Button variant="outline" size="sm" onClick={() => handleOpenBulkModal('existing')}>
-            Generate ({selectedBriefs.size})
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleBulkArchive}>
-            Archive
-          </Button>
-          <Button variant="danger" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
-            Delete
-          </Button>
-          <button
-            onClick={clearSelection}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
-          >
-            Clear
-          </button>
-        </div>
-      )}
-
       {/* Error state */}
       {error && (
         <Alert variant="error" title="Error" dismissible onDismiss={() => setError(null)} className="mb-6">
@@ -1081,34 +1006,12 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         <p className="text-gray-600">Are you sure you want to archive this brief? You can restore it later.</p>
       </Modal>
 
-      {/* Bulk Delete Confirmation Modal */}
-      <Modal
-        isOpen={showBulkDeleteConfirm}
-        onClose={() => setShowBulkDeleteConfirm(false)}
-        title="Delete Selected Briefs"
-        size="sm"
-        footer={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => setShowBulkDeleteConfirm(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" size="sm" onClick={handleBulkDelete}>
-              Delete {selectedBriefs.size} Brief{selectedBriefs.size !== 1 ? 's' : ''}
-            </Button>
-          </>
-        }
-      >
-        <p className="text-gray-600">
-          Are you sure you want to permanently delete {selectedBriefs.size} selected brief{selectedBriefs.size !== 1 ? 's' : ''}? This action cannot be undone.
-        </p>
-      </Modal>
-
       {/* Bulk Generation Modal */}
       <BulkGenerationModal
         isOpen={showBulkModal !== null}
         onClose={() => setShowBulkModal(null)}
         initialTab={showBulkModal || 'keywords'}
-        selectedBriefIds={[...selectedBriefs]}
+        selectedBriefIds={[]}
         clientId={clientId}
         userId={userId || ''}
         availableProjects={projects}
@@ -1120,7 +1023,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
           if (activeTab === 'articles') {
             loadArticles();
           }
-          setSelectedBriefs(new Set());
         }}
       />
     </div>

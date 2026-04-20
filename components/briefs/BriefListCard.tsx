@@ -12,7 +12,6 @@ import { FileTextIcon, ZapIcon } from '../Icon';
 import {
   Badge,
   Progress,
-  Checkbox,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
@@ -30,10 +29,6 @@ interface BriefListCardProps {
   onUseAsTemplate: (briefId: string) => void;
   onArchive: (briefId: string) => void;
   projectName?: string | null;
-  isSelected?: boolean;
-  /** True when ANY card on the page is selected — keeps checkboxes visible while in selection mode. */
-  hasActiveSelection?: boolean;
-  onToggleSelect?: (briefId: string) => void;
   // Background generation
   isGenerating?: boolean;
   generationStatus?: GenerationStatus;
@@ -109,9 +104,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   onUseAsTemplate,
   onArchive,
   projectName,
-  isSelected = false,
-  hasActiveSelection = false,
-  onToggleSelect,
   isGenerating = false,
   generationStatus = 'idle',
   generationStep = null,
@@ -213,29 +205,10 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
     <>
       <WorkItemCard
         hover
-        selected={isSelected}
         highlighted={isGenerating}
         onClick={brief.status === 'archived' ? undefined : handleCardClick}
         header={(
           <div className="flex items-start gap-3">
-            {onToggleSelect && (
-              <div
-                className={`pt-0.5 flex-shrink-0 transition-opacity ${
-                  isSelected || hasActiveSelection
-                    ? 'opacity-100'
-                    : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
-                }`}
-                onClick={stopClick}
-              >
-                <Checkbox
-                  checked={isSelected}
-                  onCheckedChange={() => onToggleSelect(brief.id)}
-                  onClick={stopClick}
-                  className="data-[state=checked]:bg-teal data-[state=checked]:border-teal"
-                />
-              </div>
-            )}
-
             {/* Status icon — color communicates status; click to change workflow status (if available) */}
             <div className="pt-0.5 flex-shrink-0" onClick={stopClick}>
               {showStatusMenu ? (

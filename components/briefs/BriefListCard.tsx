@@ -4,6 +4,7 @@ import type { BriefWithClient, GenerationJobProgress } from '../../types/databas
 import type { GenerationStatus } from '../../types/generationActivity';
 import { isWorkflowStatus } from '../../types/database';
 import { getGenerationProgressModel, getGenerationStatusBadgeLabel } from '../../utils/generationActivity';
+import { formatRelativeTime } from '../../utils/relativeTime';
 import BriefStatusBadge from './BriefStatusBadge';
 import WorkflowStatusSelect from './WorkflowStatusSelect';
 import PublishedUrlModal from './PublishedUrlModal';
@@ -37,8 +38,6 @@ interface BriefListCardProps {
   generationStep?: number | null;
   generationProgress?: GenerationJobProgress;
   generationUpdatedAt?: string;
-  // Article indicator
-  articleCount?: number;
   // Workflow status
   onWorkflowStatusChange?: (briefId: string, newStatus: string, metadata?: { published_url?: string; published_at?: string }) => void;
   isGeneratingArticle?: boolean;
@@ -90,48 +89,25 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   generationStatus = 'idle',
   generationStep = null,
   generationProgress,
-  articleCount,
   onWorkflowStatusChange,
   isGeneratingArticle = false,
 }) => {
   const [showPublishModal, setShowPublishModal] = useState(false);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
+  const primaryKeywords = (() => {
+    const strategyKeywords = brief.brief_data?.keyword_strategy?.primary_keywords;
+    const candidates = strategyKeywords && strategyKeywords.length > 0
+      ? strategyKeywords.map((k) => k.keyword)
+      : (brief.keywords || []).map((k) => k.kw);
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
+    const title = brief.name.trim().toLowerCase();
+    return candidates
+      .filter((kw): kw is string => Boolean(kw && kw.trim()))
+      .filter((kw) => kw.trim().toLowerCase() !== title)
+      .slice(0, 3);
+  })();
 
-  const getProgressText = () => {
-    const viewLabels: Record<string, string> = {
-      initial_input: 'Initial Input',
-      context_input: 'Adding Context',
-      visualization: 'Reviewing Competitors',
-      briefing: `Brief Step ${brief.current_step}/7`,
-      dashboard: 'Dashboard',
-      content_generation: 'Generating Content',
-    };
-    return viewLabels[brief.current_view] || brief.current_view;
-  };
-
-  const getPrimaryKeywords = () => {
-    const keywords = brief.brief_data?.keyword_strategy?.primary_keywords;
-    if (!keywords || keywords.length === 0) {
-      return brief.keywords?.slice(0, 3).map((k) => k.kw) || [];
-    }
-    return keywords.slice(0, 3).map((k) => k.keyword);
-  };
+  const totalKeywords = brief.keywords?.length || 0;
 
   const generationModel = getGenerationProgressModel({
     status: generationStatus,
@@ -139,7 +115,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
     jobProgress: generationProgress,
   });
 
-  const primaryKeywords = getPrimaryKeywords();
   const showWorkflowSelect = !isGenerating && onWorkflowStatusChange && (brief.status === 'complete' || isWorkflowStatus(brief.status));
   const isWorkflow = isWorkflowStatus(brief.status);
   const canGenerateArticle = !isGenerating && !!onGenerateArticle && (brief.status === 'complete' || isWorkflow);
@@ -158,6 +133,23 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
     }
   };
 
+  // Primary action — clicking the card body goes here.
+  const handleCardClick = () => {
+    if (isGenerating) {
+      onContinue(brief.id);
+      return;
+    }
+    if (brief.status === 'complete' || isWorkflow) {
+      onEdit(brief.id);
+      return;
+    }
+    if (brief.status !== 'archived') {
+      onContinue(brief.id);
+    }
+  };
+
+  const stopClick = (event: React.MouseEvent) => event.stopPropagation();
+
   return (
     <>
       <WorkItemCard
@@ -165,26 +157,24 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
         accentClassName={getStatusBorderColor()}
         selected={isSelected}
         highlighted={isGenerating}
+        onClick={brief.status === 'archived' ? undefined : handleCardClick}
         header={(
           <div className="flex items-start gap-3">
             {onToggleSelect && (
-              <div className="pt-0.5 flex-shrink-0">
+              <div className="pt-0.5 flex-shrink-0" onClick={stopClick}>
                 <Checkbox
                   checked={isSelected}
                   onCheckedChange={() => onToggleSelect(brief.id)}
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={stopClick}
                   className="data-[state=checked]:bg-teal data-[state=checked]:border-teal"
                 />
               </div>
             )}
 
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-heading font-semibold text-foreground leading-snug truncate">
+              <h3 className="text-sm font-heading font-semibold text-foreground leading-snug line-clamp-2">
                 {brief.name}
               </h3>
-              {brief.client && (
-                <p className="text-xs text-muted-foreground mt-0.5">{brief.client.name}</p>
-              )}
               {projectName && (
                 <div className="mt-1">
                   <Badge variant="default" size="sm">{projectName}</Badge>
@@ -192,7 +182,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0" onClick={stopClick}>
               {isGenerating ? (
                 <Badge variant="warning" size="sm" pulse>
                   {getGenerationStatusBadgeLabel(generationStatus)}
@@ -212,7 +202,10 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
               {!isGenerating && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground opacity-100">
+                    <button
+                      onClick={stopClick}
+                      className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                    >
                       <MoreHorizontalIcon className="h-4 w-4" />
                     </button>
                   </DropdownMenuTrigger>
@@ -242,49 +235,47 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
             </div>
           </div>
         )}
-        footer={
-          isGenerating ? (
-            <div className="flex items-center gap-2">
-              <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
-                View Progress
-              </Button>
-              <span className="flex items-center text-xs text-amber-500">
-                <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Runs in background
-              </span>
+        footer={(
+          <div
+            className="flex items-center justify-between gap-2 w-full"
+            onClick={stopClick}
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              {isGenerating ? (
+                <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
+                  View Progress
+                </Button>
+              ) : (
+                <>
+                  {brief.status !== 'complete' && brief.status !== 'archived' && !isWorkflow && (
+                    <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
+                      Continue
+                    </Button>
+                  )}
+                  {(brief.status === 'complete' || isWorkflow) && (
+                    <Button variant="primary" size="sm" onClick={() => onEdit(brief.id)}>
+                      View / Edit
+                    </Button>
+                  )}
+                  {canGenerateArticle && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onGenerateArticle(brief.id)}
+                      loading={isGeneratingArticle}
+                      disabled={isGeneratingArticle}
+                    >
+                      Generate Article
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
-          ) : (
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                {brief.status !== 'complete' && brief.status !== 'archived' && !isWorkflow && (
-                  <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
-                    Continue
-                  </Button>
-                )}
-                {(brief.status === 'complete' || isWorkflow) && (
-                  <Button variant="primary" size="sm" onClick={() => onEdit(brief.id)}>
-                    View / Edit
-                  </Button>
-                )}
-                {canGenerateArticle && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => onGenerateArticle(brief.id)}
-                    loading={isGeneratingArticle}
-                    disabled={isGeneratingArticle}
-                  >
-                    Generate Article
-                  </Button>
-                )}
-              </div>
-              {brief.status === 'archived' && <span />}
-            </div>
-          )
-        }
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {formatRelativeTime(brief.updated_at)}
+            </span>
+          </div>
+        )}
       >
         {primaryKeywords.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2.5">
@@ -293,9 +284,9 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
                 {keyword}
               </Badge>
             ))}
-            {(brief.keywords?.length || 0) > 3 && (
+            {totalKeywords > primaryKeywords.length && (
               <span className="text-xs text-muted-foreground self-center">
-                +{(brief.keywords?.length || 0) - 3}
+                +{totalKeywords - primaryKeywords.length}
               </span>
             )}
           </div>
@@ -313,33 +304,17 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
           </div>
         )}
 
-        {!isGenerating && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
-            <span>{getProgressText()}</span>
-            <span className="text-border">|</span>
-            <span>{formatDate(brief.updated_at)}, {formatTime(brief.updated_at)}</span>
-            {articleCount !== undefined && articleCount > 0 && (
-              <>
-                <span className="text-border">|</span>
-                <span className="text-teal font-medium">{articleCount} article{articleCount > 1 ? 's' : ''}</span>
-              </>
-            )}
-            {brief.published_url && (
-              <>
-                <span className="text-border">|</span>
-                <a
-                  href={brief.published_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-teal hover:underline truncate max-w-[200px]"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <LinkIcon className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate">{brief.published_url.replace(/^https?:\/\//, '')}</span>
-                </a>
-              </>
-            )}
-          </div>
+        {brief.published_url && !isGenerating && (
+          <a
+            href={brief.published_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={stopClick}
+            className="inline-flex items-center gap-1 mt-3 text-xs text-teal hover:underline truncate max-w-full"
+          >
+            <LinkIcon className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{brief.published_url.replace(/^https?:\/\//, '')}</span>
+          </a>
         )}
       </WorkItemCard>
 

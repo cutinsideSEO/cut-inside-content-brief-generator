@@ -3,7 +3,6 @@ import type {
   BriefListFilterStatus,
   BriefListSortBy,
   BriefListUiState,
-  BriefListViewMode,
 } from '../types/briefListUi';
 
 const ACTIVE_TABS: readonly BriefListActiveTab[] = ['briefs', 'articles'];
@@ -15,14 +14,12 @@ const FILTER_STATUSES: readonly BriefListFilterStatus[] = [
   'workflow',
   'published',
 ];
-const SORT_BY_OPTIONS: readonly BriefListSortBy[] = ['smart', 'newest', 'oldest', 'modified', 'name'];
-const VIEW_MODES: readonly BriefListViewMode[] = ['smart', 'grouped'];
+const SORT_BY_OPTIONS: readonly BriefListSortBy[] = ['newest', 'oldest', 'modified', 'name'];
 
 const DEFAULT_BRIEF_LIST_UI_STATE: BriefListUiState = {
   activeTab: 'briefs',
   filterStatus: 'all',
-  sortBy: 'smart',
-  briefViewMode: 'smart',
+  sortBy: 'newest',
   projectFilter: 'all',
 };
 
@@ -55,9 +52,6 @@ export function normalizeBriefListUiState(
       ? input.filterStatus
       : defaults.filterStatus,
     sortBy: isOneOf(input.sortBy, SORT_BY_OPTIONS) ? input.sortBy : defaults.sortBy,
-    briefViewMode: isOneOf(input.briefViewMode, VIEW_MODES)
-      ? input.briefViewMode
-      : defaults.briefViewMode,
     projectFilter: options?.resetProjectFilter ? 'all' : normalizeProjectFilter(input.projectFilter),
   };
 }

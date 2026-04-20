@@ -8,14 +8,11 @@ export type BriefListFilterStatus =
   | 'workflow'
   | 'published';
 
-export type BriefListSortBy = 'smart' | 'newest' | 'oldest' | 'modified' | 'name';
-
-export type BriefListViewMode = 'smart' | 'grouped';
+export type BriefListSortBy = 'newest' | 'oldest' | 'modified' | 'name';
 
 export interface BriefListUiState {
   activeTab: BriefListActiveTab;
   filterStatus: BriefListFilterStatus;
   sortBy: BriefListSortBy;
-  briefViewMode: BriefListViewMode;
   projectFilter: string;
 }

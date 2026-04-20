@@ -29,14 +29,17 @@ const WorkItemCard: React.FC<WorkItemCardProps> = ({
   contentClassName,
   footerClassName,
   className,
+  onClick,
   ...props
 }) => {
+  const isClickable = interactive || Boolean(onClick);
   return (
     <Card
-      variant={interactive ? 'interactive' : 'default'}
+      variant={isClickable ? 'interactive' : 'default'}
       padding="none"
-      hover={interactive || hover}
+      hover={isClickable || hover}
       glow={glow}
+      onClick={onClick}
       className={cn(
         'group overflow-hidden border-l-4 border-l-transparent focus-within:ring-2 focus-within:ring-teal/40',
         accentClassName,

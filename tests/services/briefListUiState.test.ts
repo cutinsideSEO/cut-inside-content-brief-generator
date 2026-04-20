@@ -8,8 +8,7 @@ describe('briefListUiState', () => {
     expect(state).toEqual({
       activeTab: 'briefs',
       filterStatus: 'all',
-      sortBy: 'smart',
-      briefViewMode: 'smart',
+      sortBy: 'newest',
       projectFilter: 'all',
     });
   });
@@ -20,7 +19,6 @@ describe('briefListUiState', () => {
         activeTab: 'invalid',
         filterStatus: 'invalid',
         sortBy: 'invalid',
-        briefViewMode: 'invalid',
         projectFilter: '   ',
       } as unknown as Parameters<typeof normalizeBriefListUiState>[0]
     );
@@ -28,8 +26,7 @@ describe('briefListUiState', () => {
     expect(normalized).toEqual({
       activeTab: 'briefs',
       filterStatus: 'all',
-      sortBy: 'smart',
-      briefViewMode: 'smart',
+      sortBy: 'newest',
       projectFilter: 'all',
     });
   });
@@ -40,7 +37,6 @@ describe('briefListUiState', () => {
         activeTab: 'articles',
         filterStatus: 'complete',
         sortBy: 'name',
-        briefViewMode: 'grouped',
         projectFilter: 'project-123',
       },
       { resetProjectFilter: true },
@@ -50,7 +46,6 @@ describe('briefListUiState', () => {
       activeTab: 'articles',
       filterStatus: 'complete',
       sortBy: 'name',
-      briefViewMode: 'grouped',
       projectFilter: 'all',
     });
   });

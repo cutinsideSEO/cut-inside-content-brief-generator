@@ -3,8 +3,8 @@ import { FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircle
 import { ClientSwitcherDropdown } from './PreWizardHeader';
 import type { ContentBrief } from '../types';
 import type { ClientWithBriefCount } from '../types/database';
-import type { BriefListActiveTab, BriefListFilterStatus, BriefListSortBy, BriefListViewMode } from '../types/briefListUi';
-import { Select, Tabs } from './ui';
+import type { BriefListActiveTab, BriefListFilterStatus, BriefListSortBy } from '../types/briefListUi';
+import { Select } from './ui';
 import { buildSidebarBriefListModel } from '../utils/sidebarBriefListModel';
 
 type AppView = 'initial_input' | 'context_input' | 'visualization' | 'dashboard' | 'content_generation' | 'brief_list';
@@ -38,12 +38,10 @@ interface SidebarProps {
   activeTab?: BriefListActiveTab;
   filterStatus?: BriefListFilterStatus;
   sortBy?: BriefListSortBy;
-  briefViewMode?: BriefListViewMode;
   projectFilter?: string;
   onActiveTabChange?: (activeTab: BriefListActiveTab) => void;
   onFilterStatusChange?: (filterStatus: BriefListFilterStatus) => void;
   onSortByChange?: (sortBy: BriefListSortBy) => void;
-  onBriefViewModeChange?: (briefViewMode: BriefListViewMode) => void;
   onProjectFilterChange?: (projectFilter: string) => void;
   projectFilterOptions?: Array<{ value: string; label: string }>;
 }
@@ -95,17 +93,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSwitchClient,
   selectedClientId,
   filterStatus,
-  briefViewMode,
   projectFilter,
   onFilterStatusChange,
-  onBriefViewModeChange,
   onProjectFilterChange,
   projectFilterOptions,
 }) => {
   // Brief list sidebar
   if (currentView === 'brief_list') {
     const resolvedFilter = filterStatus || 'all';
-    const resolvedViewMode = briefViewMode || 'smart';
     const resolvedProjectFilter = projectFilter && projectFilter.trim() ? projectFilter : 'all';
     const totalBriefCount =
       (briefCounts?.draft || 0) +
@@ -204,19 +199,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             />
           </div>
 
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <h4 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-2">View</h4>
-            <Tabs
-              items={[
-                { id: 'smart', label: 'Smart Queue' },
-                { id: 'grouped', label: 'Grouped' },
-              ]}
-              activeId={resolvedViewMode}
-              onChange={(id) => onBriefViewModeChange?.(id as BriefListViewMode)}
-              variant="pills"
-              size="sm"
-            />
-          </div>
 
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600 rounded-md">

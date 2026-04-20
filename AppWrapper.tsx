@@ -111,10 +111,6 @@ const AppWrapperInner: React.FC = () => {
     applyBriefListUiState({ sortBy });
   }, [applyBriefListUiState]);
 
-  const handleBriefListViewModeChange = useCallback((briefViewMode: BriefListUiState['briefViewMode']) => {
-    applyBriefListUiState({ briefViewMode });
-  }, [applyBriefListUiState]);
-
   const handleBriefListProjectFilterChange = useCallback((projectFilter: string) => {
     applyBriefListUiState({ projectFilter });
   }, [applyBriefListUiState]);
@@ -706,12 +702,10 @@ const AppWrapperInner: React.FC = () => {
               activeTab={briefListUiState.activeTab}
               filterStatus={briefListUiState.filterStatus}
               sortBy={briefListUiState.sortBy}
-              briefViewMode={briefListUiState.briefViewMode}
               projectFilter={briefListUiState.projectFilter}
               onActiveTabChange={handleBriefListActiveTabChange}
               onFilterStatusChange={handleBriefListFilterStatusChange}
               onSortByChange={handleBriefListSortByChange}
-              onBriefViewModeChange={handleBriefListViewModeChange}
               onProjectFilterChange={handleBriefListProjectFilterChange}
               projectFilterOptions={briefListProjectFilterOptions}
             />
@@ -739,12 +733,10 @@ const AppWrapperInner: React.FC = () => {
                     activeTab={briefListUiState.activeTab}
                     filterStatus={briefListUiState.filterStatus}
                     sortBy={briefListUiState.sortBy}
-                    briefViewMode={briefListUiState.briefViewMode}
                     projectFilter={briefListUiState.projectFilter}
                     onActiveTabChange={handleBriefListActiveTabChange}
                     onFilterStatusChange={handleBriefListFilterStatusChange}
                     onSortByChange={handleBriefListSortByChange}
-                    onBriefViewModeChange={handleBriefListViewModeChange}
                     onProjectFilterChange={handleBriefListProjectFilterChange}
                     onProjectFilterOptionsChange={handleBriefListProjectFilterOptionsChange}
                   />

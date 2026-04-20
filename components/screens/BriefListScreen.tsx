@@ -22,7 +22,6 @@ import type {
   BriefListActiveTab,
   BriefListFilterStatus,
   BriefListSortBy,
-  BriefListViewMode,
 } from '../../types/briefListUi';
 import Button from '../Button';
 import { Card, Input, Select, Alert, Tabs, Skeleton, Modal, Badge, Progress } from '../ui';
@@ -46,12 +45,10 @@ interface BriefListScreenProps {
   activeTab: BriefListActiveTab;
   filterStatus: BriefListFilterStatus;
   sortBy: BriefListSortBy;
-  briefViewMode: BriefListViewMode;
   projectFilter: string;
   onActiveTabChange: (activeTab: BriefListActiveTab) => void;
   onFilterStatusChange: (filterStatus: BriefListFilterStatus) => void;
   onSortByChange: (sortBy: BriefListSortBy) => void;
-  onBriefViewModeChange: (briefViewMode: BriefListViewMode) => void;
   onProjectFilterChange: (projectFilter: string) => void;
   onProjectFilterOptionsChange?: (options: Array<{ value: string; label: string }>) => void;
 }
@@ -78,12 +75,10 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   activeTab,
   filterStatus,
   sortBy,
-  briefViewMode,
   projectFilter,
   onActiveTabChange,
   onFilterStatusChange,
   onSortByChange,
-  onBriefViewModeChange,
   onProjectFilterChange,
   onProjectFilterOptionsChange,
 }) => {
@@ -525,26 +520,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       return true;
     });
 
-    const getSmartRank = (brief: BriefWithClient) => {
-      const generation = generatingBriefs[brief.id];
-      if (isBriefActivelyGenerating(generation?.status)) return 0;
-      if (brief.status === 'changes_requested' || brief.status === 'in_writing' || brief.status === 'sent_to_client') return 1;
-      if (brief.status === 'in_progress') return 2;
-      if (brief.status === 'draft') return 3;
-      if (brief.status === 'complete') return 4;
-      if (brief.status === 'approved') return 5;
-      if (brief.status === 'published') return 6;
-      return 7;
-    };
-
     // Sort
     result = [...result].sort((a, b) => {
       switch (sortBy) {
-        case 'smart': {
-          const rankDiff = getSmartRank(a) - getSmartRank(b);
-          if (rankDiff !== 0) return rankDiff;
-          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-        }
         case 'oldest':
           return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         case 'modified':
@@ -558,7 +536,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     });
 
     return result;
-  }, [briefsWithEffectiveStatus, filterStatus, generatingBriefs, searchQuery, sortBy]);
+  }, [briefsWithEffectiveStatus, filterStatus, searchQuery, sortBy]);
 
   // Count briefs by status
   const workflowStatuses = ['sent_to_client', 'approved', 'changes_requested', 'in_writing'];
@@ -586,13 +564,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   // Paginated briefs
   const paginatedBriefs = filteredBriefs.slice(0, visibleCount);
   const hasMoreBriefs = filteredBriefs.length > visibleCount;
-
-  // Group paginated briefs by status for better organization
-  const draftBriefs = paginatedBriefs.filter((b) => b.status === 'draft');
-  const inProgressBriefs = paginatedBriefs.filter((b) => b.status === 'in_progress');
-  const completeBriefs = paginatedBriefs.filter((b) => b.status === 'complete');
-  const workflowBriefs = paginatedBriefs.filter((b) => workflowStatuses.includes(b.status));
-  const publishedBriefs = paginatedBriefs.filter((b) => b.status === 'published');
 
   const projectFilterOptions = useMemo(() => {
     return [
@@ -687,6 +658,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         clientLogoUrl={clientLogoUrl}
         clientBrandColor={clientBrandColor}
         briefCount={briefs.length}
+        articleCount={activeTab === 'articles' ? articles.length : articleCount}
+        activeTab={activeTab}
+        onActiveTabChange={onActiveTabChange}
         showSearchControls={activeTab === 'briefs'}
         searchQuery={searchQuery}
         sortBy={sortBy}
@@ -706,22 +680,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         onViewBrief={onContinueBrief}
         onCancelBatch={handleCancelBatch}
       />
-
-
-      {/* Top-level Briefs / Articles toggle */}
-      <div className="mb-6 rounded-lg border border-border bg-card px-3 py-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs
-            items={[
-              { id: 'briefs', label: 'Briefs', count: briefs.length },
-              { id: 'articles', label: 'Articles', count: activeTab === 'articles' ? articles.length : articleCount },
-            ]}
-            activeId={activeTab}
-            onChange={(id) => onActiveTabChange(id as BriefListActiveTab)}
-            variant="pills"
-          />
-        </div>
-      </div>
 
       {/* Articles tab */}
       {activeTab === 'articles' && (
@@ -773,7 +731,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
               <p className="text-gray-600 py-8">No articles generated yet for this client.</p>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {articles.map(article => (
                 <ArticleListCard
                   key={article.id}
@@ -907,98 +865,20 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       {/* Brief list */}
       {!isLoading && !error && filteredBriefs.length > 0 && (
         <>
-          {briefViewMode === 'smart' && (
-            <section>
-              <h2 className="text-lg font-heading font-semibold text-gray-900 mb-1">
-                Smart Queue ({paginatedBriefs.length})
-              </h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Ordered by urgency: generating, workflow-blocked, in progress, then remaining.
-            </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {paginatedBriefs.map(renderBriefCard)}
-              </div>
-            </section>
-          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {paginatedBriefs.map(renderBriefCard)}
+          </div>
 
-          {briefViewMode === 'grouped' && (
-            <div className="space-y-8">
-              <p className="text-sm text-muted-foreground -mt-1">
-                Grouped view keeps workflow buckets visible for manual review.
-              </p>
-              {inProgressBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'in_progress') && (
-                <section>
-                  <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="w-3 h-3 bg-amber-500 rounded-full mr-3" />
-                    In Progress ({inProgressBriefs.length})
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {inProgressBriefs.map(renderBriefCard)}
-                  </div>
-                </section>
-              )}
-
-              {draftBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'draft') && (
-                <section>
-                  <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="w-3 h-3 bg-gray-400 rounded-full mr-3" />
-                    Drafts ({draftBriefs.length})
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {draftBriefs.map(renderBriefCard)}
-                  </div>
-                </section>
-              )}
-
-              {completeBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'complete') && (
-                <section>
-                  <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="w-3 h-3 bg-emerald-500 rounded-full mr-3" />
-                    Complete ({completeBriefs.length})
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {completeBriefs.map(renderBriefCard)}
-                  </div>
-                </section>
-              )}
-
-              {workflowBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'workflow') && (
-                <section>
-                  <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="w-3 h-3 bg-teal-500 rounded-full mr-3" />
-                    In Workflow ({workflowBriefs.length})
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {workflowBriefs.map(renderBriefCard)}
-                  </div>
-                </section>
-              )}
-
-              {publishedBriefs.length > 0 && (filterStatus === 'all' || filterStatus === 'published') && (
-                <section>
-                  <h2 className="text-lg font-heading font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="w-3 h-3 bg-emerald-500 rounded-full mr-3" />
-                    Published ({publishedBriefs.length})
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {publishedBriefs.map(renderBriefCard)}
-                  </div>
-                </section>
-              )}
+          {hasMoreBriefs && (
+            <div className="text-center mt-6">
+              <Button
+                variant="secondary"
+                onClick={() => setVisibleCount(prev => prev + BRIEF_PAGE_SIZE)}
+              >
+                Load More ({filteredBriefs.length - visibleCount} remaining)
+              </Button>
             </div>
           )}
-
-        {/* Load More */}
-        {hasMoreBriefs && (
-          <div className="text-center mt-6">
-            <Button
-              variant="secondary"
-              onClick={() => setVisibleCount(prev => prev + BRIEF_PAGE_SIZE)}
-            >
-              Load More ({filteredBriefs.length - visibleCount} remaining)
-            </Button>
-          </div>
-        )}
         </>
       )}
       </>)}
@@ -1124,19 +1004,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
               onChange={(event) => onProjectFilterChange(event.target.value)}
               options={projectFilterOptions}
               aria-label="Mobile project filter"
-            />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">View</p>
-            <Tabs
-              items={[
-                { id: 'smart', label: 'Smart Queue' },
-                { id: 'grouped', label: 'Grouped' },
-              ]}
-              activeId={briefViewMode}
-              onChange={(id) => onBriefViewModeChange(id as BriefListViewMode)}
-              variant="pills"
-              size="sm"
             />
           </div>
         </div>

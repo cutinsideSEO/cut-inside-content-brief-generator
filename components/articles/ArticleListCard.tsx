@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import type { ArticleWithBrief, ArticleStatus } from '../../types/database';
 import { Badge, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, WorkItemCard } from '../ui';
-import Button from '../Button';
 import { FileTextIcon } from '../Icon';
+import { formatRelativeTime } from '../../utils/relativeTime';
 import ArticleStatusBadge from './ArticleStatusBadge';
 import WorkflowStatusSelect from '../briefs/WorkflowStatusSelect';
 import PublishedUrlModal from '../briefs/PublishedUrlModal';
@@ -45,11 +45,6 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
   const wordCount = article.content.trim().split(/\s+/).filter(Boolean).length;
   const [showPublishModal, setShowPublishModal] = useState(false);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
   const getStatusBorderColor = (status: ArticleStatus) => {
     switch (status) {
       case 'published':
@@ -64,12 +59,14 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
   };
 
   const articleStatus = article.status || 'draft';
+  const stopClick = (event: React.MouseEvent) => event.stopPropagation();
 
   return (
     <>
       <WorkItemCard
         hover
         accentClassName={getStatusBorderColor(articleStatus)}
+        onClick={() => onView(article.id)}
         header={(
           <div className="flex items-start gap-3">
             <div className="pt-0.5 flex-shrink-0">
@@ -77,12 +74,9 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
             </div>
 
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-heading font-semibold text-foreground leading-snug truncate">
+              <h3 className="text-sm font-heading font-semibold text-foreground leading-snug line-clamp-2">
                 {article.title}
               </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                From: {article.brief_name}
-              </p>
               {projectName && (
                 <div className="mt-1">
                   <Badge variant="default" size="sm">{projectName}</Badge>
@@ -90,8 +84,7 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {article.is_current && <Badge variant="success" size="sm">Current</Badge>}
+            <div className="flex items-center gap-1.5 flex-shrink-0" onClick={stopClick}>
               {onStatusChange ? (
                 <WorkflowStatusSelect
                   entityType="article"
@@ -104,10 +97,12 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
               ) : (
                 <ArticleStatusBadge status={articleStatus} />
               )}
-              <Badge variant="default" size="sm">v{article.version}</Badge>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground opacity-100">
+                  <button
+                    onClick={stopClick}
+                    className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                  >
                     <MoreHorizontalIcon className="h-4 w-4" />
                   </button>
                 </DropdownMenuTrigger>
@@ -134,31 +129,37 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({ article, onView, onDe
           </div>
         )}
         footer={(
-          <Button variant="primary" size="sm" onClick={() => onView(article.id)}>
-            View Article
-          </Button>
+          <div
+            className="flex items-center justify-between gap-2 w-full text-xs text-muted-foreground"
+            onClick={stopClick}
+          >
+            <div className="flex items-center gap-2">
+              <span>v{article.version}</span>
+              <span className="text-border">·</span>
+              <span>{wordCount.toLocaleString()} words</span>
+              {article.is_current && (
+                <>
+                  <span className="text-border">·</span>
+                  <span className="text-teal font-medium">Current</span>
+                </>
+              )}
+            </div>
+            <span>{formatRelativeTime(article.created_at)}</span>
+          </div>
         )}
       >
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
-          <span>{wordCount.toLocaleString()} words</span>
-          <span className="text-border">|</span>
-          <span>{formatDate(article.created_at)}</span>
-          {article.published_url && (
-            <>
-              <span className="text-border">|</span>
-              <a
-                href={article.published_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-teal hover:underline truncate max-w-[200px]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <LinkIcon className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">{article.published_url.replace(/^https?:\/\//, '')}</span>
-              </a>
-            </>
-          )}
-        </div>
+        {article.published_url && (
+          <a
+            href={article.published_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={stopClick}
+            className="inline-flex items-center gap-1 mt-3 text-xs text-teal hover:underline truncate max-w-full"
+          >
+            <LinkIcon className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{article.published_url.replace(/^https?:\/\//, '')}</span>
+          </a>
+        )}
       </WorkItemCard>
 
       <PublishedUrlModal

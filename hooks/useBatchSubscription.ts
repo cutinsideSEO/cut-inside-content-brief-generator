@@ -43,7 +43,7 @@ export function useBatchSubscription(clientId: string | null) {
 
     const { data, error } = await supabase
       .from('generation_jobs')
-      .select('batch_id, brief_id, status, job_type, progress')
+      .select('batch_id, brief_id, status, job_type, progress, created_at')
       .in('batch_id', uniqueBatchIds);
 
     if (error) {
@@ -71,6 +71,26 @@ export function useBatchSubscription(clientId: string | null) {
       status: GenerationJobStatus;
     }>> = {};
 
+    // For fractional progress, collapse to one representative job per (batch, brief)
+    // so chained full_brief step transitions don't cause mid-pipeline dips and
+    // double-counting between a completing job and its queued successor.
+    // Priority: running > pending > latest created_at.
+    const activeJobKey = (batchId: string, briefId: string) => `${batchId}::${briefId}`;
+    const activeJobByBriefInBatch = new Map<string, {
+      batch_id: string;
+      brief_id: string;
+      status: GenerationJobStatus;
+      // deno-lint-ignore no-explicit-any
+      progress: any;
+      created_at: string | null;
+    }>();
+
+    const statusRank = (status: GenerationJobStatus): number => {
+      if (status === 'running') return 3;
+      if (status === 'pending') return 2;
+      return 1;
+    };
+
     for (const row of data || []) {
       if (!row.batch_id || !next[row.batch_id]) continue;
       const rowStatus = row.status as GenerationJobStatus;
@@ -82,15 +102,54 @@ export function useBatchSubscription(clientId: string | null) {
         status: rowStatus,
       });
 
-      if (row.status === 'pending') {
-        next[row.batch_id].pendingJobs += 1;
+      if (!row.brief_id) continue;
+      const key = activeJobKey(row.batch_id, row.brief_id);
+      const existing = activeJobByBriefInBatch.get(key);
+      if (!existing) {
+        activeJobByBriefInBatch.set(key, {
+          batch_id: row.batch_id,
+          brief_id: row.brief_id,
+          status: rowStatus,
+          progress: row.progress,
+          created_at: (row as { created_at?: string | null }).created_at ?? null,
+        });
         continue;
       }
-      if (row.status === 'running') {
-        const pct = normalizeProgressPercentage(row.progress);
-        next[row.batch_id].runningJobs += 1;
-        next[row.batch_id].fractionalCompletedJobs += pct / 100;
-        runningPercentTotals[row.batch_id] = (runningPercentTotals[row.batch_id] || 0) + pct;
+
+      const existingRank = statusRank(existing.status);
+      const nextRank = statusRank(rowStatus);
+      if (nextRank > existingRank) {
+        existing.status = rowStatus;
+        existing.progress = row.progress;
+        existing.created_at = (row as { created_at?: string | null }).created_at ?? null;
+        continue;
+      }
+      if (nextRank === existingRank) {
+        const existingTime = existing.created_at ? Date.parse(existing.created_at) : 0;
+        const nextTime = (row as { created_at?: string | null }).created_at
+          ? Date.parse((row as { created_at?: string | null }).created_at as string)
+          : 0;
+        if (nextTime >= existingTime) {
+          existing.status = rowStatus;
+          existing.progress = row.progress;
+          existing.created_at = (row as { created_at?: string | null }).created_at ?? null;
+        }
+      }
+    }
+
+    for (const job of activeJobByBriefInBatch.values()) {
+      if (!next[job.batch_id]) continue;
+      if (job.status === 'running') {
+        const pct = normalizeProgressPercentage(job.progress);
+        next[job.batch_id].runningJobs += 1;
+        next[job.batch_id].fractionalCompletedJobs += pct / 100;
+        runningPercentTotals[job.batch_id] = (runningPercentTotals[job.batch_id] || 0) + pct;
+      } else if (job.status === 'pending') {
+        const pct = normalizeProgressPercentage(job.progress);
+        next[job.batch_id].pendingJobs += 1;
+        // Include pending queued percentage so chained step transitions don't
+        // dip the progress bar between "old step completed" and "new step running".
+        next[job.batch_id].fractionalCompletedJobs += pct / 100;
       }
     }
 

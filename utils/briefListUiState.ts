@@ -13,6 +13,7 @@ const FILTER_STATUSES: readonly BriefListFilterStatus[] = [
   'complete',
   'workflow',
   'published',
+  'archived',
 ];
 const SORT_BY_OPTIONS: readonly BriefListSortBy[] = ['newest', 'oldest', 'modified', 'name'];
 

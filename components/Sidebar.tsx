@@ -28,7 +28,7 @@ interface SidebarProps {
   clientLogoUrl?: string | null;
   clientBrandColor?: string | null;
   onBackToClients?: () => void;
-  briefCounts?: { draft: number; in_progress: number; complete: number; workflow?: number; published?: number };
+  briefCounts?: { draft: number; in_progress: number; complete: number; workflow?: number; published?: number; archived?: number };
   articleCount?: number;
   onOpenClientSettings?: () => void;
   // Client switcher props
@@ -118,6 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         complete: briefCounts?.complete || 0,
         workflow: briefCounts?.workflow || 0,
         published: briefCounts?.published || 0,
+        archived: briefCounts?.archived || 0,
       },
       activeFilter: resolvedFilter,
     });
@@ -169,7 +170,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          <h4 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-3">Overview</h4>
+          <h4 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-3">Briefs</h4>
           <nav className="space-y-1">
             {sidebarModel.statusRows.map((row) => {
               const isActive = activeTab !== 'articles' && row.isActive;
@@ -194,6 +195,28 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               );
             })}
+            {sidebarModel.archivedRow && (
+              <button
+                key="archived"
+                onClick={() => {
+                  if (activeTab === 'articles') onActiveTabChange?.('briefs');
+                  onFilterStatusChange?.('archived');
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${
+                  activeTab !== 'articles' && sidebarModel.archivedRow.isActive
+                    ? 'bg-teal-50 text-teal'
+                    : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${sidebarModel.archivedRow.dotClassName}`} />
+                  {sidebarModel.archivedRow.label}
+                </span>
+                <span className={activeTab !== 'articles' && sidebarModel.archivedRow.isActive ? 'text-teal/80' : 'text-gray-400'}>
+                  {sidebarModel.archivedRow.count}
+                </span>
+              </button>
+            )}
           </nav>
 
           <div className="mt-4 pt-4 border-t border-gray-200">
@@ -208,31 +231,23 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
 
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <button
-              onClick={() => onActiveTabChange?.('articles')}
-              className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${
-                activeTab === 'articles'
-                  ? 'bg-teal-50 text-teal'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <svg
-                  className={`w-3.5 h-3.5 ${activeTab === 'articles' ? 'text-teal' : 'text-gray-400'}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Articles
-              </span>
-              <span className={activeTab === 'articles' ? 'text-teal/80' : 'text-gray-400'}>
-                {articleCount || 0}
-              </span>
-            </button>
-          </div>
+          <h4 className="mt-6 text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-3">Articles</h4>
+          <button
+            onClick={() => onActiveTabChange?.('articles')}
+            className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${
+              activeTab === 'articles'
+                ? 'bg-teal-50 text-teal'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${activeTab === 'articles' ? 'bg-teal-500' : 'bg-gray-300'}`} />
+              All Articles
+            </span>
+            <span className={activeTab === 'articles' ? 'text-teal/80' : 'text-gray-400'}>
+              {articleCount || 0}
+            </span>
+          </button>
 
           {onOpenClientSettings && (
             <div className="mt-4 pt-4 border-t border-gray-200">

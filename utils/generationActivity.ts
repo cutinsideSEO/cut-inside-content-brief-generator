@@ -19,6 +19,60 @@ export function getGenerationStatusBadgeLabel(status: GenerationStatus): string 
   return 'Idle';
 }
 
+export type BatchDisplayStatus =
+  | 'running'
+  | 'completed'
+  | 'partially_failed'
+  | 'cancelled'
+  | 'failed';
+
+export interface BatchStatusDisplay {
+  label: string;
+  badgeVariant: 'teal' | 'success' | 'warning' | 'error';
+  progressColor: 'teal' | 'yellow' | 'red';
+}
+
+export function getBatchStatusDisplay(status: string, failedJobs: number): BatchStatusDisplay {
+  switch (status) {
+    case 'running':
+      return {
+        label: 'Running',
+        badgeVariant: failedJobs > 0 ? 'warning' : 'teal',
+        progressColor: failedJobs > 0 ? 'yellow' : 'teal',
+      };
+    case 'completed':
+      return {
+        label: failedJobs > 0 ? 'Completed with errors' : 'Completed',
+        badgeVariant: failedJobs > 0 ? 'warning' : 'success',
+        progressColor: failedJobs > 0 ? 'yellow' : 'teal',
+      };
+    case 'partially_failed':
+      return {
+        label: 'Partial failure',
+        badgeVariant: 'warning',
+        progressColor: 'yellow',
+      };
+    case 'cancelled':
+      return {
+        label: 'Cancelled',
+        badgeVariant: 'warning',
+        progressColor: 'yellow',
+      };
+    case 'failed':
+      return {
+        label: 'Failed',
+        badgeVariant: 'error',
+        progressColor: 'red',
+      };
+    default:
+      return {
+        label: status.replace(/_/g, ' '),
+        badgeVariant: 'teal',
+        progressColor: 'teal',
+      };
+  }
+}
+
 function clampPercentage(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));

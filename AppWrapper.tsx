@@ -123,7 +123,7 @@ const AppWrapperInner: React.FC = () => {
   const [articleCount, setArticleCount] = useState(0);
 
   // Brief counts for sidebar
-  const [briefCounts, setBriefCounts] = useState<{ draft: number; in_progress: number; complete: number; workflow?: number; published?: number }>({ draft: 0, in_progress: 0, complete: 0 });
+  const [briefCounts, setBriefCounts] = useState<{ draft: number; in_progress: number; complete: number; workflow?: number; published?: number; archived?: number }>({ draft: 0, in_progress: 0, complete: 0 });
 
   // All clients for client switcher dropdown
   const [allClients, setAllClients] = useState<import('./types/database').ClientWithBriefCount[]>([]);
@@ -138,8 +138,15 @@ const AppWrapperInner: React.FC = () => {
   }, [isAuthenticated, state.mode]);
 
   // Callback for BriefListScreen to sync counts with sidebar
-  const handleCountsChange = useCallback((counts: { draft: number; in_progress: number; complete: number; workflow: number; published: number; articles: number }) => {
-    setBriefCounts({ draft: counts.draft, in_progress: counts.in_progress, complete: counts.complete, workflow: counts.workflow, published: counts.published });
+  const handleCountsChange = useCallback((counts: { draft: number; in_progress: number; complete: number; workflow: number; published: number; archived: number; articles: number }) => {
+    setBriefCounts({
+      draft: counts.draft,
+      in_progress: counts.in_progress,
+      complete: counts.complete,
+      workflow: counts.workflow,
+      published: counts.published,
+      archived: counts.archived,
+    });
     setArticleCount(counts.articles);
   }, []);
 
@@ -243,6 +250,9 @@ const AppWrapperInner: React.FC = () => {
               };
             } else if (isTerminalJobUpdate(job)) {
               if (isPipelineTransition) {
+                // Replace the completed competitors progress (percentage: 100)
+                // with a clean brief-phase progress so the progress bar doesn't
+                // flash 100% → 0% when the chained full_brief job is inserted.
                 return {
                   ...prev,
                   generatingBriefs: {
@@ -255,7 +265,12 @@ const AppWrapperInner: React.FC = () => {
                       terminalStatus: undefined,
                       isBackend: true,
                       jobId: job.id,
-                      jobProgress: progress,
+                      jobProgress: {
+                        current_step: 1,
+                        total_steps: 7,
+                        step_name: 'Queued — starting brief generation',
+                        percentage: 0,
+                      },
                       updatedAt: job.updated_at,
                     },
                   },

@@ -17,6 +17,8 @@ import type { ContentBrief, ModelSettings, LengthConstraints, ExtractedTemplate 
 
 export interface GetBriefsForClientOptions {
   projectId?: string | 'unassigned';
+  /** When true, only archived briefs are returned. Default: archived briefs are hidden. */
+  archivedOnly?: boolean;
 }
 
 const STALE_TERMINAL_VIEWS = new Set<AppView | undefined>([
@@ -122,8 +124,13 @@ export async function getBriefsForClient(
         *,
         client:clients(*)
       `)
-      .eq('client_id', clientId)
-      .neq('status', 'archived');
+      .eq('client_id', clientId);
+
+    if (options?.archivedOnly) {
+      query = query.eq('status', 'archived');
+    } else {
+      query = query.neq('status', 'archived');
+    }
 
     if (options?.projectId === 'unassigned') {
       query = query.is('project_id', null);

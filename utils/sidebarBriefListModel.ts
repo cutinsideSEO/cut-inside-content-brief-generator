@@ -7,6 +7,7 @@ interface SidebarBriefListCounts {
   complete: number;
   workflow: number;
   published: number;
+  archived: number;
 }
 
 interface BuildSidebarBriefListModelInput {
@@ -24,6 +25,7 @@ interface SidebarStatusRow {
 
 interface SidebarBriefListModel {
   statusRows: SidebarStatusRow[];
+  archivedRow: SidebarStatusRow | null;
 }
 
 const STATUS_META: Record<BriefListFilterStatus, { label: string; dotClassName: string }> = {
@@ -33,6 +35,7 @@ const STATUS_META: Record<BriefListFilterStatus, { label: string; dotClassName: 
   complete: { label: 'Complete', dotClassName: 'bg-emerald-500' },
   workflow: { label: 'In Workflow', dotClassName: 'bg-cyan-500' },
   published: { label: 'Published', dotClassName: 'bg-emerald-600' },
+  archived: { label: 'Archived', dotClassName: 'bg-gray-400' },
 };
 
 export function buildSidebarBriefListModel({
@@ -58,5 +61,15 @@ export function buildSidebarBriefListModel({
       isActive: activeFilter === id,
     }));
 
-  return { statusRows };
+  const archivedRow: SidebarStatusRow | null = counts.archived > 0 || activeFilter === 'archived'
+    ? {
+        id: 'archived' as BriefListFilterStatus,
+        label: STATUS_META.archived.label,
+        count: counts.archived,
+        dotClassName: STATUS_META.archived.dotClassName,
+        isActive: activeFilter === 'archived',
+      }
+    : null;
+
+  return { statusRows, archivedRow };
 }

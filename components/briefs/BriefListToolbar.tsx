@@ -1,7 +1,15 @@
 import React from 'react';
 import Button from '../Button';
 import type { BriefListActiveTab, BriefListSortBy } from '../../types/briefListUi';
-import { Input, Select, Tabs } from '../ui';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+  Tabs,
+} from '../ui';
+import { ChevronDownIcon } from '../Icon';
 
 interface BriefListToolbarProps {
   clientName: string;
@@ -21,6 +29,13 @@ interface BriefListToolbarProps {
   onOpenCreateProject: () => void;
   onOpenMobileFilters?: () => void;
 }
+
+const SORT_LABEL: Record<BriefListSortBy, string> = {
+  newest: 'Newest',
+  oldest: 'Oldest',
+  modified: 'Last modified',
+  name: 'Name A-Z',
+};
 
 const BriefListToolbar: React.FC<BriefListToolbarProps> = ({
   clientName,
@@ -101,14 +116,14 @@ const BriefListToolbar: React.FC<BriefListToolbarProps> = ({
         </div>
       </div>
 
-      {/* Row 3: search + sort (briefs tab only) */}
+      {/* Row 3: search + sort inline (briefs tab only) */}
       {showSearchControls && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2">
           <Input
             placeholder="Search briefs by name or keywords..."
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
-            className="flex-1"
+            className="w-full sm:w-80"
             icon={(
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -120,19 +135,30 @@ const BriefListToolbar: React.FC<BriefListToolbarProps> = ({
               </svg>
             )}
           />
-          <Select
-            value={sortBy}
-            onChange={(event) => onSortByChange(event.target.value as BriefListSortBy)}
-            options={[
-              { value: 'newest', label: 'Newest First' },
-              { value: 'oldest', label: 'Oldest First' },
-              { value: 'modified', label: 'Last Modified' },
-              { value: 'name', label: 'Name A-Z' },
-            ]}
-            size="sm"
-            className="sm:w-48"
-            aria-label="Sort briefs"
-          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-border rounded-md bg-card hover:bg-secondary transition-colors whitespace-nowrap"
+                aria-label="Sort briefs"
+              >
+                <span className="text-muted-foreground">Sort:</span>
+                <span className="font-medium text-foreground">{SORT_LABEL[sortBy]}</span>
+                <ChevronDownIcon className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {(Object.keys(SORT_LABEL) as BriefListSortBy[]).map((key) => (
+                <DropdownMenuItem
+                  key={key}
+                  onSelect={() => onSortByChange(key)}
+                  className={sortBy === key ? 'text-teal font-medium' : ''}
+                >
+                  {SORT_LABEL[key]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )}
     </div>

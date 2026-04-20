@@ -6,7 +6,8 @@ export type BriefListFilterStatus =
   | 'in_progress'
   | 'complete'
   | 'workflow'
-  | 'published';
+  | 'published'
+  | 'archived';
 
 export type BriefListSortBy = 'newest' | 'oldest' | 'modified' | 'name';
 

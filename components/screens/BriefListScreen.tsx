@@ -41,7 +41,7 @@ interface BriefListScreenProps {
   // Article navigation
   onViewArticle: (articleId: string) => void;
   // Callback to sync counts with parent (sidebar)
-  onCountsChange?: (counts: { draft: number; in_progress: number; complete: number; workflow: number; published: number; articles: number }) => void;
+  onCountsChange?: (counts: { draft: number; in_progress: number; complete: number; workflow: number; published: number; archived: number; articles: number }) => void;
   activeTab: BriefListActiveTab;
   filterStatus: BriefListFilterStatus;
   sortBy: BriefListSortBy;
@@ -83,6 +83,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   onProjectFilterOptionsChange,
 }) => {
   const [briefs, setBriefs] = useState<BriefWithClient[]>([]);
+  const [archivedBriefs, setArchivedBriefs] = useState<BriefWithClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,8 +138,10 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     setIsLoading(true);
     setError(null);
 
-    const projectOptions = projectFilter === 'all' ? undefined : { projectId: projectFilter as string | 'unassigned' };
-    const { data, error: fetchError } = await getBriefsForClient(clientId, projectOptions);
+    const projectOption = projectFilter === 'all'
+      ? {}
+      : { projectId: projectFilter as string | 'unassigned' };
+    const { data, error: fetchError } = await getBriefsForClient(clientId, projectOption);
 
     if (fetchError) {
       setError(fetchError);
@@ -147,6 +150,14 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     }
 
     setIsLoading(false);
+  }, [clientId, projectFilter]);
+
+  const loadArchivedBriefs = useCallback(async () => {
+    const projectOption = projectFilter === 'all'
+      ? {}
+      : { projectId: projectFilter as string | 'unassigned' };
+    const { data } = await getBriefsForClient(clientId, { ...projectOption, archivedOnly: true });
+    setArchivedBriefs(data || []);
   }, [clientId, projectFilter]);
 
   const loadArticleCount = useCallback(async () => {
@@ -176,7 +187,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   useEffect(() => {
     loadBriefs();
     loadArticleCount();
-  }, [loadBriefs, loadArticleCount]);
+    loadArchivedBriefs();
+  }, [loadBriefs, loadArticleCount, loadArchivedBriefs]);
 
   // Reload briefs when a background generation finishes (brief removed from generatingBriefs)
   const prevGeneratingIdsRef = useRef<Set<string>>(new Set(Object.keys(generatingBriefs)));
@@ -253,6 +265,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
     // Remove from local list
     setBriefs((prev) => prev.filter((b) => b.id !== briefId));
+    loadArchivedBriefs();
   };
 
   // Bulk selection helpers
@@ -278,6 +291,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       if (archiveError) failed++;
     }
     setBriefs(prev => prev.filter(b => !selectedBriefs.has(b.id) || failed > 0));
+    loadArchivedBriefs();
     toast.success(`Archived ${ids.length - failed} brief${ids.length - failed !== 1 ? 's' : ''}`);
     if (failed > 0) toast.error(`Failed to archive ${failed} brief${failed !== 1 ? 's' : ''}`);
     clearSelection();
@@ -499,6 +513,34 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
   // Filter, search, and sort briefs
   const filteredBriefs = useMemo(() => {
+    // Archived filter uses the separate archivedBriefs state so status counts
+    // for active briefs stay stable while viewing archived.
+    if (filterStatus === 'archived') {
+      const result = [...archivedBriefs].filter((brief) => {
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          const matchesName = brief.name.toLowerCase().includes(query);
+          const matchesKeywords = brief.keywords?.some((k) => k.kw.toLowerCase().includes(query));
+          return matchesName || matchesKeywords;
+        }
+        return true;
+      });
+
+      return result.sort((a, b) => {
+        switch (sortBy) {
+          case 'oldest':
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          case 'modified':
+            return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+          case 'name':
+            return a.name.localeCompare(b.name);
+          case 'newest':
+          default:
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+      });
+    }
+
     let result = briefsWithEffectiveStatus.filter((brief) => {
       if (filterStatus === 'workflow') {
         return ['sent_to_client', 'approved', 'changes_requested', 'in_writing'].includes(brief.status);
@@ -536,7 +578,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     });
 
     return result;
-  }, [briefsWithEffectiveStatus, filterStatus, searchQuery, sortBy]);
+  }, [archivedBriefs, briefsWithEffectiveStatus, filterStatus, searchQuery, sortBy]);
 
   // Count briefs by status
   const workflowStatuses = ['sent_to_client', 'approved', 'changes_requested', 'in_writing'];
@@ -547,6 +589,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
     complete: briefsWithEffectiveStatus.filter((b) => b.status === 'complete').length,
     workflow: briefsWithEffectiveStatus.filter((b) => workflowStatuses.includes(b.status)).length,
     published: briefsWithEffectiveStatus.filter((b) => b.status === 'published').length,
+    archived: archivedBriefs.length,
   };
 
   // Sync counts with parent (sidebar) whenever briefs or articleCount change
@@ -557,9 +600,10 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       complete: counts.complete,
       workflow: counts.workflow,
       published: counts.published,
+      archived: counts.archived,
       articles: articleCount,
     });
-  }, [counts.draft, counts.in_progress, counts.complete, counts.workflow, counts.published, articleCount]);
+  }, [counts.draft, counts.in_progress, counts.complete, counts.workflow, counts.published, counts.archived, articleCount]);
 
   // Paginated briefs
   const paginatedBriefs = filteredBriefs.slice(0, visibleCount);
@@ -598,8 +642,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       { id: 'complete', label: 'Complete', count: counts.complete },
       ...(counts.workflow > 0 ? [{ id: 'workflow', label: 'Workflow', count: counts.workflow }] : []),
       ...(counts.published > 0 ? [{ id: 'published', label: 'Published', count: counts.published }] : []),
+      ...(counts.archived > 0 ? [{ id: 'archived', label: 'Archived', count: counts.archived }] : []),
     ];
-  }, [counts.all, counts.complete, counts.draft, counts.in_progress, counts.published, counts.workflow]);
+  }, [counts.all, counts.archived, counts.complete, counts.draft, counts.in_progress, counts.published, counts.workflow]);
 
   const projectNamesById = useMemo(() => {
     return Object.fromEntries(projects.map((project) => [project.id, project.name]));
@@ -788,8 +833,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
 
       {/* Loading state */}
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <Card key={i} padding="md">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
@@ -813,8 +858,8 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         </div>
       )}
 
-      {/* Empty state */}
-      {!isLoading && !error && briefs.length === 0 && (
+      {/* Empty state — no briefs at all */}
+      {!isLoading && !error && briefs.length === 0 && archivedBriefs.length === 0 && (
         <Card variant="default" padding="lg" className="text-center">
           <div className="py-8">
             <div className="mx-auto w-16 h-16 bg-teal/10 rounded-full flex items-center justify-center mb-4">
@@ -845,8 +890,15 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         </Card>
       )}
 
+      {/* No archived briefs */}
+      {!isLoading && !error && filterStatus === 'archived' && archivedBriefs.length === 0 && briefs.length > 0 && (
+        <Card variant="default" padding="lg" className="text-center">
+          <p className="text-gray-600">No archived briefs.</p>
+        </Card>
+      )}
+
       {/* No results from filter */}
-      {!isLoading && !error && briefs.length > 0 && filteredBriefs.length === 0 && (
+      {!isLoading && !error && filterStatus !== 'archived' && briefs.length > 0 && filteredBriefs.length === 0 && (
         <Card variant="default" padding="lg" className="text-center">
           <p className="text-gray-600">No briefs match your search or filter.</p>
           <Button

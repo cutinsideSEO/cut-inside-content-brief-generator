@@ -106,11 +106,13 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
     const title = brief.name.trim().toLowerCase();
     return candidates
       .filter((kw): kw is string => Boolean(kw && kw.trim()))
-      .filter((kw) => kw.trim().toLowerCase() !== title)
-      .slice(0, 3);
+      .filter((kw) => kw.trim().toLowerCase() !== title);
   })();
 
+  const MAX_VISIBLE_KEYWORDS = 2;
+  const visibleKeywords = primaryKeywords.slice(0, MAX_VISIBLE_KEYWORDS);
   const totalKeywords = brief.keywords?.length || 0;
+  const hiddenKeywordCount = Math.max(0, totalKeywords - visibleKeywords.length);
 
   const generationModel = getGenerationProgressModel({
     status: generationStatus,
@@ -255,7 +257,8 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
                 <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
                   View Progress
                 </Button>
-              ) : (
+              ) : null}
+              {!isGenerating && (
                 <>
                   {brief.status !== 'complete' && brief.status !== 'archived' && !isWorkflow && (
                     <Button variant="primary" size="sm" onClick={() => onContinue(brief.id)}>
@@ -287,20 +290,18 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
           </div>
         )}
       >
-        {primaryKeywords.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2.5">
-            {primaryKeywords.map((keyword, index) => (
-              <Badge key={index} variant="teal" size="sm">
-                {keyword}
-              </Badge>
-            ))}
-            {totalKeywords > primaryKeywords.length && (
-              <span className="text-xs text-muted-foreground self-center">
-                +{totalKeywords - primaryKeywords.length}
-              </span>
-            )}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-1.5 mt-2.5 min-h-[1.5rem]">
+          {visibleKeywords.map((keyword, index) => (
+            <Badge key={index} variant="outline" size="sm" className="max-w-[12rem] truncate">
+              {keyword}
+            </Badge>
+          ))}
+          {hiddenKeywordCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              +{hiddenKeywordCount}
+            </span>
+          )}
+        </div>
 
         {isGenerating && (
           <div className="mt-3">

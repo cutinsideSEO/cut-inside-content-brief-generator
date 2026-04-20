@@ -2,7 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { GenerationBatch } from '../../types/database';
 import type { BatchLiveProgress } from '../../hooks/useBatchSubscription';
 import type { GeneratingBrief } from '../../types/generationActivity';
-import { getGenerationProgressModel, getGenerationStatusBadgeLabel } from '../../utils/generationActivity';
+import {
+  getBatchStatusDisplay,
+  getGenerationProgressModel,
+  getGenerationStatusBadgeLabel,
+} from '../../utils/generationActivity';
 import { buildBatchActivityModel, buildGenerationActivitySummary } from '../../utils/generationActivitySummary';
 import { isBriefActivelyGenerating } from '../../utils/generationStatus';
 import Button from '../Button';
@@ -53,6 +57,11 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [recentActivities, setRecentActivities] = useState<Record<string, RecentTerminalActivity>>({});
 
+  // Monotonic progress clamping per brief and per batch so transient
+  // Realtime event ordering can never render a backwards progress bar.
+  const maxBriefPercentByJobRef = useRef<Map<string, number>>(new Map());
+  const maxBatchPercentRef = useRef<Map<string, number>>(new Map());
+
   const activeJobs = useMemo(() => {
     return Object.entries(generatingBriefs)
       .filter(([, entry]) => isBriefActivelyGenerating(entry.status))
@@ -63,9 +72,33 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
           generationStep: entry.step,
           jobProgress: entry.jobProgress,
         });
-        return { briefId, briefName, entry, model };
+        // Clamp on jobId so restarting a brief with a fresh job resets the bar.
+        const clampKey = `${briefId}::${entry.jobId || 'none'}`;
+        const previousMax = maxBriefPercentByJobRef.current.get(clampKey) || 0;
+        const displayPercentage = Math.max(previousMax, model.percentage);
+        maxBriefPercentByJobRef.current.set(clampKey, displayPercentage);
+        return {
+          briefId,
+          briefName,
+          entry,
+          model: { ...model, percentage: displayPercentage },
+        };
       });
   }, [briefNamesById, generatingBriefs]);
+
+  // Prune stale monotonic records for briefs that are no longer active.
+  useEffect(() => {
+    const activeKeys = new Set(
+      Object.entries(generatingBriefs)
+        .filter(([, entry]) => isBriefActivelyGenerating(entry.status))
+        .map(([briefId, entry]) => `${briefId}::${entry.jobId || 'none'}`)
+    );
+    for (const key of Array.from(maxBriefPercentByJobRef.current.keys())) {
+      if (!activeKeys.has(key)) {
+        maxBriefPercentByJobRef.current.delete(key);
+      }
+    }
+  }, [generatingBriefs]);
 
   useEffect(() => {
     const nowIso = new Date().toISOString();
@@ -208,7 +241,20 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
                     const live = liveProgressByBatch[batch.id];
                     const model = buildBatchActivityModel(batch, live);
                     const isRunning = batch.status === 'running';
+                    const isTerminal = !isRunning;
                     const showBriefSummary = Boolean(live?.isMultiStage && live.totalBriefs > 0);
+                    const statusDisplay = getBatchStatusDisplay(batch.status, batch.failed_jobs);
+
+                    // Clamp the bar monotonically so step-transitions never cause
+                    // a transient backwards jump between Realtime events.
+                    const previousMax = maxBatchPercentRef.current.get(batch.id) || 0;
+                    // If the batch has reached a terminal state, snap to the true
+                    // percentage (either 100% completed or the frozen end state).
+                    const rawPercentage = isTerminal
+                      ? (batch.status === 'completed' ? 100 : model.percentage)
+                      : Math.max(previousMax, model.percentage);
+                    maxBatchPercentRef.current.set(batch.id, rawPercentage);
+
                     return (
                       <div key={batch.id} className="rounded-md border border-border bg-card p-3">
                         <div className="flex items-center justify-between gap-2 mb-2">
@@ -218,12 +264,12 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {model.doneCount}/{batch.total_jobs} jobs complete
-                              {showBriefSummary ? ` (${live.completedBriefs}/${live.totalBriefs} briefs finished)` : ''}
+                              {showBriefSummary ? ` · ${live.completedBriefs}/${live.totalBriefs} briefs finished` : ''}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant={isRunning ? 'teal' : batch.status === 'cancelled' ? 'warning' : 'success'} size="sm">
-                              {batch.status.replace(/_/g, ' ')}
+                            <Badge variant={statusDisplay.badgeVariant} size="sm">
+                              {statusDisplay.label}
                             </Badge>
                             {isRunning && (
                               <button
@@ -236,9 +282,9 @@ const GenerationActivityPanel: React.FC<GenerationActivityPanelProps> = ({
                           </div>
                         </div>
                         <Progress
-                          value={model.percentage}
+                          value={rawPercentage}
                           size="sm"
-                          color={batch.failed_jobs > 0 ? 'yellow' : 'teal'}
+                          color={statusDisplay.progressColor}
                         />
                         {batch.failed_jobs > 0 && (
                           <p className="text-xs text-red-600 mt-2">

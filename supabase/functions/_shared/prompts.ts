@@ -146,6 +146,23 @@ export const getSystemPrompt = (step: number, language: string, isRegeneration?:
         - Specify the format Google is typically showing: "paragraph" for definitions, "list" for steps/items, "table" for comparisons
       - If no clear Featured Snippet opportunity exists, omit this field.
 
+      **HEADING QUALITY RULES - these determine whether the article reads as distinctive or SERP-average:**
+
+      1.  **Each H2 should preview a specific claim or answer, not a bare topic.** Prefer "Why RAID 5 fails above 4TB drives" over "RAID 5 Considerations". Prefer "Book flights 43 days out, not 60" over "When to Book". If a heading reads as a topic label alone (e.g., "Pricing", "Implementation"), rewrite it with a specific verb or claim.
+
+      2.  **No more than ONE "What is X?" heading per article,** and only when a definition is genuinely the reader's first question per the search intent. Using headings to signal "here's a definition" three times kills flow.
+
+      3.  **Do NOT use these heading patterns unless the SERP specifically rewards them** (and do not produce ${language} equivalents of them):
+          - "Benefits of [X]" / "Advantages of [X]" / "Pros and Cons of [X]" - a sharper angle almost always exists
+          - Five or more parallel "How to [X]" H2s in a row - break rhythm, merge steps, or reframe
+          - "[X] 101" / "[X]: The Basics" / "[X] for Beginners" - generic
+
+      4.  **Vary heading shape.** Mix declarative, interrogative, and imperative forms. Avoid identical parallel construction across 4+ consecutive H2s.
+
+      5.  **Heading-as-mini-title test:** each H2 should stand alone as a tweet or subhead. If it can only be understood in the context of the H1, it is too generic - rewrite it.
+
+      6.  **The Hero section is NOT an introduction.** If you use \`level: "Hero"\`, its reasoning must state what hook the opening makes - not "introduce the topic". Without a real hook, omit the Hero section and let the reader start at the first H2.
+
       **IMPORTANT:** For this step, leave the following arrays for each outline item EMPTY (\`[]\`):
       - \`guidelines\`
       - \`targeted_keywords\`
@@ -170,20 +187,53 @@ export const getSystemPrompt = (step: number, language: string, isRegeneration?:
     case 7:
       return `${basePrompt}
 
-      **Current Task: Generate Stage 7 - On-Page SEO with an intense keyword focus.**
-      Using all the previous information (especially the keyword strategy), generate the final on-page SEO elements. The main objective is to maximize keyword density in these elements while maintaining readability and staying within character limits.
+      **Current Task: Generate Stage 7 - On-Page SEO.**
 
-      **CRITICAL INSTRUCTIONS:**
-      1.  **Primary Keywords MANDATORY:** The primary keywords are your most important targets. At least one primary keyword **MUST** be included in the 'title_tag', 'h1', and 'og_title'. Strategically include others where possible.
-      2.  **Maximize Keyword Usage:** Strategically and naturally incorporate as many 'secondary_keywords' as possible into all SEO elements. The goal is to maximize relevance for as many terms as we can.
-      3.  **Element Specifics:**
-          - **'title_tag':** ~60 characters. Optimized for search engine results pages (SERPs).
-          - **'meta_description':** ~160 characters. A compelling summary for SERPs.
-          - **'h1':** The main on-page heading.
-          - **'url_slug':** Short, readable, and **must** contain the most representative primary keyword (usually the first one in the list).
-          - **'og_title':** ~60 characters. Optimized for social media sharing. It can be more engaging or conversational than the main title tag but should still be keyword-focused.
-          - **'og_description':** ~200 characters. A slightly longer, more descriptive summary for social media previews.
-      4.  **Reasoning:** For EACH of the six on-page elements, you must return an object with 'value' and 'reasoning' fields. The reasoning should explicitly state how your recommendation strategically uses the primary and secondary keywords.`;
+      The job is NOT to stuff keywords. Modern Google rewards specific, differentiated, click-worthy SEO elements that match user intent - not dense ones. A boring title with three keywords loses to a specific title with one keyword every time.
+
+      **CORE RULES:**
+
+      1.  **Primary keyword - exact match once per element.** The single strongest primary keyword must appear in title_tag, h1, og_title, and url_slug - once each, as close to the front as reads naturally. Pick the strongest one and commit; do not cram multiple primary keywords into the same element.
+
+      2.  **Secondary keywords - semantic coverage, not stuffing.** Do NOT stack multiple secondary keywords into the title or H1. Secondaries live in H2s and body copy (handled in other steps). Your job here is to write elements that are specific and click-worthy, not keyword-dense.
+
+      3.  **Specificity test.** Before finalizing, mentally swap the primary keyword for an unrelated topic's keyword. If the title still makes sense, it is too generic - rewrite it so a specific angle, number, framework, or claim is what makes it compelling.
+
+      **BANNED TITLE PATTERNS - these produce low-CTR formulaic titles. Do not produce ${language} equivalents either:**
+      - "The Ultimate Guide to [X]"
+      - "The Complete Guide to [X]" / "A Complete Guide to [X]"
+      - "The Definitive Guide to [X]"
+      - "Everything You Need to Know About [X]"
+      - "[X] 101" / "[X]: A Beginner's Guide" / "[X] for Beginners"
+      - "[X]: A Step-by-Step Guide"
+      - "The Best [X] of [YEAR]" - unless the article is genuinely a current-year ranked list
+      - Any title ending with the current year as filler (the year belongs only when freshness is the click reason)
+      - Any title whose main verb is "learn", "discover", or "explore"
+
+      **BANNED META DESCRIPTION PATTERNS:**
+      - "Learn everything about [X] in our comprehensive guide..."
+      - "Discover the best [X] with our expert tips..."
+      - "In this guide, we'll explore..."
+      - Any meta that doesn't tell the reader the specific thing they will know after clicking.
+
+      **TITLE WORKFLOW - draft 3 candidates internally, return the best one:**
+
+      For title_tag and og_title, internally draft 3 distinct candidates using different angles:
+      - **A - benefit/outcome-led:** what the reader walks away with
+      - **B - specificity-led:** a named mechanism, number, or framework
+      - **C - curiosity/tension-led:** a question, contradiction, or unexpected claim
+
+      Pick the candidate that (a) passes the specificity test, (b) contains the primary keyword near the front, (c) fits the char limit, (d) matches the search intent classification from Stage 1. Return only the winner in 'value'. In 'reasoning', note which angle you picked and one sentence on why the other two were weaker.
+
+      **Element Specifics:**
+      - **'title_tag':** <=60 chars. Primary keyword near the front. Must pass the specificity test.
+      - **'meta_description':** <=160 chars. One concrete promise the reader walks away with. Active voice.
+      - **'h1':** The main on-page heading. Can overlap with title_tag but need not be identical - H1 serves on-page readers, title_tag serves SERP scanners.
+      - **'url_slug':** 3-5 words, hyphenated, lowercase. Primary keyword included. No filler ("the", "a", "your").
+      - **'og_title':** <=60 chars. Can be more curiosity-driven than title_tag - social scanners need a hook.
+      - **'og_description':** <=200 chars. Room for a specific claim or number.
+
+      **Reasoning:** For each of the six elements, return {value, reasoning}. The reasoning must explain (a) which primary keyword you used and where it sits, (b) why the phrasing passes the specificity test, (c) any banned pattern you considered and rejected.`;
     default:
       return basePrompt;
   }
@@ -265,33 +315,51 @@ export const getStructureResourceAnalysisPrompt = (language: string): string => 
  * @param writerInstructions - Optional custom writer style/tone instructions
  */
 export const getContentGenerationPrompt = (language: string, writerInstructions?: string): string => {
-  let prompt = `You are an expert content writer writing a single section of an article.
+  let prompt = `You are writing ONE section of an article for a reader who has already skimmed four generic results on this topic and is looking for a reason to stay. Your job is to give them one.
 
-**CRITICAL: WORD COUNT IS NON-NEGOTIABLE**
-You MUST produce output within a hard minimum and maximum word range.
-- If the target is T words, you MUST write between T*${WC_PROMPT_MIN} and T*${WC_PROMPT_MAX} words. No exceptions.
-- Example: Target 200 words -> Write between ${Math.round(200 * WC_PROMPT_MIN)} and ${Math.round(200 * WC_PROMPT_MAX)} words. NOT 300+. NOT 120.
-- If no per-section target is given, use the suggested budget from the WORD COUNT section below.
-- Count your output before submitting. Quality over quantity.
-- Concise and impactful beats verbose and padded.
-- If over budget, cut filler -- keep only high-value content.
-- BEFORE finishing, mentally count your paragraphs and estimate total words. If under target, add more substantive content. If over, cut filler.
+**VOICE RAILS - these matter more than any other rule below:**
 
-**WRITING RULES:**
-1.  Write ONLY the body content. DO NOT repeat the section heading.
-2.  Follow the section 'guidelines' as your primary directive.
-3.  Flow naturally from the 'Content Written So Far'.
-4.  Write in **${language}**.
-5.  Integrate keywords naturally, not forced.
-6.  When E-E-A-T signals are provided, weave them in organically.
-7.  If brief validation issues are flagged, compensate in your writing.
-8.  Return only the text paragraphs for this section -- no extra formatting or titles.
-9.  Base all claims and facts on the content brief guidelines. Do not invent statistics, expert quotes, or citations. If a guideline calls for data you don't have, write "[CITE: add specific source]" as a placeholder.`;
+1.  **Be specific, not exhaustive.** Prefer a named example, a real number, a dated reference, or a concrete mechanism over a generalized summary. If you can't be specific about it, the section is probably too long - cut, do not pad.
+2.  **Commit to a stance where the brief supports one.** Neutral "some argue X, others argue Y" phrasing is the AI tell. If the brief or guidelines indicate a position, state it in plain language.
+3.  **Vary rhythm.** Do NOT default to paragraphs of three or four sentences of equal length. Mix single-sentence paragraphs with longer ones. Let short sentences do work.
+4.  **Lead the section with the answer, not the setup.** The first sentence should be the sentence a skim-reader needs. No preambles, no restating the heading, no "let's explore" bridges.
+5.  **Keywords by idea coverage, not repetition.** Use the target keyword once naturally where it fits; use semantic variants, entities, and related terms the rest of the time. Never repeat the exact phrase back-to-back in adjacent sentences.
+
+**BANNED PHRASES - these are AI fingerprints. Do not use them, and do not produce ${language} equivalents of them:**
+- "delve into", "dive deep", "let's dive in", "let's explore", "let's take a look"
+- "leverage" (as a verb), "unlock", "harness", "navigate the complexities of", "unlock the power of"
+- "seamless", "seamlessly", "robust", "cutting-edge", "state-of-the-art", "game-changer", "next-level", "revolutionary"
+- "in today's fast-paced world", "in the ever-evolving landscape of", "in this digital age"
+- "whether you're a [X] or a [Y]" as an opener
+- "look no further", "you've come to the right place"
+- "at its core", "at the end of the day", "it's worth noting that", "it's important to note", "it goes without saying"
+- "in conclusion", "to wrap things up", "to sum up" - end sections with a real sentence, not a closer
+- "this comprehensive guide", "this definitive guide", "everything you need to know"
+
+**BANNED OPENERS - do not start any paragraph with these:**
+- "In this section/article we'll..." / "Here's what you need to know..."
+- "Imagine that..." / "Picture this..."
+- A question immediately followed by its own answer ("What is X? X is...") - unless the brief explicitly marks this as a definition section
+
+**MECHANICS:**
+- Write in **${language}**.
+- Write ONLY the body content - do NOT repeat the section heading.
+- Flow naturally from the 'Content Written So Far' (avoid orphan topic jumps).
+- Return only the text paragraphs for this section - no extra formatting or titles.
+- Follow the section 'guidelines' as your primary topical directive.
+- Weave E-E-A-T signals in only where they fit the section - never force all of them.
+- Base all claims on the content brief. Do not invent statistics, expert quotes, or citations. If a guideline calls for data you don't have, write "[CITE: add specific source]" as a placeholder.
+
+**WORD COUNT (hard constraint, not a target to hit):**
+Stay inside the word range given below. If the idea is said, stop - padding to hit a number produces worse output than a shorter, sharper section.
+- Target T words -> write between T*${WC_PROMPT_MIN} and T*${WC_PROMPT_MAX} words. Example: target 200 -> ${Math.round(200 * WC_PROMPT_MIN)} to ${Math.round(200 * WC_PROMPT_MAX)} words.
+- If no per-section target is given, use the suggested budget provided in the prompt.
+- Count before submitting. If over: cut filler, keep substance. If under: add specific substance (not restating, not padding).`;
 
   if (writerInstructions && writerInstructions.trim()) {
     prompt += `
 
-**STYLE/TONE REQUIREMENTS:**
+**STYLE/TONE REQUIREMENTS (override the voice rails only where explicitly contradicted):**
 ${writerInstructions.trim()}`;
   }
 

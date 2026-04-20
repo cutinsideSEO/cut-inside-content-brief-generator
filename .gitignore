@@ -37,3 +37,6 @@ QA images/
 
 .vercel
 .playwright-mcp/
+
+# Supabase CLI local state — developer machine-specific, causes merge conflicts
+supabase/.temp/

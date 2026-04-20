@@ -8,7 +8,7 @@ import { formatRelativeTime } from '../../utils/relativeTime';
 import { BRIEF_TRANSITIONS } from './WorkflowStatusSelect';
 import PublishedUrlModal from './PublishedUrlModal';
 import { cn } from '../../lib/utils';
-import { FileTextIcon, ZapIcon } from '../Icon';
+import { FileTextIcon, RefreshCwIcon, ZapIcon } from '../Icon';
 import {
   Badge,
   Progress,
@@ -271,7 +271,23 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 flex-shrink-0 h-6" onClick={stopClick}>
+            <div className="flex items-center gap-0.5 flex-shrink-0 h-6" onClick={stopClick}>
+              {!isGenerating && canGenerateArticle && onGenerateArticle && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onGenerateArticle(brief.id); }}
+                  disabled={isGeneratingArticle}
+                  title={isGeneratingArticle ? 'Starting article…' : 'Generate Article'}
+                  aria-label="Generate Article"
+                  className="p-1 rounded-md text-teal hover:bg-teal/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingArticle ? (
+                    <RefreshCwIcon className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ZapIcon className="h-4 w-4" />
+                  )}
+                </button>
+              )}
               {!isGenerating && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

@@ -24,7 +24,6 @@ const STALE_TERMINAL_VIEWS = new Set<AppView | undefined>([
   'initial_input',
   'context_input',
   'visualization',
-  'briefing',
 ]);
 
 const STALE_IN_PROGRESS_VIEWS = new Set<AppView | undefined>([
@@ -98,7 +97,7 @@ export function normalizeBriefPersistenceState({
   const normalizedView = isTerminal
     ? (STALE_TERMINAL_VIEWS.has(currentView) ? 'dashboard' : (currentView ?? 'dashboard'))
     : (hasStartedGeneration && STALE_IN_PROGRESS_VIEWS.has(currentView)
-        ? 'briefing'
+        ? 'dashboard'
         : (currentView ?? 'initial_input'));
 
   return {

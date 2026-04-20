@@ -74,7 +74,7 @@ describe('briefService terminal persistence', () => {
       briefData: partialBriefData,
       currentStatus: 'in_progress',
     })).toEqual({
-      currentView: 'briefing',
+      currentView: 'dashboard',
       currentStep: 4,
       status: 'in_progress',
       isTerminal: false,
@@ -145,7 +145,7 @@ describe('briefService terminal persistence', () => {
     expect(capturedUpdates).not.toHaveProperty('status');
   });
 
-  it('writes briefing view for stale partial progress instead of regressing to initial input', async () => {
+  it('writes dashboard view for stale partial progress instead of regressing to initial input', async () => {
     const { saveBriefState } = await import('../../services/briefService');
 
     await saveBriefState('brief-3', {
@@ -155,7 +155,7 @@ describe('briefService terminal persistence', () => {
     }, 'in_progress');
 
     expect(capturedUpdates).toMatchObject({
-      current_view: 'briefing',
+      current_view: 'dashboard',
       current_step: 4,
       status: 'in_progress',
     });

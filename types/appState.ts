@@ -80,7 +80,6 @@ export interface AppState {
 
   // Special modes
   writerInstructions: string;
-  isFeelingLuckyFlow: boolean;
 
   // Fun factor
   toasts: { id: number; title: string; message: string }[];

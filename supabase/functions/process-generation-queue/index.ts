@@ -124,7 +124,7 @@ function buildInProgressBriefUpdate(
   };
 
   if (STALE_IN_PROGRESS_VIEWS.has(currentView)) {
-    update.current_view = 'briefing';
+    update.current_view = 'dashboard';
   }
 
   if (!WORKFLOW_STATUSES.includes(currentStatus)) {

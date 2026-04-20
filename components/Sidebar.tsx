@@ -7,17 +7,7 @@ import type { BriefListActiveTab, BriefListFilterStatus, BriefListSortBy, BriefL
 import { Select, Tabs } from './ui';
 import { buildSidebarBriefListModel } from '../utils/sidebarBriefListModel';
 
-type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'brief_list';
-
-const BRIEFING_STEPS = [
-  { uiStep: 1, title: 'Goal & Audience', icon: <FlagIcon className="h-4 w-4" /> },
-  { uiStep: 2, title: 'Comp. Analysis', icon: <FileSearchIcon className="h-4 w-4" /> },
-  { uiStep: 3, title: 'Keywords', icon: <KeyIcon className="h-4 w-4" /> },
-  { uiStep: 4, title: 'Content Gaps', icon: <PuzzleIcon className="h-4 w-4" /> },
-  { uiStep: 5, title: 'Structure', icon: <ListTreeIcon className="h-4 w-4" /> },
-  { uiStep: 6, title: 'FAQs', icon: <HelpCircleIcon className="h-4 w-4" /> },
-  { uiStep: 7, title: 'On-Page SEO', icon: <FileCodeIcon className="h-4 w-4" /> },
-];
+type AppView = 'initial_input' | 'context_input' | 'visualization' | 'dashboard' | 'content_generation' | 'brief_list';
 
 const DASHBOARD_SECTIONS = [
   { logicalStep: 1, title: 'Goal & Audience', icon: <FlagIcon className="h-5 w-5" /> },
@@ -31,10 +21,8 @@ const DASHBOARD_SECTIONS = [
 
 interface SidebarProps {
   currentView: AppView;
-  briefingStep?: number;
   selectedSection?: number | null;
   onSelectSection?: (section: number | null) => void;
-  onGoToStep?: (step: number) => void;
   staleSteps?: Set<number>;
   clientName?: string;
   clientLogoUrl?: string | null;
@@ -93,10 +81,8 @@ const ClientIdentityBlock: React.FC<{
 
 const Sidebar: React.FC<SidebarProps> = ({
   currentView,
-  briefingStep = 1,
   selectedSection,
   onSelectSection,
-  onGoToStep,
   staleSteps = new Set(),
   clientName,
   clientLogoUrl,
@@ -258,76 +244,6 @@ const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           )}
-        </div>
-      </aside>
-    );
-  }
-
-  // Briefing stepper
-  if (currentView === 'briefing') {
-    return (
-      <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
-        <div className="p-4">
-          <ClientIdentityBlock clientName={clientName} clientLogoUrl={clientLogoUrl} clientBrandColor={clientBrandColor} />
-          <h3 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider mb-4">Brief Progress</h3>
-          <nav aria-label="Progress">
-            <ol role="list" className="space-y-1">
-              {BRIEFING_STEPS.map((step, index) => {
-                const isCompleted = briefingStep > step.uiStep;
-                const isActive = briefingStep === step.uiStep;
-                return (
-                  <li key={step.title} className="relative">
-                    {index !== BRIEFING_STEPS.length - 1 && (
-                      <div
-                        className={`absolute left-[18px] top-10 h-[calc(100%-8px)] w-0.5 transition-colors duration-300 ${
-                          isCompleted ? 'bg-teal' : 'bg-gray-200'
-                        }`}
-                        aria-hidden="true"
-                      />
-                    )}
-                    <div
-                      className={`relative flex items-center gap-3 p-2 rounded-md transition-all duration-200 ${
-                        isActive ? 'bg-teal-50' : 'hover:bg-gray-100'
-                      } ${isCompleted && onGoToStep ? 'cursor-pointer' : ''}`}
-                      onClick={() => {
-                        if (isCompleted && onGoToStep) {
-                          onGoToStep(step.uiStep);
-                        }
-                      }}
-                    >
-                      <span className={`relative z-10 w-9 h-9 flex items-center justify-center rounded-full border-2 transition-all duration-200 ${
-                        isCompleted
-                          ? 'bg-teal border-teal shadow-glow-teal-sm'
-                          : isActive
-                            ? 'border-teal bg-white'
-                            : 'border-gray-200 bg-white'
-                      }`}>
-                        <span className={`transition-colors duration-200 ${
-                          isCompleted
-                            ? 'text-white'
-                            : isActive
-                              ? 'text-teal'
-                              : 'text-gray-400'
-                        }`}>
-                          {isCompleted ? <CheckIcon className="h-4 w-4" /> : step.icon}
-                        </span>
-                      </span>
-                      <div className="flex flex-col">
-                        <span className={`text-sm font-heading font-medium transition-colors duration-200 ${
-                          isActive ? 'text-foreground' : isCompleted ? 'text-gray-600' : 'text-gray-400'
-                        }`}>
-                          {step.title}
-                        </span>
-                        {isActive && (
-                          <span className="text-xs text-teal">Current step</span>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </nav>
         </div>
       </aside>
     );

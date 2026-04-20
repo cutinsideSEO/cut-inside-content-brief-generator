@@ -117,7 +117,7 @@ async function normalizeBriefPersistenceIfNeeded(
     }
   } else if (hasPartialProgress) {
     if (STALE_IN_PROGRESS_VIEWS.has(brief.current_view)) {
-      updates.current_view = 'briefing'
+      updates.current_view = 'dashboard'
     }
 
     if ((!brief.current_step || brief.current_step < 1) && hasGeneratedBriefData(brief.brief_data)) {

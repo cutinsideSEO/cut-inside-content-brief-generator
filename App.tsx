@@ -1,13 +1,12 @@
 import React, { useState, useCallback, useEffect, useRef, createContext, useContext } from 'react';
 import Header from './components/Header';
-import { generateBriefStep, setModelSettings, regenerateParagraph } from './services/geminiService';
+import { setModelSettings, regenerateParagraph } from './services/geminiService';
 import * as dataforseoService from './services/dataforseoService';
 import { extractTemplateFromUrl } from './services/templateExtractionService';
 import type { CompetitorPage, ContentBrief, OutlineItem, ModelSettings, LengthConstraints, ExtractedTemplate } from './types';
-import { UI_TO_LOGICAL_STEP_MAP, SOUND_EFFECTS } from './constants';
-import { stripCompetitorFullText } from './services/briefContextService';
+import { SOUND_EFFECTS } from './constants';
 import { getClientWithContext } from './services/clientService';
-import { buildBrandContext, mergeBrandContext, formatForBriefGeneration, formatForArticleGeneration } from './services/brandContextBuilder';
+import { buildBrandContext, formatForArticleGeneration } from './services/brandContextBuilder';
 import type { ClientWithContext } from './types/database';
 import { BrainCircuitIcon } from './components/Icon';
 import { getClientLogoUrl } from './lib/favicon';
@@ -16,7 +15,6 @@ import { getClientLogoUrl } from './lib/favicon';
 import InitialInputScreen from './components/screens/InitialInputScreen';
 import ContextInputScreen from './components/screens/ContextInputScreen';
 import CompetitionVizScreen from './components/screens/CompetitionVizScreen';
-import BriefingScreen from './components/screens/BriefingScreen';
 import DashboardScreen from './components/screens/DashboardScreen';
 import ContentGenerationScreen from './components/screens/ContentGenerationScreen';
 import ArticleScreen from './components/screens/ArticleScreen';
@@ -37,7 +35,7 @@ import type { SaveStatus } from './types/appState';
 import type { BriefStatus } from './types/database';
 import { shouldMarkBriefCompleteOnJobCompletion } from './utils/generationStatus';
 
-type AppView = 'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'article_view';
+type AppView = 'initial_input' | 'context_input' | 'visualization' | 'dashboard' | 'content_generation' | 'article_view';
 type ToastMessage = { id: number; title: string; message: string };
 
 // Props for Supabase integration
@@ -210,9 +208,9 @@ const App: React.FC<AppProps> = ({
   const [clientProfile, setClientProfile] = useState<ClientWithContext | null>(null);
 
   // AbortController for cancelling in-flight AI generation requests on unmount
+  // (kept for inline edits like paragraph regeneration / rewrite selection)
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Abort all in-flight generation requests on unmount
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
@@ -249,9 +247,6 @@ const App: React.FC<AppProps> = ({
       if (cs?.default_serp_country) setSerpCountry(cs.default_serp_country);
     }
   }, [clientProfile, currentView, subjectInfo, brandInfo]);
-
-  // "I'm Feeling Lucky" flow state
-  const [isFeelingLuckyFlow, setIsFeelingLuckyFlow] = useState<boolean>(false);
 
   // "Fun Factor" State
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -627,24 +622,6 @@ const App: React.FC<AppProps> = ({
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const getGroundTruthCompetitors = (competitors: CompetitorPage[]): CompetitorPage[] => {
-    const starred = competitors.filter(c => c.is_starred);
-    // Assuming competitors are already sorted by score descending
-    const notStarred = competitors.filter(c => !c.is_starred);
-
-    const topCompetitors = [...starred];
-    
-    let i = 0;
-    while(topCompetitors.length < 3 && i < notStarred.length) {
-        if (!topCompetitors.some(c => c.URL === notStarred[i].URL)) {
-            topCompetitors.push(notStarred[i]);
-        }
-        i++;
-    }
-
-    return topCompetitors.slice(0, 3);
-  };
-
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setAnalysisLogs(prev => [...prev, `[${timestamp}] ${message}`]);
@@ -942,14 +919,6 @@ const App: React.FC<AppProps> = ({
     [clientProfile?.brand_identity?.brand_color]
   );
 
-  // Build merged brand context from client profile + brief-level brandInfo
-  const mergedBrandInfoForBrief = React.useMemo(() => {
-    if (!clientProfile) return brandInfo;
-    const clientContext = buildBrandContext(clientProfile, clientProfile.context_files, clientProfile.context_urls);
-    const merged = mergeBrandContext(clientContext, brandInfo);
-    return formatForBriefGeneration(merged);
-  }, [clientProfile, brandInfo]);
-
   const brandContextForArticle = React.useMemo(() => {
     if (!clientProfile) return undefined;
     return formatForArticleGeneration(clientProfile);
@@ -967,244 +936,49 @@ const App: React.FC<AppProps> = ({
     );
   }, []);
 
-  const handleNextStep = useCallback(async (userFeedback?: string) => {
-    setError(null);
-    const nextUiStep = briefingStep + 1;
-    if (nextUiStep > 7) {
-      setCurrentView('dashboard');
-      setIsFeelingLuckyFlow(false);
-      // Notify parent that brief generation completed
-      if (briefId && onGenerationComplete) {
-        onGenerationComplete(briefId, true);
-      }
-      return;
-    }
-
-    setBriefingStep(nextUiStep);
-    setIsLoading(true);
-    setLoadingStep(nextUiStep);
-    try {
-      // Create a fresh AbortController for this generation call
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
-
-      const keywordsWithVolume = Array.from(keywordVolumeMap.entries()).map(([keyword, volume]) => ({ keyword, volume }));
-      const logicalNextStep = UI_TO_LOGICAL_STEP_MAP[nextUiStep];
-      const needsFullText = [3, 4, 5].includes(logicalNextStep);
-      const competitorDataForStep = needsFullText ? competitorData : stripCompetitorFullText(competitorData);
-      const needsGroundTruth = [1, 3, 4, 5].includes(logicalNextStep);
-      const groundTruthCompetitors = getGroundTruthCompetitors(competitorData);
-      const groundTruthText = groundTruthCompetitors.map(c => `URL: ${c.URL}\nTEXT: ${c.Full_Text}`).join('\n\n---\n\n');
-
-      const result = await generateBriefStep({
-        step: logicalNextStep,
-        competitorDataJson: JSON.stringify(competitorDataForStep),
-        subjectInfo: combinedSubjectInfo || subjectInfo,
-        brandInfo: mergedBrandInfoForBrief,
-        previousStepsData: briefData,
-        groundTruthText: needsGroundTruth ? groundTruthText : undefined,
-        userFeedback,
-        availableKeywords: nextUiStep === 3 ? keywordsWithVolume : undefined,
-        language: outputLanguage,
-        // Feature 1 & 3: Pass template and length constraints for step 5 (structure)
-        templateHeadings: logicalNextStep === 5 && extractedTemplate ? extractedTemplate.headingStructure : undefined,
-        lengthConstraints: (lengthConstraints.globalTarget || Object.keys(lengthConstraints.sectionTargets || {}).length > 0) ? lengthConstraints : undefined,
-        // Feature: Pass PAA questions for step 6 (FAQ generation)
-        paaQuestions: logicalNextStep === 6 ? paaQuestions : undefined,
-        signal,
-      });
-      setBriefData(prev => ({ ...prev, ...result }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-      setBriefingStep(prev => prev - 1); // Revert on error
-      setIsFeelingLuckyFlow(false); // Stop lucky flow on error
-      // Notify parent that brief generation failed
-      if (briefId && onGenerationComplete) {
-        onGenerationComplete(briefId, false);
-      }
-    } finally {
-      setIsLoading(false);
-      setLoadingStep(null);
-    }
-  }, [briefingStep, competitorData, subjectInfo, combinedSubjectInfo, mergedBrandInfoForBrief, briefData, keywordVolumeMap, outputLanguage, extractedTemplate, lengthConstraints, paaQuestions, briefId, onGenerationComplete]);
-
-  // Navigate to a previous step without regenerating (just show existing data)
-  const handlePrevStep = useCallback(() => {
-    if (briefingStep > 1) {
-      setBriefingStep(prev => prev - 1);
-    }
-  }, [briefingStep]);
-
-  // Jump to a specific completed step
-  const handleGoToStep = useCallback((step: number) => {
-    if (step >= 1 && step <= briefingStep) {
-      setBriefingStep(step);
-    }
-  }, [briefingStep]);
-
+  // After competitor analysis, kick off the full_brief backend job and
+  // route the user to the dashboard. The dashboard fills in live as each
+  // step completes via Realtime.
   const handleProceedToBriefing = useCallback(async () => {
-    setCurrentView('briefing');
-    setIsLoading(true);
-    setLoadingStep(1);
-    try {
-      // Create a fresh AbortController for this generation pipeline
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
+    if (!briefId) return;
 
-      const groundTruthCompetitors = getGroundTruthCompetitors(competitorData);
-      const groundTruthText = groundTruthCompetitors.map(c => `URL: ${c.URL}\nTEXT: ${c.Full_Text}`).join('\n\n---\n\n');
+    // Combine uploaded file + scraped URL contexts into the saved subject info so
+    // the backend job snapshot includes them.
+    const fileContexts = Array.from(fileContents.entries())
+      .filter(([, f]) => f.status === 'done' && f.content)
+      .map(([, f]) => f.content as string);
 
-      const fileContexts = Array.from(fileContents.entries())
-        .filter(([, f]) => f.status === 'done' && f.content)
-        .map(([, f]) => f.content as string);
+    const urlContexts = Array.from(urlContents.entries())
+      .filter(([, u]) => u.status === 'done' && u.content)
+      .map(([url, u]) => `SOURCE URL: ${url}\n\n${u.content as string}`);
 
-      const urlContexts = Array.from(urlContents.entries())
-        .filter(([, u]) => u.status === 'done' && u.content)
-        .map(([url, u]) => `SOURCE URL: ${url}\n\n${u.content as string}`);
-
-      let combinedSubjectInfoLocal = subjectInfo;
-      if (fileContexts.length > 0) {
-        combinedSubjectInfoLocal += `\n\n### Additional Context from Files:\n\n` + fileContexts.join('\n\n---\n\n');
-      }
-      if (urlContexts.length > 0) {
-        combinedSubjectInfoLocal += `\n\n### Additional Context from Scraped URLs:\n\n` + urlContexts.join('\n\n---\n\n');
-      }
-
-      setCombinedSubjectInfo(combinedSubjectInfoLocal.trim());
-
-      const result = await generateBriefStep({
-        step: 1,
-        competitorDataJson: JSON.stringify(stripCompetitorFullText(competitorData)),
-        subjectInfo: combinedSubjectInfoLocal.trim(),
-        brandInfo: mergedBrandInfoForBrief,
-        previousStepsData: {},
-        groundTruthText,
-        language: outputLanguage,
-        lengthConstraints: (lengthConstraints.globalTarget || Object.keys(lengthConstraints.sectionTargets || {}).length > 0) ? lengthConstraints : undefined,
-        signal,
-      });
-      setBriefData(prev => ({ ...prev, ...result }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-      setCurrentView('visualization');
-      setIsFeelingLuckyFlow(false); // Stop lucky flow on error
-    } finally {
-      setIsLoading(false);
-      setLoadingStep(null);
+    let combinedSubjectInfoLocal = subjectInfo;
+    if (fileContexts.length > 0) {
+      combinedSubjectInfoLocal += `\n\n### Additional Context from Files:\n\n` + fileContexts.join('\n\n---\n\n');
     }
-  }, [competitorData, subjectInfo, mergedBrandInfoForBrief, fileContents, urlContents, outputLanguage, lengthConstraints]);
-  
+    if (urlContexts.length > 0) {
+      combinedSubjectInfoLocal += `\n\n### Additional Context from Scraped URLs:\n\n` + urlContexts.join('\n\n---\n\n');
+    }
+
+    setCombinedSubjectInfo(combinedSubjectInfoLocal.trim());
+    setCurrentView('dashboard');
+    await handleBackendFullBrief();
+  }, [briefId, subjectInfo, fileContents, urlContents, handleBackendFullBrief]);
+
   const handleFeelingLucky = useCallback(() => {
-    if (briefId) {
-      setCurrentView('briefing');
-      handleBackendFullBrief();
-      return;
-    }
-    // Fallback: use browser-side step-by-step generation
-    setIsFeelingLuckyFlow(true);
-    if (briefId && onGenerationStart) {
-      onGenerationStart('brief', briefId);
-    }
     handleProceedToBriefing();
-  }, [briefId, handleBackendFullBrief, handleProceedToBriefing, onGenerationStart]);
+  }, [handleProceedToBriefing]);
 
-  // Use refs to avoid re-firing the Feeling Lucky effect when callbacks change
-  const handleNextStepRef = useRef(handleNextStep);
   const onGenerationProgressRef = useRef(onGenerationProgress);
-  useEffect(() => { handleNextStepRef.current = handleNextStep; }, [handleNextStep]);
   useEffect(() => { onGenerationProgressRef.current = onGenerationProgress; }, [onGenerationProgress]);
 
-  useEffect(() => {
-    // This effect drives the "I'm Feeling Lucky" flow forward.
-    if (isFeelingLuckyFlow && currentView === 'briefing' && !isLoading && !error) {
-        // Report progress to parent
-        if (onGenerationProgressRef.current) {
-          onGenerationProgressRef.current(briefingStep);
-        }
-        // When a step completes, isLoading becomes false, and this effect triggers.
-        // We call handleNextStep, which will either generate the next step
-        // or, if all steps are complete (briefingStep will be 7), it will transition to the dashboard.
-        if (briefingStep <= 7) {
-            handleNextStepRef.current();
-        }
-    }
-  }, [isFeelingLuckyFlow, currentView, isLoading, error, briefingStep]);
-  
   const handleRegenerateStep = useCallback(async (logicalStepToRegen: number, feedback?: string) => {
     setError(null);
     if (logicalStepToRegen < 1 || logicalStepToRegen > 7) return;
-
-    if (briefId) {
-      // Use backend regeneration
-      setLoadingStep(logicalStepToRegen);
-      await handleBackendRegenerate(logicalStepToRegen, feedback);
-      return;
-    }
-
-    // Fallback: frontend regeneration (when no briefId)
-    setIsLoading(true);
+    if (!briefId) return;
     setLoadingStep(logicalStepToRegen);
-
-    try {
-      // Create a fresh AbortController for this regeneration
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
-
-      const userFeedback = feedback || userFeedbacks[logicalStepToRegen] || '';
-      const keywordsWithVolume = Array.from(keywordVolumeMap.entries()).map(([keyword, volume]) => ({ keyword, volume }));
-      const needsFullText = [3, 4, 5].includes(logicalStepToRegen);
-      const competitorDataForStep = needsFullText ? competitorData : stripCompetitorFullText(competitorData);
-      const needsGroundTruth = [1, 3, 4, 5].includes(logicalStepToRegen);
-      const groundTruthCompetitors = getGroundTruthCompetitors(competitorData);
-      const groundTruthText = groundTruthCompetitors.map(c => `URL: ${c.URL}\nTEXT: ${c.Full_Text}`).join('\n\n---\n\n');
-
-      const result = await generateBriefStep({
-        step: logicalStepToRegen,
-        competitorDataJson: JSON.stringify(competitorDataForStep),
-        subjectInfo: combinedSubjectInfo || subjectInfo,
-        brandInfo: mergedBrandInfoForBrief,
-        previousStepsData: briefData,
-        groundTruthText: needsGroundTruth ? groundTruthText : undefined,
-        userFeedback: userFeedback,
-        availableKeywords: logicalStepToRegen === 2 ? keywordsWithVolume : undefined,
-        isRegeneration: true,
-        language: outputLanguage,
-        paaQuestions: logicalStepToRegen === 6 ? paaQuestions : undefined,
-        signal,
-      });
-      setBriefData(prev => ({ ...prev, ...result }));
-
-      // Mark dependent steps as stale if we are on the dashboard
-      if (currentView === 'dashboard') {
-        const dependencies: { [key: number]: number[] } = {
-          1: [2, 3, 4, 5, 6, 7],
-          2: [4, 5, 6, 7],
-          3: [4, 5, 6, 7],
-          4: [5, 6, 7],
-          5: [6, 7],
-          6: [],
-          7: [],
-        };
-        const stepsToMarkStale = dependencies[logicalStepToRegen] || [];
-        setStaleSteps(prev => {
-            const newStale = new Set(prev);
-            stepsToMarkStale.forEach(step => newStale.add(step));
-            newStale.delete(logicalStepToRegen);
-            return newStale;
-        });
-        setUserFeedbacks(prev => ({...prev, [logicalStepToRegen]: ''}));
-      }
-
-    } catch (err) {
-      setError(err instanceof Error ? `Error regenerating step ${logicalStepToRegen}: ${err.message}` : 'An unknown error occurred.');
-    } finally {
-      setIsLoading(false);
-      setLoadingStep(null);
-    }
-  }, [currentView, competitorData, subjectInfo, combinedSubjectInfo, mergedBrandInfoForBrief, briefData, keywordVolumeMap, userFeedbacks, outputLanguage, paaQuestions, briefId, handleBackendRegenerate]);
+    await handleBackendRegenerate(logicalStepToRegen, feedback);
+  }, [briefId, handleBackendRegenerate]);
   
   const handleUserFeedbackChange = (step: number, value: string) => {
     setUserFeedbacks(prev => ({ ...prev, [step]: value }));
@@ -1346,7 +1120,6 @@ const App: React.FC<AppProps> = ({
     setGeneratedArticleDbId(null);
     setGenerationProgress(null);
     setWriterInstructions('');
-    setIsFeelingLuckyFlow(false);
     setHasAchievedDataMaven(false); // Reset achievement
     setPaaQuestions([]); // Reset PAA questions
     setExtractedTemplate(null); // Reset template
@@ -1392,21 +1165,6 @@ const App: React.FC<AppProps> = ({
                   onProceed={handleProceedToBriefing}
                   onToggleStar={handleToggleStar}
                   onFeelingLucky={handleFeelingLucky}
-                />;
-      case 'briefing':
-        return <BriefingScreen
-                  currentStep={briefingStep}
-                  isLoading={isLoading || isBackendJobActive}
-                  error={error || backendError}
-                  briefData={briefData}
-                  setBriefData={setBriefData}
-                  onNextStep={handleNextStep}
-                  onPrevStep={handlePrevStep}
-                  onRegenerate={handleRegenerateStep}
-                  onRestart={handleRestart}
-                  keywordVolumeMap={keywordVolumeMap}
-                  competitorData={competitorData}
-                  isFeelingLuckyFlow={isFeelingLuckyFlow}
                 />;
       case 'dashboard':
         return <DashboardScreen
@@ -1491,10 +1249,8 @@ const App: React.FC<AppProps> = ({
         <div className="flex-1 flex overflow-hidden">
             <Sidebar
               currentView={currentView}
-              briefingStep={briefingStep}
               selectedSection={dashboardSection}
               onSelectSection={setDashboardSection}
-              onGoToStep={handleGoToStep}
               staleSteps={staleSteps}
               clientLogoUrl={clientLogoUrl}
               clientBrandColor={clientBrandColor}

@@ -54,9 +54,10 @@ const goalSchema = {
   properties: {
     search_intent: searchIntentSchema,
     page_goal: reasoningItemSchema("A concise statement defining the primary purpose of the article."),
-    target_audience: reasoningItemSchema("A description of the ideal reader for this content.")
+    target_audience: reasoningItemSchema("A description of the ideal reader for this content."),
+    editorial_angle: reasoningItemSchema("A 1-2 sentence thesis the article champions. The specific position, framework, or argument that differentiates this article from SERP-average coverage. Derived from competitor gaps and the chosen audience.")
   },
-  required: ["search_intent", "page_goal", "target_audience"]
+  required: ["search_intent", "page_goal", "target_audience", "editorial_angle"]
 };
 
 // ============================================
@@ -182,6 +183,7 @@ const outlineBaseProperties = {
   level: { type: Type.STRING, description: "The heading level, e.g., 'H2', 'H3', 'Hero', 'Conclusion'." },
   heading: { type: Type.STRING, description: "The text for the heading." },
   guidelines: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific bullet points for the writer." },
+  section_angle: { type: Type.STRING, description: "One sentence stating the specific claim or angle this section stakes out. Not a topic restatement - the position the writer should write toward." },
   reasoning: { type: Type.STRING, description: "Why this heading is included." },
   targeted_keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific keywords targeted by this heading." },
   competitor_coverage: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Competitor URLs covering this topic." },

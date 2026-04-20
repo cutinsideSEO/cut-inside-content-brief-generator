@@ -79,6 +79,7 @@ export interface OutlineItem {
   heading: string;
   guidelines: string[];
   reasoning: string;
+  section_angle?: string;
   children: OutlineItem[];
   targeted_keywords: string[];
   competitor_coverage: string[];
@@ -143,6 +144,7 @@ export interface ContentBrief {
   search_intent?: SearchIntent;
   page_goal: ReasoningItem<string>;
   target_audience: ReasoningItem<string>;
+  editorial_angle?: ReasoningItem<string>;
   keyword_strategy: KeywordStrategy;
   competitor_insights: CompetitorInsights;
   content_gap_analysis: ContentGapAnalysis;

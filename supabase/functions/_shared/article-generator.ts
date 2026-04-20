@@ -130,7 +130,60 @@ async function generateSectionContent(
     strictMode,
   } = params;
 
-  const systemInstruction = getContentGenerationPrompt(language, writerInstructions);
+  const systemInstruction = getContentGenerationPrompt(language, writerInstructions, brief.search_intent?.type);
+
+  // Editorial angle (article-wide thesis, Phase 2)
+  let editorialAngleInstruction = '';
+  if (brief.editorial_angle?.value) {
+    editorialAngleInstruction = `
+---
+
+**EDITORIAL ANGLE (the thesis this article champions):**
+${brief.editorial_angle.value}
+
+Keep the article consistent with this angle. If a section guideline would pull against the angle, follow the angle.
+`;
+  }
+
+  // Differentiation directive (Phase 2) - recurring competitor weaknesses
+  let differentiationInstruction = '';
+  const badPointBuckets = brief.competitor_insights?.competitor_breakdown
+    ?.flatMap((c) => c.bad_points || [])
+    .map((p) => p.trim())
+    .filter(Boolean) || [];
+  if (badPointBuckets.length > 0) {
+    const seen = new Set<string>();
+    const topBadPoints: string[] = [];
+    for (const point of badPointBuckets) {
+      const key = point.toLowerCase().replace(/\s+/g, ' ').slice(0, 120);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      topBadPoints.push(point);
+      if (topBadPoints.length >= 5) break;
+    }
+    if (topBadPoints.length > 0) {
+      differentiationInstruction = `
+---
+
+**DIFFERENTIATION DIRECTIVE - what competitors get wrong:**
+These are the recurring weaknesses in the competing content. Where this section covers the same topic, close these gaps explicitly. Do not list them as complaints about competitors - just write better on these points:
+${topBadPoints.map((p) => `- ${p}`).join('\n')}
+`;
+    }
+  }
+
+  // Section angle (per-section thesis, Phase 2)
+  let sectionAngleInstruction = '';
+  if (sectionToWrite.section_angle && sectionToWrite.section_angle.trim()) {
+    sectionAngleInstruction = `
+---
+
+**SECTION ANGLE (the specific claim this section stakes out):**
+${sectionToWrite.section_angle.trim()}
+
+Write toward this claim. The guidelines below are tactical; the section angle is the argument they serve.
+`;
+  }
 
   // Featured snippet instruction
   let featuredSnippetInstruction = '';
@@ -269,6 +322,8 @@ ${brandContext}
   const prompt = `
 **FULL CONTENT BRIEF (JSON, reasoning fields stripped for brevity):**
 ${JSON.stringify(stripReasoningFromBrief(brief), null, 2)}
+${editorialAngleInstruction}
+${differentiationInstruction}
 
 ---
 
@@ -281,6 +336,7 @@ ${brandInstruction}
 **CURRENT SECTION TO WRITE:**
 - **Heading:** ${sectionToWrite.heading}
 - **Keywords to include:** ${sectionToWrite.targeted_keywords?.join(', ') || 'None specified'}
+${sectionAngleInstruction}
 - **Guidelines:**
 ${sectionToWrite.guidelines.map(g => `  - ${g}`).join('\n')}
 ${featuredSnippetInstruction}

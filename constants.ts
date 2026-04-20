@@ -1,4 +1,24 @@
-import type { CompetitorPage } from './types';
+import type { CompetitorPage, SearchIntentType } from './types';
+
+// ============================================
+// Intent-specific voice blocks (Phase 2)
+// ============================================
+
+const INTENT_VOICE_BLOCKS: Record<SearchIntentType, string> = {
+  informational: `Lead with the answer in the first sentence — do not set up, do not preview. Be explanatory but not neutral: have a position about the right way to do this, and stand by it. Clarity beats coverage — if a topic is tangential to the answer, trim it. A definition only deserves a sentence; spend the section on what the definition implies for the reader.`,
+  commercial_investigation: `You are helping a reader choose between options. Be opinionated. Use first-person-plural testing language where the brief supports it ("we found", "in our testing", "in practice"). Name trade-offs concretely — not "it depends on your needs" but "if you prioritize X, pick A; if you prioritize Y, pick B." Hedging is the failure mode. Every comparison must end with a recommendation.`,
+  transactional: `Short. Action-oriented. Treat subheads as instructions. Cut every sentence that is not guiding the reader to do the thing. No preamble, no "before we begin". If a step needs explanation, explain it in one sentence and move on.`,
+  navigational: `The reader already knows what they want — get them there. Lead with the specific destination, answer, or link the reader came for. Skip the setup. If context is genuinely needed, it goes after the answer, not before.`,
+};
+
+const getIntentVoiceBlock = (intentType?: SearchIntentType): string => {
+  if (!intentType || !INTENT_VOICE_BLOCKS[intentType]) return '';
+  return `
+
+**INTENT-SPECIFIC VOICE (this article's search intent is "${intentType}"):**
+
+${INTENT_VOICE_BLOCKS[intentType]}`;
+};
 
 // Word count ratio constants
 export const WC_PROMPT_MIN = 0.85;
@@ -62,7 +82,24 @@ export const getSystemPrompt = (step: number, language: string, isRegeneration?:
 
       For both the Page Goal and Target Audience, you must return an object with two fields: 'value' (the text itself) and 'reasoning' (a detailed explanation of why you chose it, citing the top-scoring and starred competitors).
 
-      Your response MUST include all three objects: 'search_intent', 'page_goal', and 'target_audience'.`;
+      **STEP C — EDITORIAL ANGLE (this is the most important step):**
+
+      After defining the goal and audience, commit to a specific editorial angle — a 1–2 sentence thesis this article will champion. The angle is the reason the article exists beyond covering the topic. Without one, the output defaults to averaging the SERP.
+
+      Derive the angle from three inputs:
+      1.  What the top/starred competitors do WELL — we should not re-state these generically. We need a sharper or adjacent frame.
+      2.  What competitors miss, skim, or get wrong — extracted from their weakest-on-page patterns.
+      3.  The search intent you classified in STEP A — the angle must serve the intent, not fight it.
+
+      The angle must:
+      - **Take a position.** Not "we'll cover RAID storage options" but "RAID 5 is the wrong default for modern NAS builds, and here is when RAID 6 or ZFS is worth the complexity."
+      - **Be specific.** A named framework, a dated claim, a contrarian stance, or a trade-off the reader must make.
+      - **Pass the swap test.** If you swap the topic keyword into the angle, the angle should stop making sense. "This guide covers everything you need to know" fails the swap test — it works for any topic.
+      - **Fit the intent.** For 'informational' intent, the angle is an explanatory thesis. For 'commercial_investigation', it is an opinionated recommendation. For 'transactional', it is a concrete pathway.
+
+      Return 'editorial_angle' with {value, reasoning}. The reasoning must cite at least one specific competitor gap or strength that motivated the angle.
+
+      Your response MUST include all four objects: 'search_intent', 'page_goal', 'target_audience', and 'editorial_angle'.`;
     case 2:
       return `${basePrompt}
       
@@ -216,27 +253,34 @@ export const getSystemPrompt = (step: number, language: string, isRegeneration?:
 
 export const getStructureEnrichmentPrompt = (language: string): string => {
   return `You are a specialized AI assistant named **"BriefStrategist"**. Your role is an expert SEO Content Strategist.
-  You will receive a JSON object representing a pre-defined article outline. Your sole task is to enrich this outline by populating three specific fields for EACH item in the structure: 'guidelines', 'targeted_keywords', and 'competitor_coverage'.
-  
-  **CRITICAL LANGUAGE DIRECTIVE:** All generated text in the 'guidelines' field MUST be in **${language}**.
+  You will receive a JSON object representing a pre-defined article outline. Your task is to enrich this outline by populating four fields for EACH item in the structure: 'section_angle', 'guidelines', 'targeted_keywords', and 'competitor_coverage'.
+
+  **CRITICAL LANGUAGE DIRECTIVE:** All generated text in 'section_angle' and 'guidelines' MUST be in **${language}**.
 
   **Your Task:**
-  1.  **Receive JSON:** You will be given a JSON object containing an 'article_structure' and full context from previous steps (keywords, competitor text, etc.).
+  1.  **Receive JSON:** You will be given a JSON object containing an 'article_structure' and full context from previous steps (editorial_angle, keywords, competitor text, etc.).
   2.  **Analyze Each Item:** For every item in the 'outline' (including nested children), analyze its 'heading' and 'reasoning' in the context of all the provided data.
-  3.  **Populate 'guidelines':**
-      - Based on your analysis, populate the 'guidelines' array with specific, actionable instructions for a writer.
+  3.  **Populate 'section_angle' (do this BEFORE guidelines):**
+      - Write ONE sentence stating the specific claim, stance, or framework this section stakes out. Not a restatement of the heading or topic — the position the writer should write toward.
+      - The section_angle must be consistent with the overall 'editorial_angle' from Step 1. Each section is a facet of that larger thesis.
+      - If the section is a definition or bare-facts section, the angle can be "Define X and immediately qualify when it does and does not apply" — but it must still commit to a frame.
+      - Good: "RAID 5 fails silently during rebuilds above 4TB — we recommend avoiding it for modern drives."
+      - Bad: "This section covers RAID 5 considerations." / "We will discuss the pros and cons of RAID 5."
+      - Bad (topic restatement): "RAID 5 basics and how they work."
+  4.  **Populate 'guidelines':**
+      - Based on your section_angle, populate the 'guidelines' array with specific, actionable instructions for a writer — instructions that advance the section_angle, not just cover the topic.
       - Proactively recommend strategic content formats where appropriate. Examples: "Include a comparison table here comparing X and Y," "Create an infographic to visualize this process," "End with a strong CTA to our product page."
-  4.  **Populate 'targeted_keywords':**
+  5.  **Populate 'targeted_keywords':**
       - Analyze the heading and its intent.
       - From the provided 'keyword_strategy', identify which specific keywords this heading helps to target.
       - Populate the 'targeted_keywords' array with these keyword strings.
-  5.  **Populate 'competitor_coverage':**
+  6.  **Populate 'competitor_coverage':**
       - Analyze the heading's topic.
       - Review the "Ground Truth" competitor text.
       - Identify which competitor URLs have sections that cover this same topic.
       - Populate the 'competitor_coverage' array with the URLs of those competitors.
-  6.  **Return Full JSON:** You must return the COMPLETE, original JSON object, but with the 'guidelines', 'targeted_keywords', and 'competitor_coverage' arrays fully populated. Do not change any other part of the structure.
-  
+  7.  **Return Full JSON:** You must return the COMPLETE, original JSON object, but with 'section_angle', 'guidelines', 'targeted_keywords', and 'competitor_coverage' populated. Do not change any other part of the structure.
+
   Your entire response must be the single, valid, modified JSON object.`;
 }
 
@@ -264,7 +308,7 @@ export const getStructureResourceAnalysisPrompt = (language: string): string => 
   Your entire response must be the single, valid, modified JSON object.`;
 }
 
-export const getContentGenerationPrompt = (language: string, writerInstructions?: string): string => {
+export const getContentGenerationPrompt = (language: string, writerInstructions?: string, searchIntentType?: SearchIntentType): string => {
     let prompt = `You are writing ONE section of an article for a reader who has already skimmed four generic results on this topic and is looking for a reason to stay. Your job is to give them one.
 
 **VOICE RAILS — these matter more than any other rule below:**
@@ -274,6 +318,7 @@ export const getContentGenerationPrompt = (language: string, writerInstructions?
 3.  **Vary rhythm.** Do NOT default to paragraphs of three or four sentences of equal length. Mix single-sentence paragraphs with longer ones. Let short sentences do work.
 4.  **Lead the section with the answer, not the setup.** The first sentence should be the sentence a skim-reader needs. No preambles, no restating the heading, no "let's explore" bridges.
 5.  **Keywords by idea coverage, not repetition.** Use the target keyword once naturally where it fits; use semantic variants, entities, and related terms the rest of the time. Never repeat the exact phrase back-to-back in adjacent sentences.
+${getIntentVoiceBlock(searchIntentType)}
 
 **BANNED PHRASES — these are AI fingerprints. Do not use them, and do not produce ${language} equivalents of them:**
 - "delve into", "dive deep", "let's dive in", "let's explore", "let's take a look"

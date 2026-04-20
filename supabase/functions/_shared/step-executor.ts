@@ -82,6 +82,7 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
       if (!items) return;
       items.forEach(item => {
         item.guidelines = [];
+        item.section_angle = undefined;
         item.targeted_keywords = [];
         item.competitor_coverage = [];
         if (item.children) clearEnrichment(item.children);
@@ -297,7 +298,7 @@ export async function executeBriefStep(params: StepExecutionParams): Promise<Par
     if (isRegeneration) {
       let currentStepData: Partial<ContentBrief> = {};
       switch (step) {
-        case 1: currentStepData = { page_goal: previousStepsData.page_goal, target_audience: previousStepsData.target_audience }; break;
+        case 1: currentStepData = { search_intent: previousStepsData.search_intent, page_goal: previousStepsData.page_goal, target_audience: previousStepsData.target_audience, editorial_angle: previousStepsData.editorial_angle }; break;
         case 2: currentStepData = { keyword_strategy: previousStepsData.keyword_strategy }; break;
         case 3: currentStepData = { competitor_insights: previousStepsData.competitor_insights }; break;
         case 4: currentStepData = { content_gap_analysis: previousStepsData.content_gap_analysis }; break;

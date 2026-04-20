@@ -50,7 +50,7 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 # No client-side API keys needed.
 ```
 
-**Important:** There is no client-side `GEMINI_API_KEY` or DataForSEO credentials. All Gemini calls go through a Supabase Edge Function (`gemini-proxy`) which holds the API key in its secrets. DataForSEO calls are handled server-side via the `competitors` job type. See `services/geminiService.ts` — both `callGemini()` and `callGeminiStream()` hit the edge function endpoint.
+**Important:** There is no client-side `GEMINI_API_KEY` or DataForSEO credentials. All brief and article generation runs on the backend job queue (`process-generation-queue` Edge Function calls Gemini directly). Short, interactive AI edits (paragraph rewrite, rewrite-selection, validate brief, E-E-A-T signals, validate content, article optimizer chat, template extraction) still go through the `gemini-proxy` Edge Function from the browser — polling a queue for a 1-2s edit would ruin the UX. DataForSEO calls are handled server-side via the `competitors` job type.
 
 Vite requires `VITE_` prefix for all client-side env vars (`import.meta.env.VITE_*`).
 
@@ -86,7 +86,7 @@ index.tsx → AppWrapper.tsx → AuthProvider
 
 ### Brief Generation Pipeline (7 Steps)
 
-Each step is a screen in `components/stages/Stage{1-7}*.tsx` and a Gemini prompt in `constants.ts`:
+The 7 logical steps are defined by Gemini prompts in `supabase/functions/_shared/prompts.ts` and rendered on the dashboard by stage components in `components/stages/Stage{1-7}*.tsx`. All step generation happens on the backend queue — there is no browser-driven step walker.
 
 1. **Page Goal & Audience** — Search intent classification, target readers
 2. **Keyword Strategy** — Primary/secondary keyword mapping
@@ -98,21 +98,26 @@ Each step is a screen in `components/stages/Stage{1-7}*.tsx` and a Gemini prompt
 
 ### Gemini AI Integration
 
-Generation uses two layers:
+All long-running generation runs on the backend. The browser only issues short, interactive edits.
 
-**Frontend helpers** (`services/geminiService.ts` → `gemini-proxy` Edge Function):
-- `callGemini()` / `callGeminiStream()` — Proxied Gemini API calls
-- `generateBriefStep()` — Manual step-by-step brief generation (steps 1-7)
-- `regenerateParagraph()` — Inline paragraph editing
-- Optimizer/validator functions (`optimizeMetaTitle`, `optimizeMetaDescription`, etc.)
-
-**Backend job queue** (Edge Functions → direct Gemini REST API):
-- `create-generation-job` Edge Function — Creates jobs, snapshots brief config
-- `process-generation-queue` Edge Function — Worker processing pending jobs via pg_cron
-- `_shared/` modules — Server-side generation logic (types, prompts, schemas, gemini-client, step-executor, article-generator, brief-context, generation-config)
+**Backend job queue** (`process-generation-queue` Edge Function → direct Gemini REST API):
+- `create-generation-job` Edge Function — Validates input, snapshots brief config, inserts a pending job (verify_jwt: true)
+- `create-generation-batch` Edge Function — Bulk job creation for multiple briefs in one batch (verify_jwt: true)
+- `process-generation-queue` Edge Function — Worker processing pending jobs via pg_cron (verify_jwt: false)
+- `_shared/` modules — Server-side generation logic (types, prompts, schemas, gemini-client, step-executor, article-generator, brief-context, generation-config, dataforseo-client, generation-guards, cors)
 - Frontend subscribes via Supabase Realtime for live progress updates
 
-The backend handles all job types (`competitors`, `brief_step`, `full_brief`, `regenerate`, `article`). The frontend delegates via `services/generationJobService.ts` → `createGenerationJob()`.
+The backend handles every brief/article generation job type (`competitors`, `brief_step`, `full_brief`, `regenerate`, `article`). The frontend delegates via `services/generationJobService.ts` → `createGenerationJob()` and reads progress from `useGenerationSubscription` / `useBriefRealtimeSync`.
+
+**Inline AI edits via `gemini-proxy`** (`services/geminiService.ts` → `gemini-proxy` Edge Function):
+- `regenerateParagraph()` — Inline paragraph editing in the article view
+- `rewriteSelection()` — Short rewrites (shorten, expand, change tone) on highlighted text
+- `validateBrief()` / `generateEEATSignals()` — Quick quality checks on the dashboard
+- `validateGeneratedContent()` — Score article alignment with brief
+- `routeOptimizerMessage()` / `optimizeArticleWithChat()` — Streaming article optimizer chat
+- `extractTemplateFromContent()` / `adaptHeadingsToTopic()` — Template URL heading extraction
+
+These intentionally bypass the queue — they're 1-3 second one-shot calls where the user is actively waiting. Polling a DB row for them would kill interactivity.
 
 **DataForSEO:** Competitor analysis runs server-side via the `competitors` job type using `_shared/dataforseo-client.ts`. The frontend `services/dataforseoService.ts` provides `getOnPageElementsViaProxy()` for context URL scraping and `getDetailedOnpageElements()` for template extraction.
 
@@ -120,9 +125,9 @@ The backend handles all job types (`competitors`, `brief_step`, `full_brief`, `r
 
 ```
 components/
-├── screens/     # Full-page views (11 screens: Login, ClientSelect, BriefList,
-│                #   InitialInput, ContextInput, CompetitionViz, Briefing,
-│                #   Dashboard, ContentGeneration, Article, BriefUpload)
+├── screens/     # Full-page views (9 screens: Login, ClientSelect, BriefList,
+│                #   ClientProfile, InitialInput, ContextInput, CompetitionViz,
+│                #   Dashboard, ContentGeneration, Article)
 ├── stages/      # Brief step editors (Stage1Goal through Stage7Seo)
 ├── ui/          # Reusable component library — custom + Radix primitives
 │   ├── *.tsx          # Custom components (Card, Badge, Input, Modal, etc.)
@@ -139,11 +144,13 @@ components/
 
 `App.tsx` manages 20+ useState hooks (no external state library). Key state:
 
-- `currentView: AppView` — Which screen is displayed (`'initial_input' | 'context_input' | 'visualization' | 'briefing' | 'dashboard' | 'content_generation' | 'article_view' | 'brief_upload'`)
-- `briefingStep` — Current step (1-7) in brief wizard
-- `briefData: Partial<ContentBrief>` — The brief object being built
+- `currentView: AppView` — Which screen is displayed (`'initial_input' | 'context_input' | 'visualization' | 'dashboard' | 'content_generation' | 'article_view'`). There is no `'briefing'` or `'brief_upload'` — the step-by-step briefing screen and markdown-upload flow were removed when generation moved fully to the backend queue.
+- `briefingStep` — Current step (1-7) of the in-progress brief. Now driven by `useBriefRealtimeSync.onStepUpdated` as the backend completes each step.
+- `briefData: Partial<ContentBrief>` — The brief object, synced live from the DB during backend generation via `useBriefRealtimeSync.onBriefDataUpdated`.
 - `competitorData: CompetitorPage[]` — SERP analysis results
 - `staleSteps: Set<number>` — Steps needing regeneration after edits
+
+After competitor analysis, clicking "Proceed" on `CompetitionVizScreen` kicks off a `full_brief` backend job via `handleProceedToBriefing` → `handleBackendFullBrief` and navigates straight to the dashboard. The dashboard sections fill in as each step completes.
 
 Auto-save: `useAutoSave` hook debounces state changes (500ms) and persists to Supabase. Accepts `currentDbStatus` option to guard against overwriting workflow statuses.
 
@@ -198,7 +205,9 @@ pg_cron (every 10-30s) → process-generation-queue Edge Function
 
 **All job types implemented:** `competitors`, `brief_step`, `full_brief`, `regenerate`, `article`
 
-**Deployment:** Use `mcp__supabase__deploy_edge_function` MCP tool. Import paths in deployed bundles must use `./_shared/` (not `../_shared/`). All `_shared/*.ts` files must be included in the deployment `files` array. Project ID: `iwzaikvwiwrgyliykqah`. Three Edge Functions to deploy: `create-generation-job` (verify_jwt: true), `create-generation-batch` (verify_jwt: true), `process-generation-queue` (verify_jwt: false).
+**Deployment:** The Supabase CLI is the simplest path: `npx supabase functions deploy <name> --project-ref iwzaikvwiwrgyliykqah [--no-verify-jwt]`. Run from the repo root so it picks up `supabase/functions/<name>/index.ts` + the shared modules automatically. Alternatively, use the `mcp__supabase__deploy_edge_function` MCP tool — in that case, rewrite the `index.ts` import paths from `../_shared/` to `./_shared/` and include every `_shared/*.ts` file in the `files` array.
+
+Edge Functions to deploy: `create-generation-job` (verify_jwt: true), `create-generation-batch` (verify_jwt: true), `process-generation-queue` (verify_jwt: false — called by pg_cron), `gemini-proxy` (verify_jwt: false — proxies inline AI edit calls), `dataforseo-proxy` (verify_jwt: true — used by the frontend for template URL scraping).
 
 ### Database Schema (Supabase)
 
@@ -292,14 +301,15 @@ The `@/` alias maps to project root: `import { Card } from '@/components/ui'`
 - **Auto-save status regression:** If you add any code path that writes `status` to the `briefs` table (e.g., setting `'in_progress'` or `'complete'`), you MUST guard it with `isWorkflowStatus()` to avoid overwriting manually-set workflow statuses. This applies to `saveBriefState()`, `updateBriefProgress()`, and all generation callbacks in `AppWrapper.tsx`.
 - **Supabase migration DDL:** When adding columns with `ADD COLUMN IF NOT EXISTS` combined with inline `CHECK` constraints, PostgreSQL may not support the inline syntax. Separate the `ADD COLUMN` and `ADD CONSTRAINT` into distinct statements (use a `DO $$ ... $$` block to conditionally add the constraint).
 - **Color consistency across views:** When a status appears in multiple places (card borders, section headings, sidebar counts), keep the indicator color consistent. For example, "Published" uses emerald (`bg-emerald-500`, `border-l-emerald-500`) everywhere — not blue in some places and emerald in others.
-- **Edge Function deployment:** When deploying via MCP `deploy_edge_function`, ALL `_shared/*.ts` files must be included in the `files` array (10 files total). Import paths must be `./_shared/` not `../_shared/`. Missing even one file causes "Module not found" errors. The `process-generation-queue` uses `verify_jwt: false` (called by pg_cron); `create-generation-job` and `create-generation-batch` use `verify_jwt: true`.
+- **Edge Function deployment:** Prefer `npx supabase functions deploy <name> --project-ref iwzaikvwiwrgyliykqah` from the repo root — it handles shared module bundling automatically. If you use `mcp__supabase__deploy_edge_function`, rewrite imports in `index.ts` from `../_shared/` to `./_shared/` and pass every `_shared/*.ts` file in the `files` array. The `process-generation-queue` uses `verify_jwt: false` (called by pg_cron); `create-generation-job` and `create-generation-batch` use `verify_jwt: true`.
 - **`LengthConstraints` type:** Uses `globalTarget` (not `totalWordCount`). The property `briefData.article_structure?.word_count_target` is the fallback when `globalTarget` is null.
 - **`GenerationJobProgress` type sync:** The `GenerationJobProgress` interface in `types/database.ts` must match the JSONB shape written by edge functions. Backend writes `total_sections`, `percentage`, `word_count` — keep the interface in sync when adding new progress fields.
 - **List card consistency:** For client/brief/article list surfaces, use `WorkItemCard` rather than ad hoc card wrappers to avoid UX drift.
 - **Smart Queue behavior:** If you modify brief sorting logic in `BriefListScreen`, preserve `smart` as the default sort option unless product direction explicitly changes.
 - **Article thinking budget:** `buildArticleGenerationConfig()` uses a fixed `ARTICLE_THINKING_BUDGET` (8192) regardless of user's thinking level preference. This is intentional — do not wire `thinkingLevel` through for articles.
 - **`cancelGenerationJob()` clears `active_job_id`:** After cancelling a job, the service also clears `briefs.active_job_id` to prevent stale pointers. This is best-effort (warns on failure, doesn't throw).
-- **Manual step-by-step generation is foreground-only:** `generateBriefStep()` flow runs in the frontend (non-queued). Leaving during an in-flight step aborts it and it will not continue as a background `generation_jobs` task.
+- **All brief/article generation is backend-only:** Do NOT reintroduce `generateBriefStep`, `generateHierarchicalArticleStructure`, or any browser-driven step walker in `services/geminiService.ts`. Anything longer than ~3 seconds must go through `createGenerationJob()` and the queue. Inline AI edits (paragraph rewrite, rewrite-selection, validate brief, etc.) are the allowed exception and stay on `gemini-proxy`.
+- **Normalization writes `'dashboard'`:** `briefService.normalizeBriefPersistenceState()` and both Edge Functions normalize stale in-progress briefs to `current_view = 'dashboard'` (previously `'briefing'`). If you reintroduce a `'briefing'` view you must also update that normalization target or partial-progress briefs will land on the wrong screen.
 - **Resumable article generation:** Articles with 20+ sections survive EF timeouts via checkpoint-based resume. After each section, `contentParts[]` and `completed_section_index` are saved to `job.progress` JSONB. Critical: the `onProgress` callback must always carry forward the last checkpoint state (`lastCheckpointContent`/`lastCheckpointIndex`), because `updateJobProgress` replaces the entire JSONB — non-checkpoint progress calls (e.g., trim notifications) would otherwise wipe checkpoint data. Stale job timeout is 4 minutes.
 
 ## Deployment

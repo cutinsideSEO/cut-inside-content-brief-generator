@@ -210,7 +210,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
         header={(
           <div className="flex items-start gap-3">
             {/* Status icon — color communicates status; click to change workflow status (if available) */}
-            <div className="pt-0.5 flex-shrink-0" onClick={stopClick}>
+            <div className="flex-shrink-0 flex items-center h-6" onClick={stopClick}>
               {showStatusMenu ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -271,7 +271,7 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 flex-shrink-0" onClick={stopClick}>
+            <div className="flex items-center gap-1.5 flex-shrink-0 h-6" onClick={stopClick}>
               {!isGenerating && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

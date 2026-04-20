@@ -102,7 +102,7 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({
         onClick={() => onView(article.id)}
         header={(
           <div className="flex items-start gap-3">
-            <div className="pt-0.5 flex-shrink-0" onClick={stopClick}>
+            <div className="flex-shrink-0 flex items-center h-6" onClick={stopClick}>
               {showStatusMenu ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -163,7 +163,7 @@ const ArticleListCard: React.FC<ArticleListCardProps> = ({
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 flex-shrink-0" onClick={stopClick}>
+            <div className="flex items-center gap-1.5 flex-shrink-0 h-6" onClick={stopClick}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button

@@ -321,7 +321,7 @@ function buildStepParams(
   // Model settings
   const configuredModelSettings =
     (config.model_settings as { model: string; thinkingLevel: string } | undefined) ||
-    { model: 'gemini-3-pro-preview', thinkingLevel: 'high' };
+    { model: 'gemini-3.1-pro-preview', thinkingLevel: 'high' };
   const modelSettings = resolveQueueModelSettings(jobType, step, configuredModelSettings);
 
   // Length constraints
@@ -767,7 +767,7 @@ async function chainFullBriefJob(
       output_language: brief.output_language || 'English',
       serp_language: brief.serp_language || 'English',
       serp_country: brief.serp_country || 'United States',
-      model_settings: brief.model_settings || { model: 'gemini-3-pro-preview', thinkingLevel: 'high' },
+      model_settings: brief.model_settings || { model: 'gemini-3.1-pro-preview', thinkingLevel: 'high' },
       length_constraints: brief.length_constraints,
       extracted_template: brief.extracted_template,
       user_feedbacks: brief.user_feedbacks || {},
@@ -1057,7 +1057,7 @@ async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<vo
   // Model settings
   const configuredModelSettings =
     (config.model_settings as { model: string; thinkingLevel: string } | undefined) ||
-    { model: 'gemini-3-pro-preview', thinkingLevel: 'high' };
+    { model: 'gemini-3.1-pro-preview', thinkingLevel: 'high' };
   const modelSettings = resolveQueueModelSettings('article', null, configuredModelSettings);
 
   // Build brand context from client data

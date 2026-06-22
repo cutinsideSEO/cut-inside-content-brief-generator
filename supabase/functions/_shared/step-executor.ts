@@ -154,6 +154,7 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
   const FLASH_MODEL_MAP: Record<string, string> = {
     'gemini-2.5-pro': 'gemini-2.5-flash',
     'gemini-3-pro-preview': 'gemini-3-flash-preview',
+    'gemini-3.1-pro-preview': 'gemini-3-flash-preview',
   };
   const flashModel = (FLASH_MODEL_MAP[model] || model) as GeminiModel;
   const enrichmentSystemInstruction = getStructureEnrichmentPrompt(language);
@@ -375,6 +376,9 @@ export async function executeBriefStep(params: StepExecutionParams): Promise<Par
     if (error instanceof Error && error.message.includes('call stack size exceeded')) {
       throw new Error(`Failed to generate brief for step ${step} due to a schema recursion issue.`);
     }
-    throw new Error(`Failed to generate brief from Gemini API for step ${step} after retries. Please try again.`);
+    // Preserve the underlying Gemini error (e.g. a 404 "model no longer available")
+    // so it lands in the job's error_message instead of a generic "after retries".
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to generate brief from Gemini API for step ${step} after retries: ${detail}`);
   }
 }

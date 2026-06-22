@@ -127,7 +127,7 @@ describe('generation guards', () => {
         model: 'gemini-2.5-pro',
         thinkingLevel: 'high',
       });
-      expect(settings.model).toBe('gemini-3-pro-preview');
+      expect(settings.model).toBe('gemini-3.1-pro-preview');
       expect(settings.thinkingLevel).toBe('high');
     });
 
@@ -145,7 +145,7 @@ describe('generation guards', () => {
         model: 'gemini-2.5-pro',
         thinkingLevel: 'high',
       });
-      expect(settings.model).toBe('gemini-3-pro-preview');
+      expect(settings.model).toBe('gemini-3.1-pro-preview');
       expect(settings.thinkingLevel).toBe('high');
     });
   });

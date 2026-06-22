@@ -28,7 +28,7 @@ export interface GeminiResponse {
  * Calls the Gemini REST API directly with the given model, content, and config.
  * Uses the GEMINI_API_KEY from Deno environment variables.
  *
- * @param model - The Gemini model name (e.g., 'gemini-3-pro-preview')
+ * @param model - The Gemini model name (e.g., 'gemini-3.1-pro-preview')
  * @param contents - The user message / prompt text
  * @param config - Generation config (system instruction, schema, thinking, etc.)
  * @returns The generated text response

@@ -99,7 +99,7 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
 
   // Feature 6: Model settings
   const [modelSettings, setModelSettings] = useState<ModelSettings>({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3.1-pro-preview',
     thinkingLevel: 'high',
   });
 

@@ -10,8 +10,8 @@ interface ModelSelectorProps {
 
 const models: { value: GeminiModel; label: string; description: string; icon: React.ReactNode }[] = [
   {
-    value: 'gemini-3-pro-preview',
-    label: 'Gemini 3 Pro',
+    value: 'gemini-3.1-pro-preview',
+    label: 'Gemini 3.1 Pro',
     description: 'Most intelligent, best for complex tasks',
     icon: <BrainCircuitIcon className="h-4 w-4" />,
   },

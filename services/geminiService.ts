@@ -111,7 +111,7 @@ const callGeminiStream = async function* (model: string, contents: string, confi
 
 // Default model settings - can be overridden by user
 let currentModelSettings: ModelSettings = {
-  model: 'gemini-3-pro-preview',
+  model: 'gemini-3.1-pro-preview',
   thinkingLevel: 'high'
 };
 

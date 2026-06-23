@@ -5,7 +5,6 @@ import InlineEditor from '../InlineEditor';
 import ArticleOptimizerPanel from '../ArticleOptimizerPanel';
 import { BrainCircuitIcon, AlertTriangleIcon, CheckIcon, RefreshCwIcon, EditIcon, XIcon, ZapIcon, FileTextIcon } from '../Icon';
 import { exportArticleToMarkdown } from '../../services/markdownService';
-import { useSound } from '../../App';
 import { toast } from 'sonner';
 import type { ContentBrief, LengthConstraints } from '../../types';
 import { Card, Progress, Input, Textarea } from '../ui';
@@ -235,7 +234,6 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
   const [editMode, setEditMode] = useState<EditMode>('paragraph');
   const [showValidationPanel, setShowValidationPanel] = useState(false);
   const [mobileView, setMobileView] = useState<'editor' | 'preview'>('editor');
-  const sound = useSound();
 
   // Handle content change from InlineEditor
   const handleInlineEditorChange = useCallback((newContent: string) => {
@@ -290,7 +288,6 @@ const ContentGenerationScreen: React.FC<ContentGenerationScreenProps> = ({
   // Show celebration for 3s then show the editor
   useEffect(() => {
     if (!isLoading && article) {
-        sound?.playSound('success');
         const timer = setTimeout(() => {
           setShowCelebration(false);
           // Transition to the unified ArticleScreen

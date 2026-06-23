@@ -427,14 +427,6 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                 <Button onClick={onContinue} disabled={isLoading} fullWidth glow size="lg">
                     {isLoading ? "Analyzing..." : "Continue"}
                 </Button>
-                <button
-                    type="button"
-                    onClick={onContinue}
-                    disabled={isLoading}
-                    className="text-sm text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    Skip this step
-                </button>
             </div>
         </div>
     </div>

@@ -26,7 +26,6 @@ interface BriefListCardProps {
   onEdit: (briefId: string) => void;
   onGenerateArticle?: (briefId: string) => void;
   onAssignProject?: (briefId: string, currentProjectId: string | null) => void;
-  onUseAsTemplate: (briefId: string) => void;
   onArchive: (briefId: string) => void;
   projectName?: string | null;
   // Background generation
@@ -43,12 +42,6 @@ interface BriefListCardProps {
 const MoreHorizontalIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-  </svg>
-);
-
-const CopyIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
   </svg>
 );
 
@@ -101,7 +94,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   onEdit,
   onGenerateArticle,
   onAssignProject,
-  onUseAsTemplate,
   onArchive,
   projectName,
   isGenerating = false,
@@ -300,23 +292,6 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {canGenerateArticle && onGenerateArticle && (
-                      <>
-                        <DropdownMenuItem
-                          onClick={() => onGenerateArticle(brief.id)}
-                          disabled={isGeneratingArticle}
-                          className="text-teal focus:text-teal"
-                        >
-                          <ZapIcon className="h-4 w-4 mr-2" />
-                          {isGeneratingArticle ? 'Generating…' : 'Generate Article'}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    )}
-                    <DropdownMenuItem onClick={() => onUseAsTemplate(brief.id)}>
-                      <CopyIcon className="h-4 w-4 mr-2" />
-                      Use as Template
-                    </DropdownMenuItem>
                     {onAssignProject && (
                       <DropdownMenuItem onClick={() => onAssignProject(brief.id, brief.project_id)}>
                         <FolderIcon className="h-4 w-4 mr-2" />

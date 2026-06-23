@@ -47,6 +47,45 @@ const THINKING_BUDGET_MAP: Record<ThinkingLevel, number> = {
 };
 
 // ============================================
+// Sampling Temperature Constants
+// ============================================
+
+/**
+ * Per-task sampling temperatures. Deterministic/structured tasks use a LOW
+ * temperature for stable, schema-faithful output; creative tasks use a HIGHER
+ * temperature for varied, distinctive prose.
+ */
+/** Deterministic/structured tasks: keywords, competitor, gap, on-page SEO, Step-5 enrichment/resources, trim. */
+export const TEMP_DETERMINISTIC = 0.3;
+/** Creative tasks: Step-5 skeleton, article section prose. */
+export const TEMP_CREATIVE = 0.9;
+/** Balanced tasks: Step 1 (goal/angle), Step 6 (FAQs). */
+export const TEMP_BALANCED = 0.6;
+
+/**
+ * Default temperature per brief step (logical step number 1-7).
+ * Step 5 uses TEMP_CREATIVE here because buildGenerationConfig is used for the
+ * Step-5 skeleton (Pro) phase; the Flash enrichment/resource phases pass their
+ * own deterministic temperature explicitly.
+ */
+const TEMPERATURE_BY_STEP: Record<number, number> = {
+  1: TEMP_BALANCED,       // Page Goal, Audience & Editorial Angle
+  2: TEMP_DETERMINISTIC,  // Keyword Strategy
+  3: TEMP_DETERMINISTIC,  // Competitor Analysis
+  4: TEMP_DETERMINISTIC,  // Content Gap Analysis
+  5: TEMP_CREATIVE,       // Article Structure (skeleton)
+  6: TEMP_BALANCED,       // FAQ Generation
+  7: TEMP_DETERMINISTIC,  // On-Page SEO
+};
+
+/**
+ * Returns the default sampling temperature for a brief step.
+ */
+export function getTemperatureForStep(step: number): number {
+  return TEMPERATURE_BY_STEP[step] ?? TEMP_BALANCED;
+}
+
+// ============================================
 // Config Builder
 // ============================================
 
@@ -90,6 +129,9 @@ export function buildGenerationConfig(
     config.responseSchema = schema;
   }
 
+  // Per-step sampling temperature (deterministic vs creative).
+  config.temperature = getTemperatureForStep(step);
+
   return config;
 }
 
@@ -112,6 +154,10 @@ export function buildArticleGenerationConfig(model: GeminiModel): Record<string,
   if (model.includes('gemini-3')) {
     config.thinkingConfig = { thinkingBudget: ARTICLE_THINKING_BUDGET };
   }
+
+  // Article section prose is a creative task — use a higher temperature for
+  // varied, distinctive writing.
+  config.temperature = TEMP_CREATIVE;
 
   return config;
 }

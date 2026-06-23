@@ -1,14 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-let useSound: (() => { playSound: (sound: string) => void } | null) | undefined;
-try {
-  const AppModule = require('../App');
-  useSound = AppModule.useSound;
-} catch {
-  useSound = undefined;
-}
-
 const Spinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
   const sizeClasses = {
     sm: 'w-3 h-3',
@@ -57,11 +49,8 @@ const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
-  const sound = useSound?.();
-
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (loading) return;
-    sound?.playSound('click');
     if (onClick) {
       onClick(e);
     }

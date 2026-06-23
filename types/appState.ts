@@ -80,10 +80,5 @@ export interface AppState {
 
   // Special modes
   writerInstructions: string;
-
-  // Fun factor
-  toasts: { id: number; title: string; message: string }[];
-  hasCompletedFirstBrief: boolean;
-  hasAchievedDataMaven: boolean;
 }
 

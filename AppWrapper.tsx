@@ -546,11 +546,6 @@ const AppWrapperInner: React.FC = () => {
     }));
   }, []);
 
-  // Handle using a brief as template (feature not yet implemented)
-  const handleUseAsTemplate = useCallback(async (_briefId: string) => {
-    toast.info('Template feature coming soon!');
-  }, []);
-
   // Handle viewing an article
   const handleViewArticle = useCallback((articleId: string) => {
     setState(prev => ({
@@ -741,7 +736,6 @@ const AppWrapperInner: React.FC = () => {
                     onCreateBrief={handleCreateBrief}
                     onContinueBrief={handleContinueBrief}
                     onEditBrief={handleEditBrief}
-                    onUseAsTemplate={handleUseAsTemplate}
                     generatingBriefs={state.generatingBriefs}
                     onViewArticle={handleViewArticle}
                     onCountsChange={handleCountsChange}

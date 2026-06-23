@@ -257,11 +257,6 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
     return manualKeywordRows.some(row => row.keyword.trim() !== '' && row.volume.trim() !== '');
   };
 
-  // Validation for step 2: always valid (backend handles credentials)
-  const isStep2Valid = (): boolean => {
-    return true;
-  };
-
   const handleNextFromStep1 = () => {
     setLocalError('');
     if (!isStep1Valid()) {
@@ -277,11 +272,6 @@ const InitialInputScreen: React.FC<InitialInputScreenProps> = ({ onStartAnalysis
   };
 
   const handleNextFromStep2 = () => {
-    setLocalError('');
-    if (!isStep2Valid()) {
-      setLocalError('Please enter your DataForSEO credentials to continue.');
-      return;
-    }
     setLocalError('');
     setSetupStep(3);
   };

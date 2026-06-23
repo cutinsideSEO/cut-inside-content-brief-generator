@@ -14,7 +14,7 @@ import type {
 
 import { getSystemPrompt, getStructureEnrichmentPrompt, getStructureResourceAnalysisPrompt, getLengthConstraintPrompt } from './prompts.ts';
 import { getSchemaForStep } from './schemas.ts';
-import { buildGenerationConfig, getThinkingLevelForStep } from './generation-config.ts';
+import { buildGenerationConfig, getThinkingLevelForStep, TEMP_CREATIVE, TEMP_DETERMINISTIC } from './generation-config.ts';
 import { callGeminiDirect, retryOperation, type GeminiCallConfig } from './gemini-client.ts';
 import { truncateCompetitorText, checkTokenBudget } from './brief-context.ts';
 
@@ -39,15 +39,72 @@ function normalizeOutline(items: OutlineItem[]): OutlineItem[] {
   });
 }
 
+/**
+ * Re-asserts the Pro skeleton's authored strategy (section_angle + guidelines)
+ * onto a later-phase outline, walking both trees by position.
+ *
+ * The Flash enrichment/resource phases are instructed to preserve phase-1's
+ * 'section_angle' and 'guidelines', but Flash models can still drop, reword, or
+ * replace them. Since these are the highest-value writer instructions and are
+ * owned by the Pro phase, we treat phase 1 as authoritative:
+ *  - section_angle: always taken from phase 1.
+ *  - guidelines: phase-1 entries form the authoritative base; any *additional*
+ *    later-phase entries (e.g. appended internal-link suggestions) are kept.
+ *
+ * Mechanical fields (targeted_keywords, competitor_coverage, additional_resources,
+ * featured_snippet_target, target_word_count, etc.) are left untouched on `target`.
+ */
+function preservePhase1Strategy(target: OutlineItem[], source: OutlineItem[]): OutlineItem[] {
+  if (!Array.isArray(target)) return target;
+  if (!Array.isArray(source)) return target;
+
+  return target.map((item, idx) => {
+    const skeleton = source[idx];
+    if (!skeleton) return item;
+
+    const merged: OutlineItem = { ...item };
+
+    // section_angle: phase 1 is authoritative.
+    if (typeof skeleton.section_angle === 'string' && skeleton.section_angle.trim()) {
+      merged.section_angle = skeleton.section_angle;
+    }
+
+    // guidelines: phase-1 entries are the base; append any genuinely new later entries.
+    const baseGuidelines = Array.isArray(skeleton.guidelines) ? skeleton.guidelines : [];
+    const laterGuidelines = Array.isArray(item.guidelines) ? item.guidelines : [];
+    if (baseGuidelines.length > 0) {
+      const seen = new Set(baseGuidelines.map(g => g.trim().toLowerCase()));
+      const additions = laterGuidelines.filter(g => {
+        const key = (g || '').trim().toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      merged.guidelines = [...baseGuidelines, ...additions];
+    }
+
+    // Recurse into children.
+    if (Array.isArray(item.children)) {
+      merged.children = preservePhase1Strategy(item.children, skeleton.children || []);
+    }
+
+    return merged;
+  });
+}
+
 // ============================================
 // Step 5: Hierarchical Article Structure (3-phase)
 // ============================================
 
 /**
  * Generates the article structure using a 3-phase approach:
- * 1. Core skeleton (headings + reasoning)
- * 2. Enrichment (guidelines, keywords, competitor coverage)
- * 3. Resource analysis (additional non-text resources)
+ * 1. Core skeleton (Pro): headings + reasoning + section_angle + guidelines
+ * 2. Enrichment (Flash): targeted_keywords, competitor_coverage, appended
+ *    internal-link guideline suggestions (must NOT overwrite phase-1 angle/guidelines)
+ * 3. Resource analysis (Flash): additional non-text resources
+ *
+ * Phase-1 section_angle + guidelines are re-asserted after phases 2 and 3 via
+ * preservePhase1Strategy() in case the Flash phases drop or reword them.
  *
  * This mirrors the frontend's generateHierarchicalArticleStructure().
  */
@@ -142,6 +199,8 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
         responseMimeType: 'application/json',
         responseSchema: schema,
         ...(genConfig.thinkingConfig ? { thinkingConfig: genConfig.thinkingConfig as { thinkingBudget: number } } : {}),
+        // Skeleton is the creative phase — use the higher creative temperature.
+        temperature: TEMP_CREATIVE,
       }
     );
     const text = response.text;
@@ -170,7 +229,7 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
 
       ${userFeedback ? `**User Feedback:**\n${userFeedback}` : ''}
 
-      **Task:** Please enrich the 'guidelines', 'targeted_keywords', and 'competitor_coverage' fields.
+      **Task:** Populate 'targeted_keywords' and 'competitor_coverage' for each item, and APPEND internal-link suggestions to 'guidelines'. Preserve every existing 'section_angle' and existing 'guidelines' entry exactly as written.
   `;
 
   const enrichedStructure = await retryOperation(async () => {
@@ -181,12 +240,24 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
         systemInstruction: enrichmentSystemInstruction,
         responseMimeType: 'application/json',
         responseSchema: schema,
+        // Enrichment fills mechanical fields — keep it deterministic.
+        temperature: TEMP_DETERMINISTIC,
       }
     );
     const text = response.text;
     if (!text) throw new Error("Received an empty response from the AI for structure enrichment (Part 2).");
     return JSON.parse(text);
   });
+
+  // Re-assert the Pro skeleton's section_angle + guidelines in case Flash
+  // dropped or reworded them during enrichment. Phase 1 is authoritative here.
+  const skeletonOutline: OutlineItem[] = initialStructure?.article_structure?.outline || [];
+  if (enrichedStructure?.article_structure?.outline) {
+    enrichedStructure.article_structure.outline = preservePhase1Strategy(
+      enrichedStructure.article_structure.outline,
+      skeletonOutline,
+    );
+  }
 
   // PHASE 3: Resource Analysis (with fallback)
   const resourceAnalysisSystemInstruction = getStructureResourceAnalysisPrompt(language);
@@ -206,6 +277,8 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
           systemInstruction: resourceAnalysisSystemInstruction,
           responseMimeType: 'application/json',
           responseSchema: schema,
+          // Resource analysis is mechanical — keep it deterministic.
+          temperature: TEMP_DETERMINISTIC,
         }
       );
       const text = response.text;
@@ -214,6 +287,12 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
     }, 2, 1000); // Fewer retries for this non-critical step
 
     if (finalStructure.article_structure?.outline) {
+      // Resource analysis (Flash) may also have touched angle/guidelines —
+      // re-assert the Pro skeleton's strategy before returning.
+      finalStructure.article_structure.outline = preservePhase1Strategy(
+        finalStructure.article_structure.outline,
+        skeletonOutline,
+      );
       finalStructure.article_structure.outline = normalizeOutline(finalStructure.article_structure.outline);
     }
     return finalStructure;
@@ -361,6 +440,7 @@ export async function executeBriefStep(params: StepExecutionParams): Promise<Par
           ...(genConfig.responseMimeType ? { responseMimeType: genConfig.responseMimeType as string } : {}),
           ...(genConfig.responseSchema ? { responseSchema: genConfig.responseSchema as object } : {}),
           ...(genConfig.thinkingConfig ? { thinkingConfig: genConfig.thinkingConfig as { thinkingBudget: number } } : {}),
+          ...(typeof genConfig.temperature === 'number' ? { temperature: genConfig.temperature } : {}),
         }
       );
 

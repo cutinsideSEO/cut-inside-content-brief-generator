@@ -1332,6 +1332,33 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
     }
   }
 
+  // ---- FILTER PHASE ----
+  // Drop pages whose scrape produced no usable content so junk pages aren't fed
+  // to Gemini as ground truth. A page is junk if it has 0 words or empty full
+  // text (a failed scrape also surfaces as the "No H1 Found" sentinel + no text,
+  // which the word/text checks already exclude).
+  const usableCompetitors = competitors.filter((c) => {
+    const hasText = typeof c.full_text === 'string' && c.full_text.trim().length > 0;
+    const hasWords = (c.word_count || 0) > 0;
+    return hasWords && hasText;
+  });
+
+  const droppedCount = competitors.length - usableCompetitors.length;
+  if (droppedCount > 0) {
+    console.warn(`Dropped ${droppedCount} competitor(s) with empty/junk scraped content out of ${competitors.length}.`);
+  }
+
+  if (usableCompetitors.length === 0) {
+    throw new Error(
+      `Competitor analysis produced no usable pages: all ${competitors.length} scraped result(s) had empty content. ` +
+      `Cannot proceed with brief generation without competitor ground truth.`
+    );
+  }
+
+  // Replace the working set with the filtered list for the remainder of the job.
+  competitors.length = 0;
+  competitors.push(...usableCompetitors);
+
   // ---- SAVE PHASE ----
   await updateJobProgress(supabase, job.id, {
     phase: 'saving',

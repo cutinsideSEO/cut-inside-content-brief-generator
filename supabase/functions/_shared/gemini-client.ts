@@ -15,6 +15,16 @@ export interface GeminiCallConfig {
   responseMimeType?: string;
   responseSchema?: object;
   thinkingConfig?: { thinkingBudget: number };
+  /** Sampling temperature (0-2). Lower = more deterministic. */
+  temperature?: number;
+  /** Nucleus sampling probability mass (0-1). */
+  topP?: number;
+  /**
+   * Max output tokens. IMPORTANT for Gemini 3: thinking tokens count toward this
+   * budget, so it MUST exceed thinkingBudget + expected output. Leave unset to
+   * avoid truncation unless you can guarantee a generous value.
+   */
+  maxOutputTokens?: number;
 }
 
 /**
@@ -69,6 +79,15 @@ export async function callGeminiDirect(
   if (config.thinkingConfig) {
     genConfig.thinkingConfig = config.thinkingConfig;
   }
+  if (typeof config.temperature === 'number') {
+    genConfig.temperature = config.temperature;
+  }
+  if (typeof config.topP === 'number') {
+    genConfig.topP = config.topP;
+  }
+  if (typeof config.maxOutputTokens === 'number') {
+    genConfig.maxOutputTokens = config.maxOutputTokens;
+  }
 
   if (Object.keys(genConfig).length > 0) {
     body.generationConfig = genConfig;
@@ -95,7 +114,30 @@ export async function callGeminiDirect(
     ?.map((p: Record<string, unknown>) => p.text)
     ?.join('') || '';
 
-  return { text };
+  // Inspect finishReason so truncation/safety blocks surface via the retry+error
+  // path instead of returning silently-truncated (or empty) content.
+  // STOP = normal completion; undefined = older response shape with usable text.
+  // Anything else (MAX_TOKENS, SAFETY, RECITATION, PROHIBITED_CONTENT, ...) means
+  // the output is incomplete or was blocked.
+  const finishReason: string | undefined = data.candidates?.[0]?.finishReason;
+
+  if ((finishReason === 'STOP' || finishReason === undefined) && text) {
+    return { text };
+  }
+
+  // No usable text, or a non-STOP stop reason: throw so retryOperation retries
+  // and the failure lands in the job's error_message.
+  if (!finishReason) {
+    throw new Error('Gemini returned no usable text (empty response, no finishReason).');
+  }
+  if (finishReason === 'STOP') {
+    // STOP but empty text — treat as an empty-response failure.
+    throw new Error('Gemini stopped normally but returned no usable text.');
+  }
+  throw new Error(
+    `Gemini stopped early: ${finishReason}` +
+    (text ? ' (partial/blocked output discarded).' : ' (no output).')
+  );
 }
 
 /**

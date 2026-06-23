@@ -27,7 +27,7 @@ import {
   WC_TRIM_STRICT,
   WC_TRIM_NONSTRICT,
 } from './prompts.ts';
-import { buildArticleGenerationConfig } from './generation-config.ts';
+import { buildArticleGenerationConfig, TEMP_DETERMINISTIC } from './generation-config.ts';
 import { callGeminiDirect, retryOperation } from './gemini-client.ts';
 import { stripReasoningFromBrief, countWords, checkTokenBudget } from './brief-context.ts';
 
@@ -363,6 +363,7 @@ Now, write the body content for the current section.
     const response = await callGeminiDirect(model, prompt, {
       systemInstruction,
       ...(genConfig.thinkingConfig ? { thinkingConfig: genConfig.thinkingConfig as { thinkingBudget: number } } : {}),
+      ...(typeof genConfig.temperature === 'number' ? { temperature: genConfig.temperature } : {}),
     });
     const text = response.text;
     if (!text) throw new Error('Received an empty response from the AI for article section generation.');
@@ -404,6 +405,8 @@ Condensed version (approximately ${targetWords} words):`;
     return await retryOperation(async () => {
       const response = await callGeminiDirect(ARTICLE_TRIM_MODEL, prompt, {
         thinkingConfig: { thinkingBudget: 512 },
+        // Condensing is a deterministic task — keep temperature low.
+        temperature: TEMP_DETERMINISTIC,
       });
       const text = response.text;
       if (!text) throw new Error('Empty response from AI for section trimming.');

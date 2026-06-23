@@ -35,7 +35,6 @@ interface BriefListScreenProps {
   onCreateBrief: () => void;
   onContinueBrief: (briefId: string) => void;
   onEditBrief: (briefId: string) => void;
-  onUseAsTemplate: (briefId: string) => void;
   // Background generation props - now supports multiple parallel generations
   generatingBriefs?: Record<string, GeneratingBrief>;
   // Article navigation
@@ -68,7 +67,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   onCreateBrief,
   onContinueBrief,
   onEditBrief,
-  onUseAsTemplate,
   generatingBriefs = {},
   onViewArticle,
   onCountsChange,
@@ -633,7 +631,6 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
         onEdit={onEditBrief}
         onGenerateArticle={handleOpenGenerateArticleConfirm}
         onAssignProject={handleOpenBriefAssignProject}
-        onUseAsTemplate={onUseAsTemplate}
         onArchive={handleArchiveClick}
         projectName={brief.project_id ? projectNamesById[brief.project_id] || null : null}
         isGenerating={isGenerating}
@@ -861,7 +858,7 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       )}
       </>)}
 
-      {/* Archive confirmation modal */}
+      {/* Generate Full Article confirmation modal */}
       <Modal
         isOpen={!!articleGenerateConfirmBriefId}
         onClose={() => setArticleGenerateConfirmBriefId(null)}

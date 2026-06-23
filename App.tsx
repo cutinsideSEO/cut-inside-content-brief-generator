@@ -1,14 +1,12 @@
-import React, { useState, useCallback, useEffect, useRef, createContext, useContext } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import { setModelSettings, regenerateParagraph } from './services/geminiService';
 import * as dataforseoService from './services/dataforseoService';
 import { extractTemplateFromUrl } from './services/templateExtractionService';
 import type { CompetitorPage, ContentBrief, OutlineItem, ModelSettings, LengthConstraints, ExtractedTemplate } from './types';
-import { SOUND_EFFECTS } from './constants';
 import { getClientWithContext } from './services/clientService';
 import { buildBrandContext, formatForArticleGeneration } from './services/brandContextBuilder';
 import type { ClientWithContext } from './types/database';
-import { BrainCircuitIcon } from './components/Icon';
 import { getClientLogoUrl } from './lib/favicon';
 
 // Import the new screen components
@@ -36,7 +34,6 @@ import type { BriefStatus } from './types/database';
 import { shouldMarkBriefCompleteOnJobCompletion } from './utils/generationStatus';
 
 type AppView = 'initial_input' | 'context_input' | 'visualization' | 'dashboard' | 'content_generation' | 'article_view';
-type ToastMessage = { id: number; title: string; message: string };
 
 // Props for Supabase integration
 interface AppProps {
@@ -57,44 +54,6 @@ interface AppProps {
 
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-
-// --- Sound Context ---
-interface SoundContextType {
-  isSoundEnabled: boolean;
-  toggleSound: () => void;
-  playSound: (sound: keyof typeof SOUND_EFFECTS) => void;
-}
-const SoundContext = createContext<SoundContextType | null>(null);
-export const useSound = () => useContext(SoundContext);
-
-const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isSoundEnabled, setIsSoundEnabled] = useState(false);
-  const audioRefs = React.useRef<{ [key: string]: HTMLAudioElement }>({});
-
-  useEffect(() => {
-    Object.keys(SOUND_EFFECTS).forEach(key => {
-      audioRefs.current[key] = new Audio(SOUND_EFFECTS[key as keyof typeof SOUND_EFFECTS]);
-    });
-  }, []);
-
-  const toggleSound = () => setIsSoundEnabled(prev => !prev);
-  const playSound = (sound: keyof typeof SOUND_EFFECTS) => {
-    if (isSoundEnabled) {
-      const audio = audioRefs.current[sound];
-      if (audio) {
-        audio.currentTime = 0;
-        audio.play().catch(e => console.error("Error playing sound:", e));
-      }
-    }
-  };
-
-  return (
-    <SoundContext.Provider value={{ isSoundEnabled, toggleSound, playSound }}>
-      {children}
-    </SoundContext.Provider>
-  );
-};
-
 
 // A helper function to wait for a global library to be available
 const waitForLibrary = <T,>(globalName: string, timeout = 5000): Promise<T> => {
@@ -121,28 +80,6 @@ const waitForLibrary = <T,>(globalName: string, timeout = 5000): Promise<T> => {
     }, interval);
   });
 };
-
-const Toast: React.FC<ToastMessage & { onDismiss: () => void }> = ({ title, message, onDismiss }) => {
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 5000);
-    return () => clearTimeout(timer);
-  }, [onDismiss]);
-
-  return (
-    <div className="toast bg-teal/90 backdrop-blur-sm border border-teal/50 text-white p-4 rounded-lg shadow-lg w-80">
-      <div className="flex items-start">
-        <div className="flex-shrink-0">
-          <BrainCircuitIcon className="h-6 w-6 text-amber-500" />
-        </div>
-        <div className="ml-3 w-0 flex-1">
-          <p className="text-sm font-heading font-bold">{title}</p>
-          <p className="mt-1 text-sm">{message}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 
 const App: React.FC<AppProps> = ({
   briefId,
@@ -247,11 +184,6 @@ const App: React.FC<AppProps> = ({
       if (cs?.default_serp_country) setSerpCountry(cs.default_serp_country);
     }
   }, [clientProfile, currentView, subjectInfo, brandInfo]);
-
-  // "Fun Factor" State
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [hasCompletedFirstBrief, setHasCompletedFirstBrief] = useState(false);
-  const [hasAchievedDataMaven, setHasAchievedDataMaven] = useState(false);
 
   // Feature 1, 2 & 3: Template and length constraints
   const [extractedTemplate, setExtractedTemplate] = useState<ExtractedTemplate | null>(null);
@@ -614,14 +546,6 @@ const App: React.FC<AppProps> = ({
     document.body.setAttribute('data-loading', isLoading.toString());
   }, [isLoading]);
 
-  const addToast = useCallback((title: string, message: string) => {
-    setToasts(prev => [...prev, { id: Date.now(), title, message }]);
-  }, []);
-  
-  const removeToast = (id: number) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  };
-
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setAnalysisLogs(prev => [...prev, `[${timestamp}] ${message}`]);
@@ -653,11 +577,6 @@ const App: React.FC<AppProps> = ({
     // Feature 3: Store length constraints
     if (newLengthConstraints) {
       setLengthConstraints(newLengthConstraints);
-    }
-
-    if (!hasCompletedFirstBrief) {
-      addToast("Accolade Unlocked!", "First Strike: You've initiated your first strategic analysis.");
-      setHasCompletedFirstBrief(true);
     }
 
     // Update brief name to primary keyword (makes it meaningful in the dashboard)
@@ -734,7 +653,7 @@ const App: React.FC<AppProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [hasCompletedFirstBrief, addToast, briefId, onGenerationStart, onGenerationComplete, saveNow, refreshJob]);
+  }, [briefId, onGenerationStart, onGenerationComplete, saveNow, refreshJob]);
 
   const parseFile = useCallback((file: File): Promise<{ content: string | null; error: string | null }> => {
     return new Promise((resolve) => {
@@ -808,10 +727,6 @@ const App: React.FC<AppProps> = ({
           }
         }
       }
-      if (newMap.size >= 3 && !hasAchievedDataMaven) {
-        addToast("Accolade Unlocked!", "Data Maven: You've provided 3+ context files for superior accuracy.");
-        setHasAchievedDataMaven(true);
-      }
       return newMap;
     });
 
@@ -849,7 +764,7 @@ const App: React.FC<AppProps> = ({
             setFileContents(prev => new Map(prev).set(file.name, { content: null, error: String(err), status: 'done' }));
         }
     }));
-  }, [parseFile, addToast, hasAchievedDataMaven, briefId]);
+  }, [parseFile, briefId]);
 
   const removeContextFile = useCallback((fileName: string) => {
     setContextFiles(prev => {
@@ -964,10 +879,6 @@ const App: React.FC<AppProps> = ({
     setCurrentView('dashboard');
     await handleBackendFullBrief();
   }, [briefId, subjectInfo, fileContents, urlContents, handleBackendFullBrief]);
-
-  const handleFeelingLucky = useCallback(() => {
-    handleProceedToBriefing();
-  }, [handleProceedToBriefing]);
 
   const onGenerationProgressRef = useRef(onGenerationProgress);
   useEffect(() => { onGenerationProgressRef.current = onGenerationProgress; }, [onGenerationProgress]);
@@ -1120,7 +1031,6 @@ const App: React.FC<AppProps> = ({
     setGeneratedArticleDbId(null);
     setGenerationProgress(null);
     setWriterInstructions('');
-    setHasAchievedDataMaven(false); // Reset achievement
     setPaaQuestions([]); // Reset PAA questions
     setExtractedTemplate(null); // Reset template
     setModelSettingsState(null); // Reset model settings
@@ -1159,12 +1069,11 @@ const App: React.FC<AppProps> = ({
                   competitorCount={competitorData.length}
                  />;
       case 'visualization':
-        return <CompetitionVizScreen 
-                  competitorData={competitorData} 
-                  topKeywords={topKeywordsForViz} 
+        return <CompetitionVizScreen
+                  competitorData={competitorData}
+                  topKeywords={topKeywordsForViz}
                   onProceed={handleProceedToBriefing}
                   onToggleStar={handleToggleStar}
-                  onFeelingLucky={handleFeelingLucky}
                 />;
       case 'dashboard':
         return <DashboardScreen
@@ -1243,8 +1152,7 @@ const App: React.FC<AppProps> = ({
   };
 
   return (
-    <SoundProvider>
-        <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
+    <div className="min-h-screen bg-background text-gray-600 font-sans flex flex-col">
         <Header
           clientName={clientName}
           clientLogoUrl={clientLogoUrl}
@@ -1269,13 +1177,7 @@ const App: React.FC<AppProps> = ({
               </div>
             </main>
         </div>
-        <div className="toast-container">
-            {toasts.map(toast => (
-            <Toast key={toast.id} {...toast} onDismiss={() => removeToast(toast.id)} />
-            ))}
-        </div>
-        </div>
-    </SoundProvider>
+    </div>
   );
 };
 

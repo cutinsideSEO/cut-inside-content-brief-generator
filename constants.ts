@@ -384,11 +384,6 @@ export const THEMED_LOADING_MESSAGES = [
     "Cross-referencing ranking factors..."
 ];
 
-export const SOUND_EFFECTS = {
-  click: 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSBEAAAAeXBlHw==',
-  success: 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSBEAAAACgAIAhUFLg8eBwwKFw8fDAsUDh4NCQ8FCwA=',
-};
-
 // Feature 1: Template Extraction Prompts
 export const TEMPLATE_EXTRACTION_PROMPT = `
 Analyze this content and extract the HEADING STRUCTURE only.

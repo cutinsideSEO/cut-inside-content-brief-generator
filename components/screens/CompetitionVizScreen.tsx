@@ -9,7 +9,6 @@ interface CompetitionVizScreenProps {
   topKeywords: { kw: string, volume: number }[];
   onProceed: () => void;
   onToggleStar: (url: string) => void;
-  onFeelingLucky: () => void;
 }
 
 type SortKey = 'Weighted_Score' | 'Word_Count' | string; // string for dynamic keyword keys
@@ -21,7 +20,7 @@ const StatCard: React.FC<{ title: string; value: string | number; highlight?: bo
     </Card>
 );
 
-const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorData, topKeywords, onProceed, onToggleStar, onFeelingLucky }) => {
+const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorData, topKeywords, onProceed, onToggleStar }) => {
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' }>({ key: 'Weighted_Score', direction: 'descending' });
 
   const { sortedCompetitors, maxScore, maxWordCount, avgScore, avgWordCount } = useMemo(() => {
@@ -204,9 +203,6 @@ const CompetitionVizScreen: React.FC<CompetitionVizScreenProps> = ({ competitorD
 
         {/* Action Buttons */}
         <div className="mt-8 flex justify-end items-center gap-4">
-            <Button onClick={onFeelingLucky} variant="secondary" size="lg">
-                I'm Feeling Lucky
-            </Button>
             <Button onClick={onProceed} size="lg" glow>
                 Continue to Brief Creation
             </Button>

@@ -1,6 +1,5 @@
 import React from 'react';
-import { useSound } from '../App';
-import { Volume2Icon, VolumeXIcon, ChevronRightIcon } from './Icon';
+import { ChevronRightIcon } from './Icon';
 import SaveStatusIndicator from './SaveStatusIndicator';
 import type { SaveStatus } from '../types/appState';
 
@@ -21,8 +20,6 @@ const Header: React.FC<HeaderProps> = ({
   saveStatus = 'saved',
   lastSavedAt,
 }) => {
-  const sound = useSound();
-
   return (
     <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
       <div className="px-4 sm:px-6 lg:px-8">
@@ -69,27 +66,9 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right side: Save Status + Sound Toggle */}
+          {/* Right side: Save Status */}
           <div className="flex items-center gap-4">
             <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt ?? null} />
-            <button
-              onClick={sound?.toggleSound}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all ${
-                sound?.isSoundEnabled
-                  ? 'bg-teal-50 text-teal hover:bg-teal-100'
-                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
-              }`}
-              title={sound?.isSoundEnabled ? 'Disable sound effects' : 'Enable sound effects'}
-            >
-              {sound?.isSoundEnabled ? (
-                <Volume2Icon className="h-4 w-4" />
-              ) : (
-                <VolumeXIcon className="h-4 w-4" />
-              )}
-              <span className="text-xs font-medium hidden sm:inline">
-                {sound?.isSoundEnabled ? 'Sound On' : 'Sound Off'}
-              </span>
-            </button>
           </div>
         </div>
       </div>

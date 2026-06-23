@@ -117,6 +117,8 @@ export async function getSerpUrls(
 
   if (
     data.tasks_count > 0 &&
+    Array.isArray(data.tasks) &&
+    data.tasks.length > 0 &&
     data.tasks[0].status_code === 20000 &&
     data.tasks[0].result
   ) {
@@ -151,7 +153,12 @@ export async function getSerpUrls(
     return { urls, paaQuestions };
   }
 
-  return { urls: [], paaQuestions: [] };
+  // Unexpected/empty response shape: throw so retryOperation retries and the
+  // job fails visibly instead of silently proceeding with zero competitors.
+  throw new Error(
+    `DataForSEO SERP returned an unexpected/empty response for keyword "${keyword}" (${country}/${language}). ` +
+    `tasks_count=${data.tasks_count}, status_code=${data.tasks?.[0]?.status_code}`
+  );
 }
 
 /**
@@ -168,18 +175,12 @@ export async function getOnPageElements(url: string): Promise<OnPageElements> {
     },
   ];
 
-  const errorResult: OnPageElements = {
-    H1s: [],
-    H2s: [],
-    H3s: [],
-    Word_Count: 0,
-    Full_Text: '',
-  };
-
   const data = await executePost('on_page/content_parsing/live', payload);
 
   if (
     data.tasks_count > 0 &&
+    Array.isArray(data.tasks) &&
+    data.tasks.length > 0 &&
     data.tasks[0].status_code === 20000 &&
     data.tasks[0].result
   ) {
@@ -222,5 +223,11 @@ export async function getOnPageElements(url: string): Promise<OnPageElements> {
     }
   }
 
-  return errorResult;
+  // Unexpected/empty response shape (no parseable page_content): throw so
+  // retryOperation retries and callers surface the failure instead of silently
+  // treating the page as having zero content.
+  throw new Error(
+    `DataForSEO on-page parsing returned an unexpected/empty response for "${url}". ` +
+    `tasks_count=${data.tasks_count}, status_code=${data.tasks?.[0]?.status_code}`
+  );
 }

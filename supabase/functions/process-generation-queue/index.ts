@@ -32,8 +32,9 @@ import {
   mergeBrandContext,
   formatForBriefGeneration,
   stripCompetitorFullText,
+  buildCompetitorDigestInput,
 } from '../_shared/brief-context.ts'
-import { retryOperation } from '../_shared/gemini-client.ts'
+import { callGeminiDirect, retryOperation } from '../_shared/gemini-client.ts'
 import { getSerpUrls, getOnPageElements } from '../_shared/dataforseo-client.ts'
 import {
   computeRetryBackoffSeconds,
@@ -57,6 +58,23 @@ const DEFAULT_JOB_LEASE_MINUTES = 6;
 const SOFT_ARTICLE_CHECKPOINT_MS = 120_000;
 const SOFT_REQUEUE_DELAY_MS = 5_000;
 const SOFT_REQUEUE_CODE = 'soft_checkpoint_requeue';
+
+// ---- Competitor digest config ----
+/** Flash model used for the cheap, one-shot competitor digests. */
+const COMPETITOR_DIGEST_MODEL = 'gemini-3-flash-preview';
+/**
+ * Cap on how many competitors we digest, ordered by weighted_score. Lower-ranked
+ * pages matter least and digesting all of them adds wall-clock to a single-shot
+ * job with no checkpoint/resume. Top 8 covers the pages that actually influence
+ * the brief; the rest fall back to truncated full_text in steps 3/4/5.
+ */
+const COMPETITOR_DIGEST_MAX_COUNT = 8;
+/** How many digest calls run concurrently. Keeps total added time ≈ one batch. */
+const COMPETITOR_DIGEST_CONCURRENCY = 4;
+/** Per-attempt timeout for a single digest call (Flash is fast — keep it tight). */
+const COMPETITOR_DIGEST_TIMEOUT_MS = 30_000;
+/** Sampling temperature for digests — low for stable, faithful summaries. */
+const COMPETITOR_DIGEST_TEMPERATURE = 0.3;
 
 /** Workflow statuses that must not be overwritten by auto-computed statuses */
 const WORKFLOW_STATUSES = [
@@ -180,6 +198,99 @@ function getRankWeight(rank: number): number {
 }
 
 // ============================================
+// Competitor Digest Generation
+// ============================================
+
+/** System instruction for the per-competitor digest (plain text, no schema). */
+const COMPETITOR_DIGEST_SYSTEM_INSTRUCTION =
+  'You are an SEO content strategist analyzing a competitor page that ranks for the target topic. ' +
+  'Write a tight, specific digest another strategist can act on. No fluff, no preamble, no markdown headings.';
+
+/**
+ * Builds the user prompt for one competitor digest from its headings + bounded
+ * body text. Returns '' when there is no usable input (caller skips this page).
+ */
+function buildCompetitorDigestPrompt(competitor: CompetitorPage): string {
+  const input = buildCompetitorDigestInput(competitor);
+  if (!input) return '';
+  return (
+    `In 90-130 words, summarize this competitor page for an SEO strategist. Cover, in order:\n` +
+    `(1) what it covers (scope/subtopics), (2) its angle or point of view, ` +
+    `(3) its notable strengths, (4) gaps, weaknesses, or thin spots, ` +
+    `(5) any concrete facts, stats, or examples worth beating.\n` +
+    `Be specific and concrete. Do not invent details that are not present.\n\n` +
+    `URL: ${competitor.URL}\n\n` +
+    `${input}`
+  );
+}
+
+/**
+ * Generates a concise structured digest for ONE competitor via the Flash model.
+ * Returns the trimmed digest text, or null on any failure / empty input.
+ * NEVER throws — digests are best-effort and must never fail the competitors job.
+ */
+async function generateSingleCompetitorDigest(competitor: CompetitorPage): Promise<string | null> {
+  const prompt = buildCompetitorDigestPrompt(competitor);
+  if (!prompt) return null;
+
+  try {
+    const response = await retryOperation(
+      () =>
+        callGeminiDirect(COMPETITOR_DIGEST_MODEL, prompt, {
+          systemInstruction: COMPETITOR_DIGEST_SYSTEM_INSTRUCTION,
+          temperature: COMPETITOR_DIGEST_TEMPERATURE,
+        }),
+      2, // few retries — a missing digest is non-fatal
+      1500,
+      COMPETITOR_DIGEST_TIMEOUT_MS,
+    );
+    const text = (response.text || '').trim();
+    return text || null;
+  } catch (err) {
+    console.warn(`Competitor digest failed for ${competitor.URL}:`, (err as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Generates digests for the top-{@link COMPETITOR_DIGEST_MAX_COUNT} competitors
+ * (by weighted_score), running calls in PARALLEL batches of
+ * {@link COMPETITOR_DIGEST_CONCURRENCY} so total added wall-clock stays close to a
+ * single Flash round-trip rather than the sum of all calls.
+ *
+ * @param competitors CompetitorPage objects (must carry Full_Text + headings)
+ * @returns Map of competitor URL → digest text (only successful, non-empty digests)
+ *
+ * Bounded by design: caps the number digested, bounds each prompt's input
+ * (buildCompetitorDigestInput), and swallows per-competitor failures. Lower-ranked
+ * competitors beyond the cap simply get no digest and fall back to truncated
+ * full_text during brief generation.
+ */
+async function generateCompetitorDigests(
+  competitors: CompetitorPage[],
+): Promise<Map<string, string>> {
+  const digestsByUrl = new Map<string, string>();
+  if (competitors.length === 0) return digestsByUrl;
+
+  // Highest-scored first, then cap. (Don't mutate the caller's array.)
+  const targets = [...competitors]
+    .sort((a, b) => (b.Weighted_Score || 0) - (a.Weighted_Score || 0))
+    .slice(0, COMPETITOR_DIGEST_MAX_COUNT);
+
+  for (let i = 0; i < targets.length; i += COMPETITOR_DIGEST_CONCURRENCY) {
+    const batch = targets.slice(i, i + COMPETITOR_DIGEST_CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(async (c) => ({ url: c.URL, digest: await generateSingleCompetitorDigest(c) })),
+    );
+    for (const { url, digest } of results) {
+      if (digest) digestsByUrl.set(url, digest);
+    }
+  }
+
+  return digestsByUrl;
+}
+
+// ============================================
 // Helper Types
 // ============================================
 
@@ -225,6 +336,9 @@ function transformCompetitors(rawCompetitors: Record<string, unknown>[]): Compet
     Word_Count: (c.word_count as number) || 0,
     Full_Text: (c.full_text as string) || '',
     is_starred: (c.is_starred as boolean) || false,
+    // Optional structured summary (present once the competitors job has generated
+    // it and the digest column exists). Used by steps 3/4/5 in place of Full_Text.
+    digest: (c.digest as string | null) || undefined,
   }));
 }
 
@@ -1375,6 +1489,52 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
   competitors.length = 0;
   competitors.push(...usableCompetitors);
 
+  // ---- DIGEST PHASE ----
+  // Generate a concise structured digest per competitor (top N by score, in
+  // parallel batches) so brief steps 3/4/5 get a sharp summary instead of a
+  // crudely head-truncated full_text slice. Best-effort: any failure leaves that
+  // competitor's digest null and brief generation falls back to truncated text.
+
+  // Bail early if cancelled — digests add wall-clock, so don't spend it on a
+  // cancelled job (mirrors the SERP/on-page cancellation handling above).
+  if (await isProcessingCancelled(supabase, job.id, job.batch_id)) {
+    await supabase.from('generation_jobs').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', job.id);
+    await supabase.from('briefs').update({ active_job_id: null }).eq('id', briefId);
+    return;
+  }
+
+  await updateJobProgress(supabase, job.id, {
+    phase: 'digesting',
+    completed_keywords: keywords.length,
+    total_keywords: keywords.length,
+    completed_urls: sortedUrls.length,
+    total_urls: sortedUrls.length,
+    // Keep monotonic with the on-page phase (which tops out near 85-90%); the save
+    // phase also sits at 90, so the bar never visibly regresses across phases.
+    percentage: 90,
+  });
+
+  let digestsByUrl = new Map<string, string>();
+  try {
+    // Map DB-shaped competitors → CompetitorPage shape for the digest helper.
+    const digestInputs: CompetitorPage[] = competitors.map(c => ({
+      URL: c.url,
+      Weighted_Score: c.weighted_score,
+      rankings: c.rankings,
+      H1s: c.h1s,
+      H2s: c.h2s,
+      H3s: c.h3s,
+      Word_Count: c.word_count,
+      Full_Text: c.full_text,
+    }));
+    digestsByUrl = await generateCompetitorDigests(digestInputs);
+    console.log(`Generated ${digestsByUrl.size}/${competitors.length} competitor digests.`);
+  } catch (err) {
+    // Defensive: generateCompetitorDigests already swallows per-call failures, but
+    // never let an unexpected error here fail the competitors job.
+    console.warn('Competitor digest phase failed (continuing without digests):', (err as Error).message);
+  }
+
   // ---- SAVE PHASE ----
   await updateJobProgress(supabase, job.id, {
     phase: 'saving',
@@ -1398,6 +1558,8 @@ async function processCompetitors(supabase: SupabaseClient, job: JobRow): Promis
       word_count: c.word_count,
       full_text: c.full_text,
       is_starred: false,
+      // Concise structured summary (null when not generated — see DIGEST PHASE).
+      digest: digestsByUrl.get(c.url) ?? null,
     }));
 
     const { error: upsertError } = await supabase

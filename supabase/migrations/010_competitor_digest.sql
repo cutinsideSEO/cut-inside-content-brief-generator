@@ -1,0 +1,16 @@
+-- Migration 010: Add a concise, structured digest column to brief_competitors.
+--
+-- The competitors job (process-generation-queue → processCompetitors) generates a
+-- short Flash-model summary of each competitor page once, at scrape time. Brief
+-- generation steps 3/4/5 then feed this digest to Gemini IN PLACE OF the raw
+-- (crudely head-truncated) full_text for non-ground-truth competitors, giving the
+-- model a sharp structured summary instead of a decapitated text slice.
+--
+-- Additive + nullable: old briefs (and any competitor whose digest generation
+-- failed) simply have digest = NULL, and brief generation falls back to the
+-- existing truncated-full_text behavior for that competitor — no regression.
+--
+-- Keep the ADD COLUMN simple (no inline CHECK constraint): per the CLAUDE.md
+-- gotcha, PostgreSQL may not support `ADD COLUMN IF NOT EXISTS ... CHECK (...)`
+-- as a single statement.
+ALTER TABLE brief_competitors ADD COLUMN IF NOT EXISTS digest text;

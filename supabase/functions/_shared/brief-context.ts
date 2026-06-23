@@ -165,6 +165,86 @@ export function truncateCompetitorText(json: string, maxTokens = 150000): string
 }
 
 // ============================================
+// Competitor Digests (smart structured summaries)
+// ============================================
+
+/**
+ * Default cap on how much of a competitor's body text is fed into the digest
+ * prompt. Bounds the per-competitor token cost so the competitors job stays under
+ * its single-shot wall-clock budget even with many competitors. ~7k chars ≈ ~1.7k
+ * tokens of input; headings add a little on top.
+ */
+export const DIGEST_INPUT_MAX_CHARS = 7000;
+
+/**
+ * Builds the bounded input text for a single competitor's digest prompt:
+ * the page's headings (structure signal) plus a head slice of its body text,
+ * capped at {@link DIGEST_INPUT_MAX_CHARS}. Headings are cheap and high-signal,
+ * so they're always included in full; the body text is what we bound.
+ *
+ * Returns '' when the competitor has no usable body text — the caller should skip
+ * digest generation for that competitor (leaving its digest null).
+ */
+export function buildCompetitorDigestInput(
+  competitor: CompetitorPage,
+  maxChars = DIGEST_INPUT_MAX_CHARS,
+): string {
+  const fullText = (competitor.Full_Text || '').trim();
+  if (!fullText) return '';
+
+  const headingLines: string[] = [];
+  if (competitor.H1s?.length) headingLines.push(`H1: ${competitor.H1s.join(' | ')}`);
+  if (competitor.H2s?.length) headingLines.push(`H2: ${competitor.H2s.join(' | ')}`);
+  if (competitor.H3s?.length) headingLines.push(`H3: ${competitor.H3s.join(' | ')}`);
+  const headingsBlock = headingLines.length ? `Headings:\n${headingLines.join('\n')}\n\n` : '';
+
+  // Reserve room for the headings block so the whole input stays under maxChars.
+  const bodyBudget = Math.max(0, maxChars - headingsBlock.length);
+  const body = fullText.length > bodyBudget ? fullText.slice(0, bodyBudget) : fullText;
+
+  return `${headingsBlock}Body text:\n${body}`;
+}
+
+/** Prefix used when a competitor's Full_Text is replaced by its digest for the model. */
+const DIGEST_LABEL = '[AI summary of this competitor page]';
+
+/**
+ * Prepares the competitor array for serialization into a brief-step prompt,
+ * preferring each competitor's pre-generated `digest` IN PLACE OF its raw
+ * head-truncated `Full_Text`.
+ *
+ * For each competitor:
+ * - If it has a non-empty `digest`: drop the raw `Full_Text` and the standalone
+ *   `digest` field, and set `Full_Text` to the labeled digest. The model still
+ *   reads the body under the familiar `Full_Text` key, but gets a sharp summary
+ *   instead of a decapitated slice. (Because the resulting `Full_Text` is short,
+ *   the downstream `truncateCompetitorText` pass leaves it untouched.)
+ * - Otherwise (no digest — old briefs or a failed digest call): keep `Full_Text`
+ *   exactly as-is so the existing `truncateCompetitorText` fallback still applies.
+ *   The empty/undefined `digest` field is stripped so it never bloats the prompt.
+ *
+ * Returns a NEW array of plain objects (does not mutate the inputs). With no
+ * digests present anywhere, the output is field-equivalent to the input array
+ * (digest stripped), so brief generation behaves exactly as before.
+ *
+ * NOTE: this only affects the bulk competitor array fed to steps 3/4/5. The
+ * top-3 "ground truth" full text is built separately (buildGroundTruthText reads
+ * Full_Text directly) and is intentionally NOT touched here.
+ */
+export function applyCompetitorDigests(
+  competitors: Array<CompetitorPage | CompetitorSummary>,
+): Array<Record<string, unknown>> {
+  return competitors.map((c) => {
+    const { digest, ...rest } = c as CompetitorPage;
+    const trimmedDigest = typeof digest === 'string' ? digest.trim() : '';
+    if (trimmedDigest) {
+      return { ...rest, Full_Text: `${DIGEST_LABEL}\n${trimmedDigest}` };
+    }
+    return { ...rest };
+  });
+}
+
+// ============================================
 // Brand Voice Sample Extraction
 // ============================================
 

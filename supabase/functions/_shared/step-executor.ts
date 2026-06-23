@@ -10,13 +10,15 @@ import type {
   GeminiModel,
   ThinkingLevel,
   StepExecutionParams,
+  CompetitorPage,
+  CompetitorSummary,
 } from './types.ts';
 
 import { getSystemPrompt, getStructureEnrichmentPrompt, getStructureResourceAnalysisPrompt, getLengthConstraintPrompt } from './prompts.ts';
 import { getSchemaForStep } from './schemas.ts';
 import { buildGenerationConfig, getThinkingLevelForStep, TEMP_CREATIVE, TEMP_DETERMINISTIC } from './generation-config.ts';
 import { callGeminiDirect, retryOperation, type GeminiCallConfig } from './gemini-client.ts';
-import { truncateCompetitorText, checkTokenBudget } from './brief-context.ts';
+import { truncateCompetitorText, checkTokenBudget, applyCompetitorDigests } from './brief-context.ts';
 
 // ============================================
 // Outline Normalization Helper
@@ -124,7 +126,12 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
     thinkingLevel,
   } = params;
 
-  const competitorDataJson = truncateCompetitorText(JSON.stringify(competitorData));
+  // Prefer per-competitor digests over raw head-truncated full_text (digested
+  // competitors carry a short summary in Full_Text; undigested ones keep their
+  // raw text and are still bounded by truncateCompetitorText as a fallback).
+  const competitorDataJson = truncateCompetitorText(
+    JSON.stringify(applyCompetitorDigests(competitorData)),
+  );
   const schema = getSchemaForStep(5);
   const effectiveThinkingLevel = getThinkingLevelForStep(5, thinkingLevel);
   const genConfig = buildGenerationConfig(model, 5, effectiveThinkingLevel, schema);
@@ -397,8 +404,20 @@ export async function executeBriefStep(params: StepExecutionParams): Promise<Par
     // Length constraints
     const lengthContext = lengthConstraints ? getLengthConstraintPrompt(lengthConstraints.globalTarget) : '';
 
-    // Token safety: truncate competitor data if it exceeds safe limits
-    const competitorDataJson = JSON.stringify(competitorData);
+    // Competitor data serialization.
+    // - Steps that feed full competitor text (3, 4) PREFER each competitor's
+    //   digest in place of its raw head-truncated full_text; undigested
+    //   competitors keep their full_text and are bounded by truncateCompetitorText
+    //   as a fallback.
+    // - Other steps (1, 2, 6, 7) receive competitor SUMMARIES (no full_text). We
+    //   strip the optional `digest` field from those so the prompt is identical to
+    //   pre-digest behavior (summaries never carried a digest key).
+    const stepNeedsFullText = step === 3 || step === 4;
+    const competitorList = competitorData as Array<CompetitorPage | CompetitorSummary>;
+    const competitorDataForPrompt = stepNeedsFullText
+      ? applyCompetitorDigests(competitorList)
+      : competitorList.map(({ digest: _digest, ...rest }) => rest);
+    const competitorDataJson = JSON.stringify(competitorDataForPrompt);
     const safeCompetitorDataJson = truncateCompetitorText(competitorDataJson);
 
     const prompt = `

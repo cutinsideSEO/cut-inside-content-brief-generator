@@ -26,6 +26,13 @@ export interface CompetitorPage {
   Word_Count: number;
   Full_Text: string;
   is_starred?: boolean;
+  /**
+   * Concise, structured summary of the page generated once during the competitors
+   * job (Flash model). Brief steps 3/4/5 feed this to Gemini in place of the raw
+   * head-truncated Full_Text for non-ground-truth competitors. Optional: absent on
+   * older briefs or when digest generation failed — callers fall back to Full_Text.
+   */
+  digest?: string;
 }
 
 export type CompetitorSummary = Omit<CompetitorPage, 'Full_Text'>;

@@ -37,8 +37,43 @@ export function isBriefActivelyGenerating(status?: BriefGenerationStatus): boole
   return ACTIVE_BRIEF_GENERATION_STATUSES.includes(status);
 }
 
-export function shouldMarkBriefCompleteOnJobCompletion(jobType?: GenerationJobType | null): boolean {
-  return jobType === 'full_brief';
+/**
+ * The final logical step of the brief pipeline (On-Page SEO). A `full_brief` job
+ * runs as a CHAIN of per-step jobs, each marked `completed` as it finishes, so a
+ * job completing is only "brief complete" when it is this last step.
+ */
+export const FINAL_BRIEF_STEP = 7;
+
+/**
+ * Decide whether a completed generation job means the WHOLE brief is now complete.
+ *
+ * Only a `full_brief` job qualifies — and only when it is the final step in the
+ * chain (`step_number === FINAL_BRIEF_STEP`). Intermediate `full_brief` steps emit
+ * their own `completed` events as they chain to the next step; treating those as
+ * brief-complete would prematurely flip the brief to `complete` / step 7 and
+ * navigate to the dashboard after a single step.
+ *
+ * `regenerate` / `article` / `competitors` always return false (their completion
+ * is handled by dedicated branches at the call site).
+ *
+ * When `stepNumber` is unknown (null/undefined), fall back to checking whether the
+ * brief actually has every generated section, so we never falsely report complete.
+ */
+export function shouldMarkBriefCompleteOnJobCompletion(
+  jobType?: GenerationJobType | null,
+  stepNumber?: number | null,
+  briefData?: Partial<ContentBrief> | null,
+): boolean {
+  if (jobType !== 'full_brief') {
+    return false;
+  }
+
+  if (stepNumber != null) {
+    return stepNumber === FINAL_BRIEF_STEP;
+  }
+
+  // step_number not available — only treat as complete if all sections exist.
+  return hasAllGeneratedSections(briefData);
 }
 
 export function getEffectiveBriefStatusForList(brief: BriefStatusForListInput): BriefStatus {

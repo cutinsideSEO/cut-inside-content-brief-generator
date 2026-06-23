@@ -55,6 +55,54 @@ interface AutoSaveData {
   length_constraints: LengthConstraints | null;
 }
 
+/** Inputs needed to build an {@link AutoSaveData} snapshot. */
+export interface AutoSaveBaselineInput {
+  currentView: AppView;
+  briefingStep: number;
+  briefData: Partial<ContentBrief>;
+  staleSteps: Set<number>;
+  userFeedbacks: { [key: number]: string };
+  paaQuestions: string[];
+  subjectInfo: string;
+  brandInfo: string;
+  extractedTemplate: ExtractedTemplate | null;
+  keywords: { kw: string; volume: number }[] | null;
+  outputLanguage: string;
+  serpLanguage: string;
+  serpCountry: string;
+  modelSettings: ModelSettings | null;
+  lengthConstraints: LengthConstraints | null;
+}
+
+/**
+ * Pure builder for the persisted snapshot shape.
+ *
+ * IMPORTANT: this is the single source of truth for the save payload's key order.
+ * Both the live auto-save path and the post-load baseline seeding go through it,
+ * so their `JSON.stringify` output is byte-identical — otherwise `hasDataChanged()`
+ * would always see a diff after load and re-save the unchanged brief.
+ */
+export function buildAutoSaveData(input: AutoSaveBaselineInput): AutoSaveData {
+  return {
+    current_view: input.currentView,
+    current_step: input.briefingStep,
+    brief_data: input.briefData,
+    stale_steps: Array.from(input.staleSteps),
+    user_feedbacks: input.userFeedbacks,
+    paa_questions: input.paaQuestions,
+    subject_info: input.subjectInfo,
+    brand_info: input.brandInfo,
+    extracted_template: input.extractedTemplate,
+    // New fields
+    keywords: input.keywords,
+    output_language: input.outputLanguage,
+    serp_language: input.serpLanguage,
+    serp_country: input.serpCountry,
+    model_settings: input.modelSettings,
+    length_constraints: input.lengthConstraints,
+  };
+}
+
 interface UseAutoSaveOptions {
   briefId: string | null;
   enabled: boolean;
@@ -72,6 +120,12 @@ interface UseAutoSaveReturn {
   isSaving: boolean;
   pauseAutoSave: () => void;
   resumeAutoSave: () => void;
+  /**
+   * Seed the "last saved" baseline with a known-persisted snapshot (e.g. right
+   * after loading a brief from the DB) so an unchanged brief isn't immediately
+   * re-saved. Does NOT touch the DB.
+   */
+  setBaseline: (input: AutoSaveBaselineInput) => void;
 }
 
 /**
@@ -121,24 +175,23 @@ export function useAutoSave(
 
   // Build the data to save
   const buildSaveData = useCallback((): AutoSaveData => {
-    return {
-      current_view: state.currentView as AppView,
-      current_step: state.briefingStep,
-      brief_data: state.briefData,
-      stale_steps: Array.from(state.staleSteps),
-      user_feedbacks: state.userFeedbacks,
-      paa_questions: state.paaQuestions,
-      subject_info: state.subjectInfo,
-      brand_info: state.brandInfo,
-      extracted_template: state.extractedTemplate,
-      // New fields
+    return buildAutoSaveData({
+      currentView: state.currentView as AppView,
+      briefingStep: state.briefingStep,
+      briefData: state.briefData,
+      staleSteps: state.staleSteps,
+      userFeedbacks: state.userFeedbacks,
+      paaQuestions: state.paaQuestions,
+      subjectInfo: state.subjectInfo,
+      brandInfo: state.brandInfo,
+      extractedTemplate: state.extractedTemplate,
       keywords: state.keywords,
-      output_language: state.outputLanguage,
-      serp_language: state.serpLanguage,
-      serp_country: state.serpCountry,
-      model_settings: state.modelSettings,
-      length_constraints: state.lengthConstraints,
-    };
+      outputLanguage: state.outputLanguage,
+      serpLanguage: state.serpLanguage,
+      serpCountry: state.serpCountry,
+      modelSettings: state.modelSettings,
+      lengthConstraints: state.lengthConstraints,
+    });
   }, [
     state.currentView,
     state.briefingStep,
@@ -332,12 +385,20 @@ export function useAutoSave(
     isPausedRef.current = false;
   }, []);
 
+  // Seed the baseline so a freshly-loaded (unchanged) brief isn't re-saved.
+  // Built through the same `buildAutoSaveData` as the live path, so the next
+  // `hasDataChanged()` comparison sees an identical string and skips the write.
+  const setBaseline = useCallback((input: AutoSaveBaselineInput) => {
+    lastSavedDataRef.current = JSON.stringify(buildAutoSaveData(input));
+  }, []);
+
   return {
     triggerSave,
     saveNow,
     isSaving: isSavingState,
     pauseAutoSave,
     resumeAutoSave,
+    setBaseline,
   };
 }
 

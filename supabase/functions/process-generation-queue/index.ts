@@ -668,9 +668,9 @@ async function updateBatchCounters(
 
       if (batch.failed_jobs === 0) {
         updates.status = 'completed';
-      } else if (batch.completed_jobs === 0) {
-        updates.status = 'cancelled'; // All failed
       } else {
+        // Any failures (all-failed or partially-failed) -> partially_failed.
+        // 'cancelled' is reserved for manual aborts, not generation failures.
         updates.status = 'partially_failed';
       }
 

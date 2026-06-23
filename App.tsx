@@ -209,7 +209,7 @@ const App: React.FC<AppProps> = ({
     : Array.from(keywordVolumeMap.entries()).map(([kw, volume]) => ({ kw, volume }));
 
   // Auto-save hook (only active in Supabase mode)
-  const { triggerSave, saveNow, pauseAutoSave } = useAutoSave(
+  const { triggerSave, saveNow, pauseAutoSave, setBaseline } = useAutoSave(
     {
       currentView,
       briefingStep,
@@ -371,6 +371,12 @@ const App: React.FC<AppProps> = ({
     }
   }, [activeJob, refreshJob]);
 
+  // Mirror briefData into a ref so the completion effect can read the latest
+  // sections (for the step_number-unknown fallback) without re-firing on every
+  // briefData change — which would risk double-firing onGenerationComplete.
+  const briefDataRef = useRef(briefData);
+  useEffect(() => { briefDataRef.current = briefData; }, [briefData]);
+
   // When backend job completes, notify parent and clear loading state
   useEffect(() => {
     if (activeJob?.status === 'completed') {
@@ -431,7 +437,13 @@ const App: React.FC<AppProps> = ({
         }
       }
       if (briefId && onGenerationComplete) {
-        onGenerationComplete(briefId, shouldMarkBriefCompleteOnJobCompletion(activeJob.job_type));
+        // For full_brief jobs, only mark the WHOLE brief complete on the final
+        // chained step (step 7 / On-Page SEO). Intermediate steps each emit their
+        // own `completed` event and must NOT flip the brief to complete early.
+        onGenerationComplete(
+          briefId,
+          shouldMarkBriefCompleteOnJobCompletion(activeJob.job_type, activeJob.step_number, briefDataRef.current),
+        );
       }
     } else if (activeJob?.status === 'failed') {
       setLoadingStep(null);
@@ -442,7 +454,7 @@ const App: React.FC<AppProps> = ({
         onGenerationComplete(briefId, false);
       }
     }
-  }, [activeJob?.status, activeJob?.job_type, activeJob?.error_message, briefId, onGenerationComplete]);
+  }, [activeJob?.status, activeJob?.job_type, activeJob?.step_number, activeJob?.error_message, briefId, onGenerationComplete]);
 
   // Propagate backend progress to parent (use ref to avoid re-render loop —
   // onGenerationProgress can change on every render if not memoized by the caller)
@@ -510,13 +522,41 @@ const App: React.FC<AppProps> = ({
         if (currentArticle) {
           setGeneratedArticle({ title: currentArticle.title, content: currentArticle.content });
         }
+
+        // Seed the auto-save baseline with the just-loaded state so that opening
+        // an unchanged brief does NOT trigger a redundant write-back (which would
+        // bump updated_at and reorder the brief list on every open). The keywords
+        // value MUST mirror `keywordsForSave`'s post-load value: when keywords
+        // exist, App settles `topKeywordsForViz` to the first 5, so the auto-save
+        // snapshot's keywords become that slice; otherwise it is null.
+        const baselineKeywords =
+          loadedState.keywords && loadedState.keywords.length > 0
+            ? loadedState.keywords.slice(0, 5)
+            : null;
+        setBaseline({
+          currentView: loadedState.currentView as AppView,
+          briefingStep: loadedState.briefingStep,
+          briefData: loadedState.briefData,
+          staleSteps: loadedState.staleSteps,
+          userFeedbacks: loadedState.userFeedbacks,
+          paaQuestions: loadedState.paaQuestions,
+          subjectInfo: loadedState.subjectInfo,
+          brandInfo: loadedState.brandInfo,
+          extractedTemplate: loadedState.extractedTemplate,
+          keywords: baselineKeywords,
+          outputLanguage: loadedState.outputLanguage,
+          serpLanguage: loadedState.serpLanguage,
+          serpCountry: loadedState.serpCountry,
+          modelSettings: loadedState.modelSettings,
+          lengthConstraints: loadedState.lengthConstraints,
+        });
       }
 
       setIsLoading(false);
     };
 
     loadExistingBrief();
-  }, [briefId, loadBrief]);
+  }, [briefId, loadBrief, setBaseline]);
 
   // Mark state as unsaved when relevant data changes
   useEffect(() => {

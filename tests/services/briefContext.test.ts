@@ -211,18 +211,21 @@ describe('truncateCompetitorText', () => {
     expect(result).toBe(JSON.stringify(tiny));
   });
 
-  it('truncates Full_Text proportionally when over budget', () => {
-    // Build a string that will definitely exceed a tiny maxTokens budget
+  it('truncates Full_Text proportionally and stays under budget', () => {
+    // Build a string that will definitely exceed the budget
     const longText = 'a'.repeat(2000);
     const competitors = [makeCompetitor({ Full_Text: longText })];
     const json = JSON.stringify(competitors);
 
-    // Set a tiny maxTokens so truncation always triggers
-    const result = truncateCompetitorText(json, 10);
+    // Realistic budget that triggers truncation but leaves room for valid JSON
+    const maxTokens = 400;
+    const result = truncateCompetitorText(json, maxTokens);
     const parsed = JSON.parse(result);
 
     expect(parsed[0].Full_Text).toContain('... [truncated]');
     expect(parsed[0].Full_Text.length).toBeLessThan(longText.length);
+    // The whole point of the fix: output stays conservatively UNDER the cap.
+    expect(estimateTokens(result)).toBeLessThanOrEqual(maxTokens);
   });
 
   it('preserves non-Full_Text fields after truncation', () => {
@@ -230,18 +233,19 @@ describe('truncateCompetitorText', () => {
     const competitors = [makeCompetitor({ URL: 'https://keep.me', Full_Text: longText })];
     const json = JSON.stringify(competitors);
 
-    const result = truncateCompetitorText(json, 10);
+    const result = truncateCompetitorText(json, 400);
     const parsed = JSON.parse(result);
 
     expect(parsed[0].URL).toBe('https://keep.me');
   });
 
-  it('falls back to raw slice when JSON is invalid', () => {
+  it('falls back to a raw under-budget prefix when JSON is invalid', () => {
     const invalid = 'not valid json ' + 'x'.repeat(200);
-    // Budget of 1 token (4 chars) forces truncation
-    const result = truncateCompetitorText(invalid, 1);
-    // Falls back to json.slice(0, maxTokens * 4) = slice(0, 4)
-    expect(result).toBe(invalid.slice(0, 4));
+    const maxTokens = 10;
+    const result = truncateCompetitorText(invalid, maxTokens);
+    // Falls back to a raw slice that is a prefix of the input and under budget.
+    expect(invalid.startsWith(result)).toBe(true);
+    expect(estimateTokens(result)).toBeLessThanOrEqual(maxTokens);
   });
 });
 

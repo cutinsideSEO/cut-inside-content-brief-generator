@@ -193,8 +193,12 @@ Deno.serve(async (req: Request) => {
       config.output_language = output_language || brief.output_language || 'English';
     }
 
-    // Determine initial step_number
-    let initialStep = step_number || null
+    // Determine initial step_number.
+    // article/competitors jobs are not step-scoped — force step_number: null
+    // (documented invariant) regardless of what the caller passed.
+    let initialStep = (job_type === 'article' || job_type === 'competitors')
+      ? null
+      : step_number || null
     if (job_type === 'full_brief' && !initialStep) {
       initialStep = 1 // Start from step 1
     }

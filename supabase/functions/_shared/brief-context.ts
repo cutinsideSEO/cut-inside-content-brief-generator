@@ -129,23 +129,38 @@ export function checkTokenBudget(label: string, text: string, warnAt = 200000, h
   return false;
 }
 
+const TRUNCATION_SUFFIX = '... [truncated]';
+
 /**
  * Truncates competitor Full_Text fields to fit within a token budget.
+ * Targets ~90% of the budget and accounts for the per-competitor suffix plus
+ * non-text JSON fields so the result stays conservatively UNDER maxTokens.
  */
 export function truncateCompetitorText(json: string, maxTokens = 150000): string {
   const est = estimateTokens(json);
   if (est <= maxTokens) return json;
+  // Aim under the cap to leave headroom for suffixes, JSON punctuation, and
+  // non-text fields the proportional ratio doesn't shrink.
+  const targetTokens = Math.floor(maxTokens * 0.9);
   try {
     const data = JSON.parse(json);
-    const ratio = maxTokens / est;
+    const ratio = targetTokens / est;
     for (const c of data) {
       if (c.Full_Text) {
-        c.Full_Text = c.Full_Text.slice(0, Math.floor(c.Full_Text.length * ratio)) + '... [truncated]';
+        // Reserve room for the appended suffix so it can't push us back over.
+        const allowed = Math.max(0, Math.floor(c.Full_Text.length * ratio) - TRUNCATION_SUFFIX.length);
+        c.Full_Text = c.Full_Text.slice(0, allowed) + TRUNCATION_SUFFIX;
       }
     }
-    return JSON.stringify(data);
+    let result = JSON.stringify(data);
+    // Belt-and-suspenders: if the re-serialized JSON still exceeds the budget
+    // (e.g. many competitors with large non-text fields), hard-cap it.
+    if (estimateTokens(result) > maxTokens) {
+      result = result.slice(0, targetTokens * 4);
+    }
+    return result;
   } catch {
-    return json.slice(0, maxTokens * 4);
+    return json.slice(0, targetTokens * 4);
   }
 }
 

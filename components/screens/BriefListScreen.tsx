@@ -100,6 +100,14 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   const [articleGenerateConfirmBriefId, setArticleGenerateConfirmBriefId] = useState<string | null>(null);
   const [startingArticleBriefIds, setStartingArticleBriefIds] = useState<Set<string>>(new Set());
   const startingArticleBriefIdsRef = useRef<Set<string>>(new Set());
+  // Per-brief safety timers that force-clear the optimistic "starting" disable if
+  // the job is never observed as generating (e.g. a failed/no-op start). This is a
+  // long fallback (not a short re-enable) so a slow Edge Function cold start
+  // (30-60s) can't re-enable the ⚡ button and allow a duplicate job.
+  const articleStartSafetyTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Fallback window: comfortably longer than a worst-case cold start so the live
+  // generation state has time to arrive before we re-enable.
+  const ARTICLE_START_SAFETY_MS = 90000;
 
   // Auth
   const { userId } = useAuth();
@@ -199,6 +207,9 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   }, [generatingBriefs, loadArticleCount, loadBriefs]);
 
   // If realtime generation state arrives, stop showing "starting" on those cards.
+  // Observing the brief as actively generating is the authoritative signal that
+  // the job is live, so we clear the optimistic disable here (the 90s timer is
+  // only a fallback for starts that never become live).
   useEffect(() => {
     setStartingArticleBriefIds((prev) => {
       let changed = false;
@@ -207,6 +218,12 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       prev.forEach((briefId) => {
         if (isBriefActivelyGenerating(generatingBriefs[briefId]?.status)) {
           changed = true;
+          // Job is live — cancel the safety fallback timer for this brief.
+          const timer = articleStartSafetyTimersRef.current.get(briefId);
+          if (timer) {
+            clearTimeout(timer);
+            articleStartSafetyTimersRef.current.delete(briefId);
+          }
           return;
         }
         next.add(briefId);
@@ -231,6 +248,13 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
   }, []);
 
   const clearArticleGenerationStarting = useCallback((briefId: string) => {
+    // Always clear any pending safety timer for this brief, even if the
+    // "starting" flag was already removed by the realtime effect.
+    const timer = articleStartSafetyTimersRef.current.get(briefId);
+    if (timer) {
+      clearTimeout(timer);
+      articleStartSafetyTimersRef.current.delete(briefId);
+    }
     if (!startingArticleBriefIdsRef.current.has(briefId)) return;
     startingArticleBriefIdsRef.current.delete(briefId);
     setStartingArticleBriefIds((prev) => {
@@ -239,6 +263,16 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       next.delete(briefId);
       return next;
     });
+  }, []);
+
+  // Clear any pending article-start safety timers on unmount so they don't fire
+  // (and call state setters) after the screen is gone.
+  useEffect(() => {
+    const timers = articleStartSafetyTimersRef.current;
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+    };
   }, []);
 
   const handleArchiveClick = (briefId: string) => {
@@ -419,11 +453,20 @@ const BriefListScreen: React.FC<BriefListScreenProps> = ({
       await createGenerationJob(briefId, 'article');
       toast.success('Article generation started');
 
-      // Keep local loading briefly in case realtime update is delayed.
-      setTimeout(() => {
+      // Keep the ⚡ control disabled until the brief is actually observed as
+      // generating (handled by the realtime effect above). Arm only a LONG
+      // safety fallback so a genuinely failed/no-op start eventually re-enables.
+      // A short timeout here would re-enable mid Edge-Function cold start
+      // (30-60s) before the job is live, allowing a duplicate job.
+      const existingTimer = articleStartSafetyTimersRef.current.get(briefId);
+      if (existingTimer) clearTimeout(existingTimer);
+      const safetyTimer = setTimeout(() => {
+        articleStartSafetyTimersRef.current.delete(briefId);
         clearArticleGenerationStarting(briefId);
-      }, 5000);
+      }, ARTICLE_START_SAFETY_MS);
+      articleStartSafetyTimersRef.current.set(briefId, safetyTimer);
     } catch (err) {
+      // Start failed outright — re-enable immediately (also clears any timer).
       clearArticleGenerationStarting(briefId);
       const message = err instanceof Error ? err.message : 'Failed to start article generation';
       toast.error(message);

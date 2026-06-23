@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import { getArticle } from '../../services/articleService';
 import { getBrief } from '../../services/briefService';
 import { exportArticleToMarkdown, copyArticleToClipboardRich } from '../../services/markdownService';
+import { buildFaqSchemaStringFromArticle } from '../../utils/faqSchema';
 import { toast } from 'sonner';
 import type { BriefArticle } from '../../types/database';
 import type { ContentBrief, LengthConstraints, OnPageSeo } from '../../types';
@@ -10,7 +11,7 @@ import type { SaveStatus } from '../../types/appState';
 import Button from '../Button';
 import SaveStatusIndicator from '../SaveStatusIndicator';
 import { Badge, Skeleton, Alert, Collapsible, CollapsibleTrigger, CollapsibleContent, Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui';
-import { ChevronDownIcon, ChevronUpIcon, CopyIcon, ZapIcon } from '../Icon';
+import { ChevronDownIcon, ChevronUpIcon, CopyIcon, ZapIcon, FileCodeIcon } from '../Icon';
 import ArticleOptimizerPanel from '../ArticleOptimizerPanel';
 
 // localStorage key persisting whether the article optimizer panel is open.
@@ -292,6 +293,13 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
     return currentContent?.content ? countWords(currentContent.content) : 0;
   }, [currentContent?.content]);
 
+  // FAQPage JSON-LD derived deterministically from the article content.
+  // null when the article has no detectable FAQ Q&A — the copy button hides then.
+  const faqSchemaString = useMemo(() => {
+    if (!currentContent?.content) return null;
+    return buildFaqSchemaStringFromArticle(currentContent.content);
+  }, [currentContent?.content]);
+
   // -- Resolved brief data (must be before handlers that reference it) --
 
   const resolvedBriefData = briefContext || briefDataProp || null;
@@ -327,6 +335,16 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
     exportArticleToMarkdown(currentContent, resolvedBriefData?.on_page_seo);
     toast.success('Markdown file downloaded');
   }, [currentContent, resolvedBriefData]);
+
+  const handleCopyFaqSchema = useCallback(async () => {
+    if (!faqSchemaString) return;
+    try {
+      await navigator.clipboard.writeText(faqSchemaString);
+      toast.success('FAQ schema copied (FAQPage JSON-LD)');
+    } catch {
+      toast.error('Failed to copy FAQ schema');
+    }
+  }, [faqSchemaString]);
 
   const handleApplyChanges = useCallback(
     (newContent: string) => {
@@ -479,6 +497,18 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
             >
               .md
             </Button>
+            {faqSchemaString && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleCopyFaqSchema}
+                icon={<FileCodeIcon className="h-4 w-4" />}
+                title="Copy FAQPage schema (JSON-LD) for the article FAQ"
+              >
+                <span className="hidden sm:inline">Copy FAQ schema</span>
+                <span className="sm:hidden">FAQ schema</span>
+              </Button>
+            )}
             {!showOptimizer && resolvedBriefData && (
               <Button
                 variant="outline"

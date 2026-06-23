@@ -107,6 +107,12 @@ All long-running generation runs on the backend. The browser only issues short, 
 - `_shared/` modules — Server-side generation logic (types, prompts, schemas, gemini-client, step-executor, article-generator, brief-context, generation-config, dataforseo-client, generation-guards, cors)
 - Frontend subscribes via Supabase Realtime for live progress updates
 
+**Models** (defined in `_shared/generation-guards.ts` → `resolveQueueModelSettings()`; `GeminiModel` union in `types.ts`): Pro is `gemini-3.1-pro-preview` (the older `gemini-3-pro-preview` was retired by Google), Flash is `gemini-3-flash-preview`. Articles + Step 5 skeleton use Pro; brief steps 1-4/6/7 and the Step-5 Flash phases use Flash.
+
+**Per-task sampling temperature** (`_shared/generation-config.ts`): each brief step gets a temperature (`getTemperatureForStep()`) — deterministic/structured tasks (keywords, competitor, gap, on-page SEO, Step-5 enrichment/resources) ~`0.3`, creative tasks (Step-5 skeleton, article prose) ~`0.9`, balanced (Step 1, FAQs) ~`0.6`. `gemini-client.ts`'s `GeminiCallConfig` supports `temperature`/`topP`/`maxOutputTokens`.
+
+**finishReason guard** (`gemini-client.ts`): `callGeminiDirect()` throws on any non-`STOP` finishReason (`MAX_TOKENS`, `SAFETY`, `RECITATION`, …) instead of returning silently-truncated text, so truncation/blocks surface through `retryOperation()` and into the job's `error_message`. The step-executor wraps that detail into its error message (`...after retries: ${detail}`).
+
 The backend handles every brief/article generation job type (`competitors`, `brief_step`, `full_brief`, `regenerate`, `article`). The frontend delegates via `services/generationJobService.ts` → `createGenerationJob()` and reads progress from `useGenerationSubscription` / `useBriefRealtimeSync`.
 
 **Inline AI edits via `gemini-proxy`** (`services/geminiService.ts` → `gemini-proxy` Edge Function):
@@ -120,6 +126,12 @@ The backend handles every brief/article generation job type (`competitors`, `bri
 These intentionally bypass the queue — they're 1-3 second one-shot calls where the user is actively waiting. Polling a DB row for them would kill interactivity.
 
 **DataForSEO:** Competitor analysis runs server-side via the `competitors` job type using `_shared/dataforseo-client.ts`. The frontend `services/dataforseoService.ts` provides `getOnPageElementsViaProxy()` for context URL scraping and `getDetailedOnpageElements()` for template extraction.
+
+**Competitor digests:** During the `competitors` job, `processCompetitors` generates a one-shot Flash digest per competitor (top ~8 by weighted score, run in bounded parallel batches; best-effort — never fails the job) and persists it to `brief_competitors.digest` (migration `010_competitor_digest.sql`). Steps 3/4/5 feed each digest in place of the raw head-truncated `Full_Text` for non-ground-truth competitors via `applyCompetitorDigests()` (`brief-context.ts`); the top-3 "ground truth" full text is built separately and is NOT digested. Competitors with no digest (old briefs / failed call) fall back to truncated `full_text`. While digesting, the job writes a `phase: 'digesting'` progress value (`percentage: 90`).
+
+**Article competitor grounding:** Article section prose (a) receives short per-section competitor excerpts so the writer can be specific/take a stance, and (b) optionally uses Gemini Google Search grounding, gated behind `ENABLE_ARTICLE_SEARCH_GROUNDING` in `_shared/article-generator.ts`. A grounded call that throws falls back automatically to the same call WITHOUT grounding (inside each retry attempt), so article generation never breaks on grounding. Grounding adds cost/latency — flip the constant to `false` to disable. (Note: grounding is incompatible with `responseSchema`, so `callGeminiDirect()` defensively drops grounding whenever a schema is set — only free-text/prose calls ground.)
+
+**Brand voice by example:** `brief-context.ts` extracts a short representative prose excerpt (`extractVoiceSample()`, ~600 chars, skips nav/boilerplate) from context files/URLs and injects a "write in a voice matching this sample" block into the brand context, alongside the existing tone labels.
 
 ### Key Component Layers
 
@@ -178,7 +190,7 @@ pg_cron (every 10-30s) → process-generation-queue Edge Function
 - `gemini-client.ts` — Direct Gemini REST API client (`callGeminiDirect()`, `retryOperation()` with exponential backoff + jitter)
 - `prompts.ts` — All system prompts for steps 1-7 and article generation
 - `schemas.ts` — JSON response schemas for Gemini structured output
-- `step-executor.ts` — Main step execution logic including 3-phase Step 5 (skeleton → enrichment → resources)
+- `step-executor.ts` — Main step execution logic including 3-phase Step 5: phase 1 skeleton (Pro) authors headings + `section_angle` + `guidelines`; phases 2 (enrichment) + 3 (resources) run on Flash and only fill `targeted_keywords`/`competitor_coverage` and append internal-link guidelines. Flash phases must NOT clobber phase-1 `section_angle`/`guidelines` — `preservePhase1Strategy()` re-asserts the Pro skeleton's strategy after each Flash phase.
 - `article-generator.ts` — Full article generation with word count enforcement (expand/trim cycles)
 - `brief-context.ts` — Brand context building, token budget management, competitor text truncation
 - `generation-config.ts` — Thinking budgets, model config builders
@@ -216,7 +228,7 @@ Edge Functions to deploy: `create-generation-job` (verify_jwt: true), `create-ge
 - `access_codes` — Custom auth (not Supabase Auth), codes validated against this table
 - `clients` — Folders/workspaces for organizing briefs
 - `briefs` — Main entity, brief data stored as JSONB, `active_job_id` links to running generation
-- `brief_competitors` — Competitor analysis data per brief
+- `brief_competitors` — Competitor analysis data per brief; `digest` column (migration `010_competitor_digest.sql`) holds a concise Flash-generated summary used by steps 3/4/5
 - `brief_context_files` — Uploaded file metadata (files in Supabase Storage)
 - `brief_context_urls` — Scraped URL content
 - `brief_articles` — Generated article versions with `is_current` flag and workflow status
@@ -314,10 +326,16 @@ The `@/` alias maps to project root: `import { Card } from '@/components/ui'`
 - **Pipeline transition must reset progress:** When the batch `competitors` job completes and a `full_brief` job is chained, `AppWrapper.tsx`'s `isPipelineTransition` branch MUST replace `jobProgress` with `{ current_step: 1, total_steps: 7, percentage: 0 }`. Carrying the competitors' `percentage: 100` forward makes the brief phase render at 100% and then jump to 0% when the chained job inserts. Same applies if you add any other pipeline-style transition.
 - **Generation progress must clamp monotonically:** All UI that renders `getGenerationProgressModel().percentage` for a live job should wrap it in a max-seen ref keyed by `briefId::jobId` (or `batchId`), and reset the ref when the job/batch changes. `GenerationActivityPanel`, `BriefListCard`, `DashboardScreen`'s `GenerationBanner` already do this — don't add a new progress display that reads the raw percentage directly, it will visibly regress during step transitions.
 - **Batch fractional progress picks one job per brief:** `useBatchSubscription.refreshLiveProgress()` collapses jobs to one representative per `(batchId, briefId)` with priority `running > pending > latest created_at`, and includes pending-queued percentages. This prevents the progress bar from dipping between "old step completed" and "new step running" in a chained full_brief pipeline. Don't revert to summing percentages over all running jobs — it double-counts during the INSERT-before-COMPLETE window inside `processFullBrief`.
-- **Batch status labels + variants:** Use `getBatchStatusDisplay(batch.status, batch.failed_jobs)` from `utils/generationActivity.ts` — do NOT do `batch.status.replace(/_/g, ' ')` inline, and do NOT map `partially_failed` to the success variant.
-- **Dashboard banner for active backend jobs:** When on `'dashboard'` view, if a `full_brief` / `article` / `competitors` job is running, `DashboardScreen` renders a `GenerationBanner` at the top with step label + percentage + cancel. This is what prevents the empty-7-sections screen after "I'm Feeling Lucky" and after bulk batch starts. The banner is intentionally NOT shown for `regenerate` — that flow uses a per-section spinner.
+- **Batch status labels + variants:** Use `getBatchStatusDisplay(batch.status, batch.failed_jobs)` from `utils/generationActivity.ts` — do NOT do `batch.status.replace(/_/g, ' ')` inline, and do NOT map `partially_failed` to the success variant. When a batch finishes with any failures (all-failed OR partly-failed), `process-generation-queue` marks it `partially_failed`, NOT `cancelled` — `cancelled` is reserved for manual aborts.
+- **Dashboard banner for active backend jobs:** When on `'dashboard'` view, if a `full_brief` / `article` / `competitors` job is running, `DashboardScreen` renders a `GenerationBanner` at the top with step label + percentage + cancel. This is what prevents the empty-7-sections screen after a full-brief kickoff and after a bulk batch starts. The banner is intentionally NOT shown for `regenerate` — that flow uses a per-section spinner.
 - **`resetStaleJobs` must guard status:** Both UPDATE branches in `process-generation-queue`'s `resetStaleJobs()` must include `.eq('status', 'running')` so a job that transitions to `completed` between the stale SELECT and the UPDATE is not clobbered back to `pending`. Same pattern applies to any future "sweep running jobs" recovery logic.
 - **Edge function deploy bundler can transiently time out:** Supabase's remote bundler occasionally returns `Bundle generation timed out` for large multi-file functions like `process-generation-queue` (~4,800 total lines). Symptom: CLI uploads all assets, then fails at the bundle step. Resolution: retry — in practice it clears within ~5–20 minutes. If you need a fallback, the Supabase Dashboard → Edge Functions UI uses a different code path.
+- **`'digesting'` progress phase:** During the `competitors` job, `processCompetitors` writes a `phase: 'digesting'` / `percentage: 90` progress value while generating per-competitor Flash digests. Any UI that maps competitor-job progress phases must tolerate this value (it sits between scrape/parse and completion). Don't treat an unknown phase as an error state.
+- **Run the digest migration before deploying the digest code:** `applyCompetitorDigests()` and `processCompetitors` read/write `brief_competitors.digest`. Apply migration `010_competitor_digest.sql` (additive, nullable `text` column) BEFORE deploying `process-generation-queue` — otherwise the digest write/select hits a missing column. The column is best-effort: if absent or null, generation falls back to truncated `full_text`, so a deploy-before-migrate slip degrades quality rather than crashing, but apply the migration first regardless.
+- **Article search-grounding off-switch:** `ENABLE_ARTICLE_SEARCH_GROUNDING` in `_shared/article-generator.ts` toggles Google Search grounding for article prose. It's `true` by default; grounded calls add cost/latency and fall back to a non-grounded call on any failure. Set it to `false` to disable. Never combine grounding with `responseSchema` — `callGeminiDirect()` drops grounding when a schema is present, so grounding is for free-text/prose calls only.
+- **Toasts use `sonner`, not the old in-app toast UI:** `contexts/ToastContext.tsx` is now a thin adapter over `sonner` (`useToast()` + `ToastProvider` render `<Toaster>`); `components/ui/Toast.tsx` is a no-op stub kept only for its type export. Use `useToast()` or import `toast` from `sonner` directly — don't resurrect a custom toast renderer.
+- **Single brief-status color source:** Brief status indicator colors live in `utils/briefStatusColors.ts` (`BRIEF_STATUS_COLOR`). Use it everywhere a brief status color is needed (card accents, section headings, sidebar dots) rather than re-deriving colors inline — this is what keeps a status consistent across views.
+- **Article Optimizer panel defaults closed:** `ArticleScreen`'s `showOptimizer` defaults to `false` and persists the user's choice to `localStorage` (`OPTIMIZER_VISIBILITY_KEY`). Don't flip the default back to open.
 
 ## Deployment
 

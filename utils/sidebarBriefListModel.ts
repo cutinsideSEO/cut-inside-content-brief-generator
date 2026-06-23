@@ -1,4 +1,5 @@
 import type { BriefListFilterStatus } from '../types/briefListUi';
+import { BRIEF_STATUS_COLOR, WORKFLOW_BUCKET_DOT } from './briefStatusColors';
 
 interface SidebarBriefListCounts {
   all: number;
@@ -28,14 +29,18 @@ interface SidebarBriefListModel {
   archivedRow: SidebarStatusRow | null;
 }
 
+// Dot colors come from the shared brief-status color map so the sidebar can
+// never drift from the status badge / card icon. `all` and `workflow` are
+// aggregate rows: `all` keeps the brand teal; `workflow` uses the shared
+// workflow-bucket accent (teal) instead of an orphan cyan.
 const STATUS_META: Record<BriefListFilterStatus, { label: string; dotClassName: string }> = {
   all: { label: 'All', dotClassName: 'bg-teal-500' },
-  draft: { label: 'Drafts', dotClassName: 'bg-gray-300' },
-  in_progress: { label: 'In Progress', dotClassName: 'bg-amber-400' },
-  complete: { label: 'Complete', dotClassName: 'bg-emerald-500' },
-  workflow: { label: 'In Workflow', dotClassName: 'bg-cyan-500' },
-  published: { label: 'Published', dotClassName: 'bg-emerald-600' },
-  archived: { label: 'Archived', dotClassName: 'bg-gray-400' },
+  draft: { label: 'Drafts', dotClassName: BRIEF_STATUS_COLOR.draft.dot },
+  in_progress: { label: 'In Progress', dotClassName: BRIEF_STATUS_COLOR.in_progress.dot },
+  complete: { label: 'Complete', dotClassName: BRIEF_STATUS_COLOR.complete.dot },
+  workflow: { label: 'In Workflow', dotClassName: WORKFLOW_BUCKET_DOT },
+  published: { label: 'Published', dotClassName: BRIEF_STATUS_COLOR.published.dot },
+  archived: { label: 'Archived', dotClassName: BRIEF_STATUS_COLOR.archived.dot },
 };
 
 export function buildSidebarBriefListModel({

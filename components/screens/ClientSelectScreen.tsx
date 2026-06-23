@@ -1,9 +1,12 @@
 // Client Select Screen - Choose a client folder
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAccessibleClients, createClient, deleteClient } from '../../services/clientService';
 import { toast } from 'sonner';
 import type { ClientWithBriefCount } from '../../types/database';
+import type { GeneratingBrief } from '../../types/generationActivity';
+import { getGenerationProgressModel, getGenerationStatusBadgeLabel } from '../../utils/generationActivity';
+import { isBriefActivelyGenerating } from '../../utils/generationStatus';
 import ClientCard from '../clients/ClientCard';
 import { getClientLogoUrl } from '../../lib/favicon';
 import Button from '../Button';
@@ -21,17 +24,6 @@ import {
   FloatingPanelFooter,
   Progress,
 } from '../ui';
-
-// Generation status type (matches AppWrapper)
-type GenerationStatus = 'idle' | 'analyzing_competitors' | 'generating_brief' | 'generating_content';
-
-// Type for tracking individual generation (matches AppWrapper)
-interface GeneratingBrief {
-  clientId: string;
-  clientName: string;
-  status: GenerationStatus;
-  step: number | null;
-}
 
 interface ClientSelectScreenProps {
   onSelectClient: (clientId: string, clientName: string, logoUrl?: string, brandColor?: string) => void;
@@ -71,35 +63,49 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
   const [visibleCount, setVisibleCount] = useState(12);
   const CLIENT_PAGE_SIZE = 12;
 
-  // Get list of generating brief IDs
-  const generatingBriefIds = Object.keys(generatingBriefs);
-  const hasGeneratingBriefs = generatingBriefIds.length > 0;
+  // Monotonic progress clamp per brief+job so transient Realtime event
+  // ordering can never render a backwards progress bar. Keyed on
+  // `${briefId}::${jobId}` exactly like GenerationActivityPanel / BriefListCard.
+  const maxPercentByJobRef = useRef<Map<string, number>>(new Map());
 
-  // Check if a specific client has any generating briefs
-  const getGeneratingBriefsForClient = (clientId: string) => {
-    return generatingBriefIds.filter(briefId => generatingBriefs[briefId].clientId === clientId);
-  };
+  // Build the list of actively-generating briefs with shared progress model +
+  // clamped percentage. This is the single source the floating panel renders.
+  const activeGenerations = useMemo(() => {
+    return Object.entries(generatingBriefs)
+      .filter(([, entry]) => isBriefActivelyGenerating(entry.status))
+      .map(([briefId, entry]) => {
+        const model = getGenerationProgressModel({
+          status: entry.status,
+          generationStep: entry.step,
+          jobProgress: entry.jobProgress,
+        });
+        const clampKey = `${briefId}::${entry.jobId || 'none'}`;
+        const previousMax = maxPercentByJobRef.current.get(clampKey) || 0;
+        const displayPercentage = Math.max(previousMax, model.percentage);
+        maxPercentByJobRef.current.set(clampKey, displayPercentage);
+        return {
+          briefId,
+          entry,
+          model: { ...model, percentage: displayPercentage },
+        };
+      });
+  }, [generatingBriefs]);
 
-  // Get generation status text for a brief
-  const getGenerationStatusText = (status: GenerationStatus, step: number | null) => {
-    switch (status) {
-      case 'analyzing_competitors':
-        return 'Analyzing competitors...';
-      case 'generating_brief':
-        return `Generating brief... ${step ? `(${step}/7)` : ''}`;
-      case 'generating_content':
-        return 'Generating content...';
-      default:
-        return '';
+  // Prune stale monotonic records for briefs that are no longer active.
+  useEffect(() => {
+    const activeKeys = new Set(activeGenerations.map(({ briefId, entry }) => `${briefId}::${entry.jobId || 'none'}`));
+    for (const key of Array.from(maxPercentByJobRef.current.keys())) {
+      if (!activeKeys.has(key)) {
+        maxPercentByJobRef.current.delete(key);
+      }
     }
-  };
+  }, [activeGenerations]);
 
-  // Get progress value for generation
-  const getGenerationProgress = (status: GenerationStatus, step: number | null) => {
-    if (status === 'analyzing_competitors') return 15;
-    if (status === 'generating_brief' && step) return 20 + (step / 7) * 60;
-    if (status === 'generating_content') return 85;
-    return 0;
+  const hasGeneratingBriefs = activeGenerations.length > 0;
+
+  // Count actively-generating briefs for a specific client (drives the card badge).
+  const getGeneratingCountForClient = (clientId: string) => {
+    return activeGenerations.filter(({ entry }) => entry.clientId === clientId).length;
   };
 
   // Filter clients by search
@@ -349,8 +355,8 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
                 <ClientCard
                   client={client}
                   onClick={() => onSelectClient(client.id, client.name, getClientLogoUrl(client.brand_identity) || undefined, client.brand_identity?.brand_color || undefined)}
-                  isGenerating={getGeneratingBriefsForClient(client.id).length > 0}
-                  generatingCount={getGeneratingBriefsForClient(client.id).length}
+                  isGenerating={getGeneratingCountForClient(client.id) > 0}
+                  generatingCount={getGeneratingCountForClient(client.id)}
                   colorIndex={clients.indexOf(client)}
                 />
                 {/* Edit/Delete/Settings overlay buttons */}
@@ -415,37 +421,35 @@ const ClientSelectScreen: React.FC<ClientSelectScreenProps> = ({
               </span>
             }
           >
-            {generatingBriefIds.length} {generatingBriefIds.length === 1 ? 'brief' : 'briefs'} generating
+            {activeGenerations.length} {activeGenerations.length === 1 ? 'brief' : 'briefs'} generating
           </FloatingPanelHeader>
 
-          {generatingBriefIds.map((briefId) => {
-            const brief = generatingBriefs[briefId];
-            return (
-              <FloatingPanelItem
-                key={briefId}
-                title={brief.clientName}
-                status={getGenerationStatusText(brief.status, brief.step)}
-                progress={
-                  <Progress
-                    value={getGenerationProgress(brief.status, brief.step)}
+          {activeGenerations.map(({ briefId, entry, model }) => (
+            <FloatingPanelItem
+              key={briefId}
+              title={entry.clientName}
+              subtitle={getGenerationStatusBadgeLabel(entry.status)}
+              status={model.label}
+              progress={
+                <Progress
+                  value={model.percentage}
+                  size="sm"
+                  color="yellow"
+                />
+              }
+              action={
+                onViewGeneratingBrief && (
+                  <Button
+                    variant="ghost"
                     size="sm"
-                    color="yellow"
-                  />
-                }
-                action={
-                  onViewGeneratingBrief && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onViewGeneratingBrief(briefId)}
-                    >
-                      View
-                    </Button>
-                  )
-                }
-              />
-            );
-          })}
+                    onClick={() => onViewGeneratingBrief(briefId)}
+                  >
+                    View
+                  </Button>
+                )
+              }
+            />
+          ))}
 
           <FloatingPanelFooter>
             Runs in background. You can switch pages safely.

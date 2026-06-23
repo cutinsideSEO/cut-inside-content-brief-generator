@@ -221,6 +221,11 @@ export interface ArticleSectionParams {
   language: string;
   writerInstructions?: string;
   brandContext?: string;
+  /**
+   * Optional competitor pages used to ground the section in what ranking pages said.
+   * When omitted/empty, section generation behaves exactly as before.
+   */
+  competitors?: CompetitorPage[];
   model: GeminiModel;
   /**
    * Included for type consistency with the job queue payload, but intentionally

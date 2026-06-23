@@ -171,8 +171,12 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
                                     <EditableText
                                       value={item.good_points.join('\n')}
                                       onChange={(val) => handleBreakdownChange(index, 'good_points', val.split('\n').filter(Boolean))}
-                                      placeholder="One point per line..."
-                                      textClassName="text-foreground text-sm leading-relaxed opacity-0 h-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto"
+                                      placeholder={item.good_points.length > 0 ? 'One point per line...' : '+ Add a strength'}
+                                      textClassName={
+                                        item.good_points.length > 0
+                                          ? 'text-foreground text-sm leading-relaxed opacity-0 h-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto'
+                                          : 'text-foreground text-sm leading-relaxed'
+                                      }
                                     />
                                   </div>
 
@@ -194,8 +198,12 @@ const Stage3CompetitorAnalysis: React.FC<StageProps> = ({ briefData, setBriefDat
                                     <EditableText
                                       value={item.bad_points.join('\n')}
                                       onChange={(val) => handleBreakdownChange(index, 'bad_points', val.split('\n').filter(Boolean))}
-                                      placeholder="One point per line..."
-                                      textClassName="text-foreground text-sm leading-relaxed opacity-0 h-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto"
+                                      placeholder={item.bad_points.length > 0 ? 'One point per line...' : '+ Add a weakness'}
+                                      textClassName={
+                                        item.bad_points.length > 0
+                                          ? 'text-foreground text-sm leading-relaxed opacity-0 h-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto'
+                                          : 'text-foreground text-sm leading-relaxed'
+                                      }
                                     />
                                   </div>
                                 </div>

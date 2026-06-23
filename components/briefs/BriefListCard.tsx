@@ -1,9 +1,10 @@
 // Brief List Card - Card component for displaying briefs in a list
 import React, { useEffect, useRef, useState } from 'react';
-import type { BriefStatus, BriefWithClient, GenerationJobProgress } from '../../types/database';
+import type { BriefWithClient, GenerationJobProgress } from '../../types/database';
 import type { GenerationStatus } from '../../types/generationActivity';
 import { isWorkflowStatus } from '../../types/database';
 import { getGenerationProgressModel, getGenerationStatusBadgeLabel } from '../../utils/generationActivity';
+import { BRIEF_STATUS_COLOR } from '../../utils/briefStatusColors';
 import { formatRelativeTime } from '../../utils/relativeTime';
 import { BRIEF_TRANSITIONS } from './WorkflowStatusSelect';
 import PublishedUrlModal from './PublishedUrlModal';
@@ -63,30 +64,6 @@ const LinkIcon: React.FC<{ className?: string }> = ({ className }) => (
     <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
   </svg>
 );
-
-const STATUS_ICON_COLOR: Record<BriefStatus, string> = {
-  draft: 'text-gray-400',
-  in_progress: 'text-amber-500',
-  complete: 'text-emerald-500',
-  sent_to_client: 'text-teal-500',
-  changes_requested: 'text-amber-500',
-  in_writing: 'text-blue-500',
-  approved: 'text-emerald-500',
-  published: 'text-emerald-600',
-  archived: 'text-gray-300',
-};
-
-const STATUS_LABEL: Record<BriefStatus, string> = {
-  draft: 'Draft',
-  in_progress: 'In Progress',
-  complete: 'Complete',
-  sent_to_client: 'Sent to Client',
-  changes_requested: 'Changes Requested',
-  in_writing: 'In Writing',
-  approved: 'Approved',
-  published: 'Published',
-  archived: 'Archived',
-};
 
 const BriefListCard: React.FC<BriefListCardProps> = ({
   brief,
@@ -153,10 +130,10 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   const canGenerateArticle = !isGenerating && !!onGenerateArticle && (brief.status === 'complete' || isWorkflow);
 
   // Status icon: color communicates state; amber during generation.
-  const iconColor = isGenerating ? 'text-amber-500' : STATUS_ICON_COLOR[brief.status];
+  const iconColor = isGenerating ? 'text-amber-500' : BRIEF_STATUS_COLOR[brief.status].icon;
   const statusLabel = isGenerating
     ? getGenerationStatusBadgeLabel(generationStatus)
-    : STATUS_LABEL[brief.status];
+    : BRIEF_STATUS_COLOR[brief.status].label;
   const availableTransitions = BRIEF_TRANSITIONS[brief.status] || [];
   const forwardTransitions = availableTransitions.filter((t) => !t.isRevert);
   const revertTransitions = availableTransitions.filter((t) => t.isRevert);

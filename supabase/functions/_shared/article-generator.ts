@@ -9,6 +9,7 @@
 
 import type {
   ContentBrief,
+  CompetitorPage,
   OutlineItem,
   FAQs,
   GeminiModel,
@@ -29,7 +30,7 @@ import {
 } from './prompts.ts';
 import { buildArticleGenerationConfig, TEMP_DETERMINISTIC } from './generation-config.ts';
 import { callGeminiDirect, retryOperation } from './gemini-client.ts';
-import { stripReasoningFromBrief, countWords, checkTokenBudget } from './brief-context.ts';
+import { stripReasoningFromBrief, countWords, checkTokenBudget, estimateTokens } from './brief-context.ts';
 
 const ARTICLE_SECTION_CALL_TIMEOUT_MS = 60_000;
 const ARTICLE_SECTION_CALL_RETRIES = 2;
@@ -39,6 +40,22 @@ const ARTICLE_TRIM_CALL_RETRIES = 1;
 const ARTICLE_TRIM_RETRY_DELAY_MS = 800;
 const ARTICLE_TRIM_MODEL: GeminiModel = 'gemini-3-flash-preview';
 const MAX_FINAL_TRIM_SECTIONS = 2;
+
+// --- Competitor grounding (per-section excerpts) ---
+// Excerpts ground each section in what ranking pages actually said so the writer
+// can be more specific / take a clearer stance. Kept deliberately small to bound tokens.
+/** Max number of competitor excerpts injected per section. */
+const MAX_COMPETITORS_PER_SECTION = 3;
+/** Max characters of body text per competitor excerpt. */
+const COMPETITOR_EXCERPT_MAX_CHARS = 550;
+/**
+ * If the section prompt is already large (brief JSON + brand + lots of guidelines),
+ * shrink the competitor block so we never blow up the per-section token budget.
+ * Estimated in tokens (≈ chars / 4). Above this we drop to a single, shorter excerpt.
+ */
+const SECTION_PROMPT_TOKEN_SOFTCAP = 60000;
+/** Total character ceiling for the combined competitor block in one section. */
+const COMPETITOR_BLOCK_MAX_CHARS = MAX_COMPETITORS_PER_SECTION * COMPETITOR_EXCERPT_MAX_CHARS;
 
 // ============================================
 // Types
@@ -67,6 +84,13 @@ export interface ArticleJobConfig {
   thinkingLevel: ThinkingLevel;
   globalWordTarget: number | null;
   strictMode: boolean;
+  /**
+   * Optional competitor pages (with Full_Text/headings) used to ground each section
+   * in what ranking pages actually said. Selected per section by
+   * `competitor_coverage` URL match, with top-ranked fallback. Safe to omit —
+   * when absent or empty, article generation behaves exactly as before.
+   */
+  competitors?: CompetitorPage[];
 }
 
 /** Result of article generation */
@@ -103,6 +127,126 @@ export function flattenOutline(items: OutlineItem[]): OutlineItem[] {
 }
 
 // ============================================
+// Competitor grounding helpers
+// ============================================
+
+/** Normalizes a URL for loose matching (strip scheme, www, trailing slash, lowercase). */
+function normalizeUrl(url: string): string {
+  return (url || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/+$/, '');
+}
+
+/** Collapses whitespace and trims a competitor body excerpt to a hard char cap. */
+function makeExcerpt(text: string, maxChars: number): string {
+  const cleaned = (text || '').replace(/\s+/g, ' ').trim();
+  if (cleaned.length <= maxChars) return cleaned;
+  // Cut on a word boundary near the cap so we don't end mid-word.
+  const slice = cleaned.slice(0, maxChars);
+  const lastSpace = slice.lastIndexOf(' ');
+  return (lastSpace > maxChars * 0.6 ? slice.slice(0, lastSpace) : slice) + '…';
+}
+
+/**
+ * Selects up to {@link MAX_COMPETITORS_PER_SECTION} competitor pages relevant to a
+ * section. Prefers the competitors named in `competitor_coverage` (matched by URL);
+ * if coverage is empty or yields no matches, falls back to the highest Weighted_Score
+ * competitors so every section still gets grounding. Only returns pages that have body
+ * text to excerpt.
+ */
+function selectCompetitorsForSection(
+  section: OutlineItem,
+  competitors: CompetitorPage[],
+): CompetitorPage[] {
+  const withText = competitors.filter((c) => c.Full_Text && c.Full_Text.trim().length > 0);
+  if (withText.length === 0) return [];
+
+  const coverage = (section.competitor_coverage || [])
+    .map(normalizeUrl)
+    .filter(Boolean);
+
+  const selected: CompetitorPage[] = [];
+  const seen = new Set<string>();
+
+  // 1) Competitors explicitly listed as covering this section.
+  if (coverage.length > 0) {
+    for (const c of withText) {
+      const key = normalizeUrl(c.URL);
+      if (!key || seen.has(key)) continue;
+      if (coverage.some((cov) => cov === key || cov.includes(key) || key.includes(cov))) {
+        selected.push(c);
+        seen.add(key);
+        if (selected.length >= MAX_COMPETITORS_PER_SECTION) return selected;
+      }
+    }
+  }
+
+  // 2) Fallback / top-up with highest-scored competitors so the section is still grounded.
+  if (selected.length < MAX_COMPETITORS_PER_SECTION) {
+    const ranked = [...withText].sort((a, b) => (b.Weighted_Score || 0) - (a.Weighted_Score || 0));
+    for (const c of ranked) {
+      const key = normalizeUrl(c.URL);
+      if (!key || seen.has(key)) continue;
+      selected.push(c);
+      seen.add(key);
+      if (selected.length >= MAX_COMPETITORS_PER_SECTION) break;
+    }
+  }
+
+  return selected;
+}
+
+/**
+ * Builds the per-section competitor-grounding prompt block. Returns '' when there is
+ * nothing useful to add (graceful no-op). Token-bounded: the number and size of
+ * excerpts shrink when the rest of the section prompt is already large.
+ *
+ * @param baseTokenEstimate rough token count of the section prompt built so far,
+ *   used to decide how aggressively to shrink the competitor block.
+ */
+function buildCompetitorExcerptInstruction(
+  section: OutlineItem,
+  competitors: CompetitorPage[] | undefined,
+  baseTokenEstimate: number,
+): string {
+  if (!competitors || competitors.length === 0) return '';
+
+  const selected = selectCompetitorsForSection(section, competitors);
+  if (selected.length === 0) return '';
+
+  // When the section prompt is already heavy, keep grounding minimal: one shorter excerpt.
+  const heavyPrompt = baseTokenEstimate > SECTION_PROMPT_TOKEN_SOFTCAP;
+  const perCompetitorCap = heavyPrompt
+    ? Math.round(COMPETITOR_EXCERPT_MAX_CHARS / 2)
+    : COMPETITOR_EXCERPT_MAX_CHARS;
+  const maxCompetitors = heavyPrompt ? 1 : MAX_COMPETITORS_PER_SECTION;
+
+  let budgetRemaining = COMPETITOR_BLOCK_MAX_CHARS;
+  const entries: string[] = [];
+  for (const c of selected.slice(0, maxCompetitors)) {
+    if (budgetRemaining <= 0) break;
+    const cap = Math.min(perCompetitorCap, budgetRemaining);
+    const excerpt = makeExcerpt(c.Full_Text, cap);
+    if (!excerpt) continue;
+    budgetRemaining -= excerpt.length;
+    entries.push(`- **${c.URL}:** "${excerpt}"`);
+  }
+
+  if (entries.length === 0) return '';
+
+  return `
+---
+
+**HOW RANKING PAGES CURRENTLY HANDLE THIS SECTION (competitor excerpts):**
+These are short excerpts from pages currently ranking for this topic. Use them only as a baseline to beat — be MORE specific, take a CLEARER stance, and fill the gaps they leave. Do NOT copy their phrasing, repeat their structure, or mention them. The section angle and guidelines above remain the primary instruction.
+${entries.join('\n')}
+`;
+}
+
+// ============================================
 // Section Generation (server-side)
 // ============================================
 
@@ -122,6 +266,7 @@ async function generateSectionContent(
     language,
     writerInstructions,
     brandContext,
+    competitors,
     model,
     globalWordTarget,
     wordsWrittenSoFar,
@@ -319,9 +464,20 @@ ${brandContext}
 `;
   }
 
+  // Competitor grounding (per-section excerpts from ranking pages).
+  // Bounded against the heaviest prompt contributors (brief JSON + brand + content so far)
+  // so a large section context shrinks the competitor block instead of overflowing.
+  const briefJson = JSON.stringify(stripReasoningFromBrief(brief), null, 2);
+  const baseTokenEstimate = estimateTokens(briefJson + brandInstruction + contentSoFar);
+  const competitorExcerptInstruction = buildCompetitorExcerptInstruction(
+    sectionToWrite,
+    competitors,
+    baseTokenEstimate,
+  );
+
   const prompt = `
 **FULL CONTENT BRIEF (JSON, reasoning fields stripped for brevity):**
-${JSON.stringify(stripReasoningFromBrief(brief), null, 2)}
+${briefJson}
 ${editorialAngleInstruction}
 ${differentiationInstruction}
 
@@ -344,6 +500,7 @@ ${wordCountInstruction}
 ${resourcesInstruction}
 ${eeatInstruction}
 ${validationInstruction}
+${competitorExcerptInstruction}
 
 ---
 
@@ -447,6 +604,7 @@ export async function generateFullArticle(
     language,
     writerInstructions,
     brandContext,
+    competitors,
     model,
     globalWordTarget,
     strictMode,
@@ -510,6 +668,7 @@ export async function generateFullArticle(
       language,
       writerInstructions,
       brandContext,
+      competitors,
       model,
       thinkingLevel: config.thinkingLevel,
       globalWordTarget,
@@ -548,6 +707,7 @@ export async function generateFullArticle(
           language,
           writerInstructions,
           brandContext,
+          competitors,
           model,
           thinkingLevel: config.thinkingLevel,
           globalWordTarget,

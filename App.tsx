@@ -1170,6 +1170,7 @@ const App: React.FC<AppProps> = ({
               clientLogoUrl={clientLogoUrl}
               clientBrandColor={clientBrandColor}
               clientName={clientName || undefined}
+              onBackToBriefList={onBackToBriefList}
             />
             <main className="flex-1 overflow-y-auto">
               <div className="p-6 lg:p-8">

@@ -28,6 +28,8 @@ interface SidebarProps {
   clientLogoUrl?: string | null;
   clientBrandColor?: string | null;
   onBackToClients?: () => void;
+  /** Navigate back to the brief list from the dashboard (mirrors the header breadcrumb). */
+  onBackToBriefList?: () => void;
   briefCounts?: { draft: number; in_progress: number; complete: number; workflow?: number; published?: number; archived?: number };
   articleCount?: number;
   onOpenClientSettings?: () => void;
@@ -86,6 +88,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   clientLogoUrl,
   clientBrandColor,
   onBackToClients,
+  onBackToBriefList,
   briefCounts,
   articleCount,
   onOpenClientSettings,
@@ -273,6 +276,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     return (
       <aside className="w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 overflow-y-auto">
         <div className="p-4">
+          {onBackToBriefList && (
+            <button onClick={onBackToBriefList} className="flex items-center gap-2 text-sm text-gray-500 hover:text-teal transition-colors mb-6 group">
+              <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to briefs
+            </button>
+          )}
           <ClientIdentityBlock clientName={clientName} clientLogoUrl={clientLogoUrl} clientBrandColor={clientBrandColor} />
           <h3 className="text-xs font-heading font-semibold text-gray-400 uppercase tracking-wider">Dashboard</h3>
           <nav className="mt-2 space-y-1">

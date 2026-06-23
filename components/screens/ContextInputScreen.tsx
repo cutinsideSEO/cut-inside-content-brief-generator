@@ -142,9 +142,20 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   }
 
+  // The screen is dual-mode: while a backend competitor-analysis job is running
+  // we show a focused progress view (no editable form); otherwise we show the
+  // context-entry form. `hasProgressPayload` distinguishes the cold-start window
+  // (job kicked off, first Realtime payload not yet received) from active phases.
+  const hasProgressPayload = Boolean(generationProgress && generationProgress.phase);
+
   return (
     <div className="max-w-5xl mx-auto animate-fade-in">
-        {isLoading ? (
+        {isBackendGenerating ? (
+            <div className="text-center mb-8">
+                <h1 className="text-2xl font-heading font-bold text-gray-900">Analyzing Competitors</h1>
+                <p className="text-md text-gray-600 mt-2">Scanning the SERP and competitor pages to build your brief</p>
+            </div>
+        ) : isLoading ? (
             <ThemedLoader header="Analyzing Competitors..." />
         ) : (
             <div className="text-center mb-8">
@@ -154,29 +165,58 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
         )}
 
         <div className="space-y-6">
-            {/* Backend Competitor Analysis Progress */}
-            {isBackendGenerating && generationProgress && (
-              <Card variant="default" padding="lg" className="mb-6">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-heading font-semibold text-foreground">
-                      {generationProgress.phase === 'serp' && 'Analyzing Keywords...'}
-                      {generationProgress.phase === 'onpage' && 'Scraping Competitor Pages...'}
-                      {generationProgress.phase === 'saving' && 'Saving Results...'}
-                      {generationProgress.phase === 'complete' && 'Analysis Complete!'}
-                      {!generationProgress.phase && 'Starting Analysis...'}
-                    </h3>
-                    <Badge variant="secondary">{generationProgress.percentage || 0}%</Badge>
+            {/* Backend Competitor Analysis Progress (focused view while job runs) */}
+            {isBackendGenerating && (
+              hasProgressPayload ? (
+                <Card variant="default" padding="lg" className="mb-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-heading font-semibold text-foreground">
+                        {generationProgress!.phase === 'serp' && 'Analyzing Keywords...'}
+                        {generationProgress!.phase === 'onpage' && 'Scraping Competitor Pages...'}
+                        {generationProgress!.phase === 'saving' && 'Saving Results...'}
+                        {generationProgress!.phase === 'complete' && 'Analysis Complete!'}
+                      </h3>
+                      <Badge variant="secondary">{generationProgress!.percentage || 0}%</Badge>
+                    </div>
+                    <Progress value={generationProgress!.percentage || 0} />
+                    <p className="text-xs text-muted-foreground">
+                      {generationProgress!.phase === 'serp' &&
+                        `Keywords: ${generationProgress!.completed_keywords || 0}/${generationProgress!.total_keywords || 0}`}
+                      {generationProgress!.phase === 'onpage' &&
+                        `Pages: ${generationProgress!.completed_urls || 0}/${generationProgress!.total_urls || 0}${generationProgress!.current_domain ? ` — ${generationProgress!.current_domain}` : ''}`}
+                    </p>
                   </div>
-                  <Progress value={generationProgress.percentage || 0} />
-                  <p className="text-xs text-muted-foreground">
-                    {generationProgress.phase === 'serp' &&
-                      `Keywords: ${generationProgress.completed_keywords || 0}/${generationProgress.total_keywords || 0}`}
-                    {generationProgress.phase === 'onpage' &&
-                      `Pages: ${generationProgress.completed_urls || 0}/${generationProgress.total_urls || 0}${generationProgress.current_domain ? ` — ${generationProgress.current_domain}` : ''}`}
-                  </p>
-                </div>
-              </Card>
+                </Card>
+              ) : (
+                /* Cold-start reassurance — job queued, first payload not in yet.
+                   Edge Function cold starts can take 30-60s, so show an immediate
+                   indeterminate "queued" state rather than a blank loader. */
+                <Card variant="default" padding="lg" className="mb-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <MiniSpinner className="h-4 w-4 text-teal" />
+                      <h3 className="text-sm font-heading font-semibold text-foreground">
+                        Queued — starting analysis…
+                      </h3>
+                    </div>
+                    {/* Indeterminate bar — no percentage yet, so animate a sweep. */}
+                    <div className="w-full h-2 rounded-full overflow-hidden bg-teal-100">
+                      <div
+                        className="h-full w-full rounded-full animate-shimmer"
+                        style={{
+                          background:
+                            'linear-gradient(90deg, rgba(13,148,136,0.15) 25%, rgba(13,148,136,0.5) 50%, rgba(13,148,136,0.15) 75%)',
+                          backgroundSize: '200% 100%',
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Spinning up the analysis worker. This can take up to a minute on a cold start.
+                    </p>
+                  </div>
+                </Card>
+              )
             )}
 
             {/* Sticky completion state — shown once competitor job finishes */}
@@ -273,6 +313,10 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                 </div>
             )}
 
+            {/* Context-entry form — hidden while a backend analysis job is running
+                so the screen shows only the focused progress view. */}
+            {!isBackendGenerating && (
+            <>
             {/* Subject Matter & Brand Info - Side by Side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Subject Matter Details */}
@@ -428,6 +472,8 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                     {isLoading ? "Analyzing..." : "Continue"}
                 </Button>
             </div>
+            </>
+            )}
         </div>
     </div>
   );

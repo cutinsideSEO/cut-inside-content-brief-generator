@@ -13,6 +13,9 @@ import { Badge, Skeleton, Alert, Collapsible, CollapsibleTrigger, CollapsibleCon
 import { ChevronDownIcon, ChevronUpIcon, CopyIcon, ZapIcon } from '../Icon';
 import ArticleOptimizerPanel from '../ArticleOptimizerPanel';
 
+// localStorage key persisting whether the article optimizer panel is open.
+const OPTIMIZER_VISIBILITY_KEY = 'articleOptimizerOpen';
+
 // --- Inline SVG icons not available in Icon.tsx ---
 
 const ArrowLeftIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
@@ -196,11 +199,28 @@ const ArticleScreen: React.FC<ArticleScreenProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
-  const [showOptimizer, setShowOptimizer] = useState(true);
+  // Default the optimizer closed so opening an article to read/copy shows the
+  // full-width content. Persist the user's last choice across sessions.
+  const [showOptimizer, setShowOptimizer] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(OPTIMIZER_VISIBILITY_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [copyLabel, setCopyLabel] = useState<'idle' | 'copied'>('idle');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [seoMetadataOpen, setSeoMetadataOpen] = useState(true);
+
+  // Persist the optimizer open/closed preference across sessions.
+  useEffect(() => {
+    try {
+      localStorage.setItem(OPTIMIZER_VISIBILITY_KEY, showOptimizer ? 'true' : 'false');
+    } catch {
+      // Ignore storage failures (private mode, quota, etc.)
+    }
+  }, [showOptimizer]);
 
   // -- Loading logic --
 

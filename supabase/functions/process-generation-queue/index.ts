@@ -1070,12 +1070,28 @@ async function processArticle(supabase: SupabaseClient, job: JobRow): Promise<vo
     || null;
   const strictMode = lengthConstraints?.strictMode || false;
 
+  // Competitor pages for per-section grounding. Reuse the config snapshot first
+  // (create-generation-job / create-generation-batch snapshot brief_competitors as
+  // config.competitors for every job type). Fall back to a fresh DB read for older
+  // article jobs whose snapshot predates this, then transform to CompetitorPage shape.
+  let competitorRows = (config.competitors as Record<string, unknown>[]) || [];
+  if (competitorRows.length === 0) {
+    const { data: dbCompetitors } = await supabase
+      .from('brief_competitors')
+      .select('*')
+      .eq('brief_id', briefId)
+      .order('weighted_score', { ascending: false });
+    competitorRows = (dbCompetitors as Record<string, unknown>[]) || [];
+  }
+  const competitors = transformCompetitors(competitorRows);
+
   // Build article job config
   const articleConfig: ArticleJobConfig = {
     brief: briefData,
     language: (config.output_language as string) || 'English',
     writerInstructions: (config.writer_instructions as string) || undefined,
     brandContext: brandContext || undefined,
+    competitors: competitors.length > 0 ? competitors : undefined,
     model: modelSettings.model as GeminiModel,
     thinkingLevel: modelSettings.thinkingLevel as ThinkingLevel,
     globalWordTarget,

@@ -41,6 +41,24 @@ const ARTICLE_TRIM_RETRY_DELAY_MS = 800;
 const ARTICLE_TRIM_MODEL: GeminiModel = 'gemini-3-flash-preview';
 const MAX_FINAL_TRIM_SECTIONS = 2;
 
+/**
+ * Master switch for Google Search grounding on article-section prose.
+ *
+ * When true, the main section-writing call ({@link generateSectionContent}) asks
+ * Gemini to ground its prose in live Google Search results — improving factual
+ * accuracy and E-E-A-T at the cost of extra latency/quota. Flip to false to
+ * disable grounding everywhere instantly.
+ *
+ * Scope is deliberately narrow: ONLY the main section prose call. Trim/condense
+ * calls and all structured brief-step calls never use grounding (grounding is
+ * incompatible with `responseSchema`, and trimming gains nothing from it).
+ *
+ * Safety: a grounded call that throws falls back to the SAME call WITHOUT
+ * grounding (see {@link generateSectionContent}), so article generation never
+ * breaks because of grounding.
+ */
+const ENABLE_ARTICLE_SEARCH_GROUNDING = true;
+
 // --- Competitor grounding (per-section excerpts) ---
 // Excerpts ground each section in what ranking pages actually said so the writer
 // can be more specific / take a clearer stance. Kept deliberately small to bound tokens.
@@ -516,12 +534,39 @@ Now, write the body content for the current section.
 
   const genConfig = buildArticleGenerationConfig(model);
 
+  // Base (non-grounded) config for the section call. Grounding is layered on top
+  // when enabled; the fallback path reuses this exact object without grounding.
+  const baseCallConfig = {
+    systemInstruction,
+    ...(genConfig.thinkingConfig ? { thinkingConfig: genConfig.thinkingConfig as { thinkingBudget: number } } : {}),
+    ...(typeof genConfig.temperature === 'number' ? { temperature: genConfig.temperature } : {}),
+  };
+
   return await retryOperation(async () => {
-    const response = await callGeminiDirect(model, prompt, {
-      systemInstruction,
-      ...(genConfig.thinkingConfig ? { thinkingConfig: genConfig.thinkingConfig as { thinkingBudget: number } } : {}),
-      ...(typeof genConfig.temperature === 'number' ? { temperature: genConfig.temperature } : {}),
-    });
+    // Try with Google Search grounding first (when enabled). If the grounded call
+    // throws for ANY reason (tool unsupported, API error, etc.), fall back to the
+    // SAME call without grounding so article generation never breaks. The fallback
+    // runs inside each retry attempt, so a transient grounding failure can't burn
+    // the whole retry budget on grounding alone.
+    if (ENABLE_ARTICLE_SEARCH_GROUNDING) {
+      try {
+        const grounded = await callGeminiDirect(model, prompt, {
+          ...baseCallConfig,
+          useSearchGrounding: true,
+        });
+        if (grounded.text) return grounded.text;
+        // Empty text from the grounded call: fall through to the ungrounded attempt
+        // below rather than returning empty.
+        console.warn('Grounded section call returned empty text; retrying without grounding.');
+      } catch (groundingError) {
+        console.warn(
+          'Grounded section call failed; retrying the same call without grounding:',
+          groundingError,
+        );
+      }
+    }
+
+    const response = await callGeminiDirect(model, prompt, baseCallConfig);
     const text = response.text;
     if (!text) throw new Error('Received an empty response from the AI for article section generation.');
     return text;
@@ -535,23 +580,42 @@ Now, write the body content for the current section.
 /**
  * Trims a section to target word count using AI condensation.
  * Server-side port of geminiService.ts trimSectionToWordCount().
+ *
+ * Angle-aware: when a `sectionAngle` is supplied, the condenser is told to
+ * protect the claim that angle stakes out and the most specific sentences,
+ * cutting hedging/restatement/generic transitions first — so trimming sharpens
+ * rather than flattens the section.
  */
 async function trimSectionToWordCount(
   content: string,
   targetWords: number,
   language: string,
   sectionHeading: string,
+  sectionAngle?: string,
 ): Promise<string> {
-  const prompt = `Condense the following section to approximately ${targetWords} words.
+  const angleLine = sectionAngle && sectionAngle.trim()
+    ? `\nSECTION ANGLE (the claim this section must keep making): ${sectionAngle.trim()}`
+    : '';
+  const prompt = `Condense the following section to approximately ${targetWords} words by cutting the WEAKEST words, not the sharpest.
+
+WHAT TO PROTECT (do not cut these to hit the number):
+- The claim stated in the section angle${sectionAngle && sectionAngle.trim() ? '' : ' / heading'} — the condensed version must still make it.
+- Concrete facts, statistics, named examples, figures, and any "[CITE: ...]" placeholders.
+- The most specific, load-bearing sentences.
+
+WHAT TO CUT FIRST (in this order):
+1. Hedging and qualifiers that add no information ("it's worth noting", "generally speaking", "in many cases").
+2. Restatement — sentences that repeat a point already made.
+3. Generic transitions and throat-clearing.
+4. Wordy phrasing — tighten what remains.
 
 RULES:
-- Preserve ALL key information and main points
-- Maintain natural flow and readability
-- Remove filler, redundancy, and overly wordy phrases
-- Do NOT add any commentary — return ONLY the condensed text
-- Write in **${language}**
+- Maintain natural flow and readability.
+- Never remove a concrete fact or example just to reach the word count; cut a hedge or a restatement instead.
+- Do NOT add any commentary — return ONLY the condensed text.
+- Write in **${language}**.
 
-SECTION HEADING: ${sectionHeading}
+SECTION HEADING: ${sectionHeading}${angleLine}
 
 CONTENT TO CONDENSE:
 ${content}
@@ -693,6 +757,10 @@ export async function generateFullArticle(
           });
         }
 
+        const expandTarget = Math.round(sectionTarget * 0.85);
+        const angleReminder = section.section_angle && section.section_angle.trim()
+          ? ` Deepen the section's argument ("${section.section_angle.trim()}") — do not drift off it.`
+          : ' Stay on the section angle and guidelines above.';
         sectionBody = await generateSectionContent({
           brief,
           contentSoFar: fullContent + heading,
@@ -700,7 +768,7 @@ export async function generateFullArticle(
             ...section,
             guidelines: [
               ...section.guidelines,
-              `CRITICAL: Your previous attempt was only ${sectionWords} words. You MUST write at least ${Math.round(sectionTarget * 0.85)} words for this section. Expand with more detail, examples, and depth.`,
+              `LENGTH: your previous draft was only ${sectionWords} words; this section needs about ${expandTarget}. Reach that by ADDING SUBSTANCE, not words: a concrete example or mini-scenario, a specific statistic or figure (insert "[CITE: add specific source]" if you don't have the exact number), a counterpoint or edge case the competitors miss, or a deeper explanation of the underlying mechanism.${angleReminder} Do NOT pad with filler, restate earlier points, add generic transitions, or hedge to fill space — a sharper ${expandTarget} words beats a padded one.`,
             ],
           },
           upcomingHeadings,
@@ -737,7 +805,7 @@ export async function generateFullArticle(
           });
         }
 
-        sectionBody = await trimSectionToWordCount(sectionBody, sectionTarget, language, section.heading);
+        sectionBody = await trimSectionToWordCount(sectionBody, sectionTarget, language, section.heading, section.section_angle);
       }
     }
 
@@ -875,7 +943,7 @@ export async function generateFullArticle(
       }
 
       // Find the most over-budget sections to trim
-      const sectionOverages: { index: number; heading: string; overage: number; body: string; target: number }[] = [];
+      const sectionOverages: { index: number; heading: string; overage: number; body: string; target: number; angle?: string }[] = [];
       for (let idx = 0; idx < contentParts.length; idx++) {
         const part = contentParts[idx];
         if (!part || part.trim().length < 20) continue;
@@ -888,7 +956,7 @@ export async function generateFullArticle(
         const matchedSection = allSections.find(s => headingLine.includes(s.heading));
         const sTarget = matchedSection?.target_word_count || 0;
         if (sTarget > 0 && bodyWords > sTarget) {
-          sectionOverages.push({ index: idx, heading: matchedSection!.heading, overage: bodyWords - sTarget, body: bodyText, target: sTarget });
+          sectionOverages.push({ index: idx, heading: matchedSection!.heading, overage: bodyWords - sTarget, body: bodyText, target: sTarget, angle: matchedSection!.section_angle });
         }
       }
 
@@ -905,7 +973,7 @@ export async function generateFullArticle(
             total: totalSectionsWithFaqs,
           });
         }
-        const trimmedContent = await trimSectionToWordCount(sec.body, sec.target, language, sec.heading);
+        const trimmedContent = await trimSectionToWordCount(sec.body, sec.target, language, sec.heading, sec.angle);
         const headingLine = contentParts[sec.index].split('\n').find(l => l.startsWith('#')) || '';
         contentParts[sec.index] = headingLine + '\n\n' + trimmedContent;
       }

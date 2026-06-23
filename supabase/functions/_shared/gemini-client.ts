@@ -25,13 +25,42 @@ export interface GeminiCallConfig {
    * avoid truncation unless you can guarantee a generous value.
    */
   maxOutputTokens?: number;
+  /**
+   * When true, attach the Google Search grounding tool so the model can ground
+   * its output in live web results (improves factual accuracy / E-E-A-T).
+   *
+   * IMPORTANT: grounding does NOT combine reliably with `responseSchema` —
+   * structured-output requests must NOT use grounding. This client defensively
+   * ignores `useSearchGrounding` whenever `responseSchema` is set, so a caller
+   * can never accidentally produce that invalid combination.
+   *
+   * Only enable this for NON-structured (free-text / prose) calls.
+   */
+  useSearchGrounding?: boolean;
 }
+
+/**
+ * The Google Search grounding tool object for the v1beta `generateContent` REST
+ * API. For Gemini 3 models the shape is `{ google_search: {} }` inside the
+ * top-level `tools` array (this is the generateContent shape; the separate
+ * "Interactions API" uses `{ type: "google_search" }` instead — do not confuse
+ * the two). Isolated as a constant so the exact field naming is trivial to
+ * correct in one place if Google changes it.
+ */
+const GOOGLE_SEARCH_TOOL = { google_search: {} } as const;
 
 /**
  * Response from a Gemini API call.
  */
 export interface GeminiResponse {
   text: string;
+  /**
+   * Grounding metadata from the candidate when Google Search grounding was used
+   * (search queries, web sources, citation supports). Present only on grounded
+   * responses; undefined otherwise. Captured opportunistically — callers may
+   * ignore it.
+   */
+  groundingMetadata?: unknown;
 }
 
 /**
@@ -93,6 +122,21 @@ export async function callGeminiDirect(
     body.generationConfig = genConfig;
   }
 
+  // Google Search grounding (free-text calls only). Defensively refuse to combine
+  // grounding with structured output — the two are not reliably compatible, and a
+  // grounded structured-output request can fail or silently drop the schema. If a
+  // caller sets both, grounding is dropped and the schema wins.
+  if (config.useSearchGrounding) {
+    if (config.responseSchema) {
+      console.warn(
+        '[gemini-client] useSearchGrounding ignored: responseSchema is set ' +
+        '(grounding is not compatible with structured output).'
+      );
+    } else {
+      body.tools = [GOOGLE_SEARCH_TOOL];
+    }
+  }
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -121,8 +165,12 @@ export async function callGeminiDirect(
   // the output is incomplete or was blocked.
   const finishReason: string | undefined = data.candidates?.[0]?.finishReason;
 
+  // Optionally surface grounding metadata (present only on grounded responses).
+  // Capturing it never affects text extraction or the finishReason guard below.
+  const groundingMetadata: unknown = data.candidates?.[0]?.groundingMetadata;
+
   if ((finishReason === 'STOP' || finishReason === undefined) && text) {
-    return { text };
+    return groundingMetadata !== undefined ? { text, groundingMetadata } : { text };
   }
 
   // No usable text, or a non-STOP stop reason: throw so retryOperation retries

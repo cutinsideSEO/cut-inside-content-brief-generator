@@ -413,6 +413,82 @@ describe('buildBrandContext', () => {
     const result = buildBrandContext(client, undefined, urls);
     expect(result).not.toContain('Brand Reference URLs');
   });
+
+  // -- Brand voice sample (prose-by-example) --
+
+  it('adds a "voice matching this sample" block from substantial file prose, skipping leading nav boilerplate', () => {
+    const client = makeClient({ brand_identity: { brand_name: 'X' } });
+    const files: ContextFileData[] = [
+      {
+        file_name: 'page.txt',
+        description: null,
+        // Leading boilerplate (short nav-style lines) then a real body sentence.
+        parsed_content:
+          'Home\nProducts\nAbout\nContact\nSign In\n' +
+          'Our hard drives are built for the long haul: each unit is helium-sealed, rated for 24/7 operation, and tested under sustained write loads so your archive survives the decade, not just the warranty window.',
+        parse_status: 'done',
+      },
+    ];
+
+    const result = buildBrandContext(client, files);
+
+    expect(result).toContain('Write in a voice matching this sample');
+    expect(result).toContain('helium-sealed'); // real body copy is included
+    expect(result).not.toContain('"Home Products About'); // leading nav skipped
+  });
+
+  it('does NOT add a voice sample when prose is too short to be representative', () => {
+    const client = makeClient({ brand_identity: { brand_name: 'X' } });
+    const files: ContextFileData[] = [
+      {
+        file_name: 'tiny.txt',
+        description: null,
+        parsed_content: 'Short blurb.',
+        parse_status: 'done',
+      },
+    ];
+
+    const result = buildBrandContext(client, files);
+    expect(result).not.toContain('Write in a voice matching this sample');
+  });
+
+  it('keeps the voice sample token-bounded (under ~650 chars of excerpt)', () => {
+    const client = makeClient({ brand_identity: { brand_name: 'X' } });
+    const longProse = ('This is a long, well-formed brand sentence that conveys tone and rhythm. ').repeat(40);
+    const files: ContextFileData[] = [
+      {
+        file_name: 'long.txt',
+        description: null,
+        parsed_content: longProse,
+        parse_status: 'done',
+      },
+    ];
+
+    const result = buildBrandContext(client, files);
+    expect(result).toContain('Write in a voice matching this sample');
+
+    // Extract the quoted sample and assert it is bounded.
+    const match = result.match(/voice matching this sample[^\n]*:\*\*\n"([\s\S]*?)"$/m);
+    expect(match).not.toBeNull();
+    expect(match![1].length).toBeLessThanOrEqual(650);
+  });
+
+  it('falls back to body URL content when no file prose is available', () => {
+    const client = makeClient({ brand_identity: { brand_name: 'X' } });
+    const urls: ContextUrlData[] = [
+      {
+        url: 'https://example.com/about',
+        label: 'About',
+        scraped_content:
+          'We believe storage should be boring in the best way: predictable, durable, and quietly dependable. That philosophy shapes every product decision we make, from firmware to packaging.',
+        scrape_status: 'done',
+      },
+    ];
+
+    const result = buildBrandContext(client, undefined, urls);
+    expect(result).toContain('Write in a voice matching this sample');
+    expect(result).toContain('boring in the best way');
+  });
 });
 
 // ---------------------------------------------------------------------------

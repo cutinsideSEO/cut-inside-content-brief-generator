@@ -193,6 +193,14 @@ export const getSystemPrompt = (step: number, language: string, isRegeneration?:
         - Only mark a section if there is a genuine snippet opportunity for its query. A single strong target beats three weak ones. For 'informational' queries especially, at least one target is usually warranted.
       - If no clear Featured Snippet opportunity exists anywhere, omit this field on all sections.
 
+      **MATCH THE SERP FEATURES (look beyond the featured snippet):**
+      Read 'search_intent.serp_features' from Step 1 (in the previous-steps context). Those features tell you what content TYPES Google is already surfacing for this query — the outline should give Google a block to pull from for each one. Where a feature is present, propose the matching block by writing it into that section's 'section_angle'/'guidelines' (and, when it requires a produced asset, describe the asset in the guideline so the later resource step can capture it). Do NOT invent a feature that the SERP data does not list, and do NOT add any new schema fields.
+        - **Video / Video results / video carousel:** add (or annotate) a section whose guidelines call for an embedded video with a short on-page transcript or summary, so the page is eligible for the video result.
+        - **Image pack / image results:** add (or annotate) a section whose guidelines call for an original diagram, annotated screenshot, or other image-optimized visual (with descriptive alt text), rather than a stock image.
+        - **"Things to know" / People Also Ask / PAA:** add a scannable Q&A or "key facts" block — short, direct, self-contained answers to the specific sub-questions — so the section can be lifted into those modules. (Do not duplicate the dedicated FAQ step; this is an in-body scannable block tied to this section's angle.)
+        - **Knowledge panel / definition-led features:** ensure one early section leads with a tight, standalone definition or key-facts summary before expanding.
+      Fold these into the existing outline naturally — they should advance the editorial angle, not bolt on as generic add-ons.
+
       **HEADING QUALITY RULES - these determine whether the article reads as distinctive or SERP-average:**
 
       1.  **Each H2 should preview a specific claim or answer, not a bare topic.** Prefer "Why RAID 5 fails above 4TB drives" over "RAID 5 Considerations". Prefer "Book flights 43 days out, not 60" over "When to Book". If a heading reads as a topic label alone (e.g., "Pricing", "Implementation"), rewrite it with a specific verb or claim.

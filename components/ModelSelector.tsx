@@ -16,8 +16,8 @@ const models: { value: GeminiModel; label: string; description: string; icon: Re
     icon: <BrainCircuitIcon className="h-4 w-4" />,
   },
   {
-    value: 'gemini-3-flash-preview',
-    label: 'Gemini 3 Flash',
+    value: 'gemini-3.5-flash',
+    label: 'Gemini 3.5 Flash',
     description: 'Fast, balanced & cost-effective',
     icon: <ZapIcon className="h-4 w-4" />,
   },

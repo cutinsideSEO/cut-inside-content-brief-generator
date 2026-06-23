@@ -136,7 +136,7 @@ describe('generation guards', () => {
         model: 'gemini-2.5-pro',
         thinkingLevel: 'medium',
       });
-      expect(settings.model).toBe('gemini-3-flash-preview');
+      expect(settings.model).toBe('gemini-3.5-flash');
       expect(settings.thinkingLevel).toBe('medium');
     });
 

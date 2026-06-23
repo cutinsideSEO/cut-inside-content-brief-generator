@@ -219,8 +219,8 @@ async function generateHierarchicalArticleStructure(params: StepExecutionParams)
   // Use flash model for enrichment (faster, no creative reasoning needed)
   const FLASH_MODEL_MAP: Record<string, string> = {
     'gemini-2.5-pro': 'gemini-2.5-flash',
-    'gemini-3-pro-preview': 'gemini-3-flash-preview',
-    'gemini-3.1-pro-preview': 'gemini-3-flash-preview',
+    'gemini-3-pro-preview': 'gemini-3.5-flash',
+    'gemini-3.1-pro-preview': 'gemini-3.5-flash',
   };
   const flashModel = (FLASH_MODEL_MAP[model] || model) as GeminiModel;
   const enrichmentSystemInstruction = getStructureEnrichmentPrompt(language);

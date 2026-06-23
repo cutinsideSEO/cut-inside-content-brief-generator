@@ -38,7 +38,7 @@ const ARTICLE_SECTION_RETRY_DELAY_MS = 1_500;
 const ARTICLE_TRIM_CALL_TIMEOUT_MS = 45_000;
 const ARTICLE_TRIM_CALL_RETRIES = 1;
 const ARTICLE_TRIM_RETRY_DELAY_MS = 800;
-const ARTICLE_TRIM_MODEL: GeminiModel = 'gemini-3-flash-preview';
+const ARTICLE_TRIM_MODEL: GeminiModel = 'gemini-3.5-flash';
 const MAX_FINAL_TRIM_SECTIONS = 2;
 
 /**

@@ -38,7 +38,7 @@ export type ChainJobOutcome = 'chained' | 'cancelled' | 'failed'
 // NOTE: gemini-3-pro-preview was retired by Google (~May 2026) and now returns
 // 404 "no longer available". gemini-3.1-pro-preview is the validated drop-in.
 const GEMINI_3_PRO_MODEL = 'gemini-3.1-pro-preview'
-const GEMINI_3_FLASH_MODEL = 'gemini-3-flash-preview'
+const GEMINI_3_FLASH_MODEL = 'gemini-3.5-flash'
 const DEFAULT_THINKING_LEVEL = 'high'
 const DEFAULT_STALE_TIMEOUT_MINUTES = 4
 const ARTICLE_STALE_TIMEOUT_MINUTES = 8

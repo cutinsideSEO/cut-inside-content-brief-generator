@@ -148,9 +148,17 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
   // (job kicked off, first Realtime payload not yet received) from active phases.
   const hasProgressPayload = Boolean(generationProgress && generationProgress.phase);
 
+  // Show the progress view (not the editable form/CTA) whenever analysis hasn't
+  // produced data yet. This covers the cold-start gap right after the competitors
+  // job is created — `isLoading` has been flipped back to false but the Realtime
+  // `activeJob` (which sets `isBackendGenerating`) hasn't arrived — so the form
+  // (and its "View Competitors" CTA) never shows with empty competitor data.
+  const analysisInProgress = Boolean(isBackendGenerating) ||
+    (!analysisComplete && (competitorCount ?? 0) === 0);
+
   return (
     <div className="max-w-5xl mx-auto animate-fade-in">
-        {isBackendGenerating ? (
+        {analysisInProgress ? (
             <div className="text-center mb-8">
                 <h1 className="text-2xl font-heading font-bold text-gray-900">Analyzing Competitors</h1>
                 <p className="text-md text-gray-600 mt-2">Scanning the SERP and competitor pages to build your brief</p>
@@ -166,7 +174,7 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
 
         <div className="space-y-6">
             {/* Backend Competitor Analysis Progress (focused view while job runs) */}
-            {isBackendGenerating && (
+            {analysisInProgress && (
               hasProgressPayload ? (
                 <Card variant="default" padding="lg" className="mb-6">
                   <div className="space-y-3">
@@ -313,9 +321,10 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                 </div>
             )}
 
-            {/* Context-entry form — hidden while a backend analysis job is running
-                so the screen shows only the focused progress view. */}
-            {!isBackendGenerating && (
+            {/* Context-entry form — hidden while analysis is in progress (including
+                the cold-start window) so the screen shows only the focused progress
+                view, never an empty CTA. */}
+            {!analysisInProgress && (
             <>
             {/* Subject Matter & Brand Info - Side by Side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -464,13 +473,6 @@ const ContextInputScreen: React.FC<ContextInputScreenProps> = ({
                         </div>
                     )}
                 </Card>
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="flex flex-col items-center gap-3 pt-2 pb-4 max-w-md mx-auto">
-                <Button onClick={onContinue} disabled={isLoading} fullWidth glow size="lg">
-                    {isLoading ? "Analyzing..." : "Continue"}
-                </Button>
             </div>
             </>
             )}

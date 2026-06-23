@@ -154,7 +154,7 @@ export interface ContentBrief {
 
 // Feature 6: Gemini Model Settings
 // Gemini 3: https://ai.google.dev/gemini-api/docs/gemini-3
-export type GeminiModel = 'gemini-3.1-pro-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro';
+export type GeminiModel = 'gemini-3.1-pro-preview' | 'gemini-3-pro-preview' | 'gemini-3.5-flash' | 'gemini-3-flash-preview' | 'gemini-2.5-pro';
 export type ThinkingLevel = 'high' | 'medium' | 'low' | 'minimal';
 
 export interface ModelSettings {

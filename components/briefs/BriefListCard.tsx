@@ -109,15 +109,21 @@ const BriefListCard: React.FC<BriefListCardProps> = ({
   });
 
   // Clamp the card's progress bar monotonically across Realtime events so the
-  // bar never regresses during step or phase transitions.
+  // bar never regresses. Reset the max-seen value only when generation actually
+  // stops (so the next fresh run starts clean after being idle) or when the card
+  // is reused for a different brief — NOT on every status change. A batch chain
+  // moves through analyzing_competitors → generating_brief while staying
+  // `isGenerating`; resetting on that status change is what made the bar drop to
+  // 0 ("bump"). Holding across the phase transition keeps the bar stable.
   const maxPercentageRef = useRef<number>(0);
-  const prevStatusRef = useRef<typeof generationStatus>(generationStatus);
+  const prevBriefIdRef = useRef<string>(brief.id);
   useEffect(() => {
-    if (!isGenerating || prevStatusRef.current !== generationStatus) {
+    // New generation episode (after idle) or a different brief in this card slot.
+    if (!isGenerating || prevBriefIdRef.current !== brief.id) {
       maxPercentageRef.current = 0;
     }
-    prevStatusRef.current = generationStatus;
-  }, [isGenerating, generationStatus]);
+    prevBriefIdRef.current = brief.id;
+  }, [isGenerating, brief.id]);
   const clampedPercentage = isGenerating
     ? Math.max(maxPercentageRef.current, rawGenerationModel.percentage)
     : rawGenerationModel.percentage;

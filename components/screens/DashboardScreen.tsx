@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import type { ContentBrief, CompetitorPage, BriefValidation, EEATSignals, OutlineItem } from '../../types';
 import type { SaveStatus } from '../../types/appState';
-import type { BriefStatus, GenerationJobProgress, GenerationJobType } from '../../types/database';
+import type { BriefStatus, GenerationJobProgress, GenerationJobType, BriefArticle } from '../../types/database';
 import { isWorkflowStatus } from '../../types/database';
 import WorkflowStatusSelect from '../briefs/WorkflowStatusSelect';
 import PublishedUrlModal from '../briefs/PublishedUrlModal';
 import { exportBriefToMarkdown } from '../../services/markdownService';
 import { validateBrief, generateEEATSignals } from '../../services/geminiService';
+import { getArticlesForBrief } from '../../services/articleService';
+import { countArticleWords } from '../../utils/articleMetrics';
 import Button from '../Button';
 import Spinner from '../Spinner';
 import { Badge, Callout, Textarea, Modal, Separator, Table, TableHeader, TableBody, TableHead, TableRow, TableCell, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, Progress } from '../ui';
@@ -23,7 +25,7 @@ import Stage6Faqs from '../stages/Stage6Faqs';
 import Stage7Seo from '../stages/Stage7Seo';
 
 // Import icons
-import { FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircleIcon, FileCodeIcon, BrainCircuitIcon, RefreshCwIcon, ChevronDownIcon, CheckIcon, StarIcon } from '../Icon';
+import { FlagIcon, KeyIcon, FileSearchIcon, PuzzleIcon, ListTreeIcon, HelpCircleIcon, FileCodeIcon, BrainCircuitIcon, RefreshCwIcon, CheckIcon, StarIcon, MoreHorizontalIcon, FileTextIcon, ExternalLinkIcon } from '../Icon';
 
 interface DashboardScreenProps {
   briefData: Partial<ContentBrief>;
@@ -38,6 +40,7 @@ interface DashboardScreenProps {
   competitorData: CompetitorPage[];
   keywordVolumeMap: Map<string, number>;
   onStartContentGeneration: () => void;
+  onViewArticle?: (articleId: string) => void;
   writerInstructions: string;
   setWriterInstructions: (value: string) => void;
   subjectInfo: string;
@@ -236,17 +239,46 @@ const EEATSignalsDisplay: React.FC<{ signals: EEATSignals }> = ({ signals }) => 
 };
 
 // A new component for the "home" state of the dashboard
-const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'onRestart' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'briefId' | 'briefStatus' | 'onWorkflowStatusChange' | 'isBackendGenerating' | 'backendJobType'>> = ({
-    briefData, setBriefData, staleSteps, writerInstructions, setWriterInstructions, onStartContentGeneration, onRestart, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, briefId, briefStatus, onWorkflowStatusChange, isBackendGenerating, backendJobType,
+const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setBriefData' | 'staleSteps' | 'writerInstructions' | 'setWriterInstructions' | 'onStartContentGeneration' | 'competitorData' | 'keywordVolumeMap' | 'subjectInfo' | 'brandInfo' | 'contextFiles' | 'userFeedbacks' | 'outputLanguage' | 'saveStatus' | 'lastSavedAt' | 'briefId' | 'briefStatus' | 'onWorkflowStatusChange' | 'isBackendGenerating' | 'backendJobType' | 'onViewArticle'>> = ({
+    briefData, setBriefData, staleSteps, writerInstructions, setWriterInstructions, onStartContentGeneration, competitorData, keywordVolumeMap, outputLanguage = 'English', saveStatus, lastSavedAt, briefId, briefStatus, onWorkflowStatusChange, isBackendGenerating, backendJobType, onViewArticle,
 }) => {
     const [isValidating, setIsValidating] = useState(false);
     const [isGeneratingEEAT, setIsGeneratingEEAT] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     const [eeatError, setEeatError] = useState<string | null>(null);
     const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
-    const [showNewBriefConfirm, setShowNewBriefConfirm] = useState(false);
     const [showPublishModal, setShowPublishModal] = useState(false);
+    const [articles, setArticles] = useState<BriefArticle[]>([]);
     const showWorkflowSelect = briefId && briefStatus && onWorkflowStatusChange && (briefStatus === 'complete' || isWorkflowStatus(briefStatus));
+
+    // Load all article versions for this brief. Refetch when the brief changes and
+    // when an article-generation job finishes (so a freshly generated version shows
+    // up without a manual reload).
+    const fetchArticles = React.useCallback(() => {
+        if (!briefId) {
+            setArticles([]);
+            return;
+        }
+        getArticlesForBrief(briefId)
+            .then(({ data }) => {
+                if (data) setArticles(data);
+            })
+            .catch(err => console.error('Failed to load articles for brief:', err));
+    }, [briefId]);
+
+    useEffect(() => {
+        fetchArticles();
+    }, [fetchArticles]);
+
+    // Detect an article job transitioning from running -> done and refetch.
+    const wasGeneratingArticleRef = useRef(false);
+    useEffect(() => {
+        const isGeneratingArticle = Boolean(isBackendGenerating && backendJobType === 'article');
+        if (wasGeneratingArticleRef.current && !isGeneratingArticle) {
+            fetchArticles();
+        }
+        wasGeneratingArticleRef.current = isGeneratingArticle;
+    }, [isBackendGenerating, backendJobType, fetchArticles]);
 
     const handleExport = (isConcise: boolean) => {
         exportBriefToMarkdown(briefData, competitorData, keywordVolumeMap, isConcise);
@@ -371,45 +403,42 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                     </div>
                 </div>
 
-                {/* Action buttons */}
+                {/* Action buttons — primary CTA + overflow menu */}
                 <div className="flex items-center gap-2.5 flex-wrap">
                     <Button variant="primary" size="sm" onClick={() => setShowGenerateConfirm(true)} glow>
                         <BrainCircuitIcon className="h-4 w-4 mr-1.5" />
                         Generate Full Article
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={handleValidateBrief} disabled={isValidating}>
-                        {isValidating ? (
-                            <><Spinner className="h-3.5 w-3.5 mr-1.5" /> Validating...</>
-                        ) : (
-                            <><CheckIcon className="h-3.5 w-3.5 mr-1.5" /> Validate Brief</>
-                        )}
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={handleGenerateEEAT} disabled={isGeneratingEEAT}>
-                        {isGeneratingEEAT ? (
-                            <><Spinner className="h-3.5 w-3.5 mr-1.5" /> Generating...</>
-                        ) : (
-                            <><StarIcon className="h-3.5 w-3.5 mr-1.5" /> E-E-A-T Signals</>
-                        )}
-                    </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="secondary" size="sm">
-                                <ChevronDownIcon className="h-3.5 w-3.5 mr-1 transition-transform data-[state=open]:rotate-180" />
-                                Export Brief
+                            <Button variant="secondary" size="sm" aria-label="More brief actions">
+                                <MoreHorizontalIcon className="h-4 w-4 mr-1.5" />
+                                More
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={handleValidateBrief} disabled={isValidating}>
+                                {isValidating ? (
+                                    <><Spinner className="h-3.5 w-3.5 mr-2" /> Validating...</>
+                                ) : (
+                                    <><CheckIcon className="h-3.5 w-3.5 mr-2" /> Validate Brief</>
+                                )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleGenerateEEAT} disabled={isGeneratingEEAT}>
+                                {isGeneratingEEAT ? (
+                                    <><Spinner className="h-3.5 w-3.5 mr-2" /> Generating...</>
+                                ) : (
+                                    <><StarIcon className="h-3.5 w-3.5 mr-2" /> E-E-A-T Signals</>
+                                )}
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleExport(false)}>
-                                Full Brief
+                                <FileTextIcon className="h-3.5 w-3.5 mr-2" /> Export Full Brief
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleExport(true)}>
-                                Concise Brief
+                                <FileTextIcon className="h-3.5 w-3.5 mr-2" /> Export Concise Brief
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button variant="secondary" size="sm" onClick={() => setShowNewBriefConfirm(true)}>
-                        Start New Brief
-                    </Button>
                 </div>
             </div>
 
@@ -544,6 +573,54 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                 </div>
             </div>
 
+            {/* ── Articles generated from this brief ── */}
+            {articles.length > 0 && (
+                <div>
+                    <h2 className="text-sm font-heading font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                        Articles ({articles.length})
+                    </h2>
+                    <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
+                        {articles.map(article => {
+                            const words = countArticleWords(article.content);
+                            const created = new Date(article.created_at).toLocaleDateString(undefined, {
+                                year: 'numeric', month: 'short', day: 'numeric',
+                            });
+                            return (
+                                <div key={article.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <FileTextIcon className="h-4 w-4 text-teal flex-shrink-0" />
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-sm font-medium text-foreground">
+                                                    Version {article.version}
+                                                </span>
+                                                {article.is_current && (
+                                                    <Badge variant="teal" size="sm">Current</Badge>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground truncate">
+                                                {words.toLocaleString()} words · {created}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {onViewArticle && (
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => onViewArticle(article.id)}
+                                            className="flex-shrink-0"
+                                        >
+                                            <ExternalLinkIcon className="h-3.5 w-3.5 mr-1.5" />
+                                            Open
+                                        </Button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Validation results (if generated) */}
             {validationError && (
                 <Callout variant="error">
@@ -578,26 +655,6 @@ const DashboardOverview: React.FC<Pick<DashboardScreenProps, 'briefData' | 'setB
                 }
             >
                 <p className="text-gray-600">This will generate a full article based on your brief. The process may take several minutes. Continue?</p>
-            </Modal>
-
-            {/* Start New Brief Confirmation Modal */}
-            <Modal
-                isOpen={showNewBriefConfirm}
-                onClose={() => setShowNewBriefConfirm(false)}
-                title="Start New Brief"
-                size="sm"
-                footer={
-                    <>
-                        <Button variant="secondary" size="sm" onClick={() => setShowNewBriefConfirm(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="primary" size="sm" onClick={() => { setShowNewBriefConfirm(false); onRestart(); }}>
-                            Start New Brief
-                        </Button>
-                    </>
-                }
-            >
-                <p className="text-gray-600">Starting a new brief will clear your current work. Make sure you have exported or saved your brief before continuing.</p>
             </Modal>
 
             {/* Published URL Modal */}

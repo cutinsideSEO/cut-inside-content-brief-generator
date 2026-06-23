@@ -301,10 +301,19 @@ const AppWrapperInner: React.FC = () => {
             return prev;
           });
 
-          // Clean up completed jobs from the map after delay
+          // Clean up completed jobs from the map after delay.
+          // Ownership guard: only remove the entry if it STILL belongs to this
+          // job. A non-batch competitors job that completes and then chains a
+          // separate full_brief job re-populates generatingBriefs[brief_id] with
+          // the new job's entry; without this check the stale 3s timeout would
+          // delete the live full_brief entry (loader flicker: disappears →
+          // reappears). Compare jobId so we never wipe a successor job.
           if (isTerminalJobUpdate(job) && !isPipelineTransition) {
             setTimeout(() => {
               setState(prev => {
+                if (prev.generatingBriefs[job.brief_id]?.jobId !== job.id) {
+                  return prev;
+                }
                 const { [job.brief_id]: removed, ...remaining } = prev.generatingBriefs;
                 return { ...prev, generatingBriefs: remaining };
               });

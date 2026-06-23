@@ -61,7 +61,7 @@ const SOFT_REQUEUE_CODE = 'soft_checkpoint_requeue';
 
 // ---- Competitor digest config ----
 /** Flash model used for the cheap, one-shot competitor digests. */
-const COMPETITOR_DIGEST_MODEL = 'gemini-3-flash-preview';
+const COMPETITOR_DIGEST_MODEL = 'gemini-3.5-flash';
 /**
  * Cap on how many competitors we digest, ordered by weighted_score. Lower-ranked
  * pages matter least and digesting all of them adds wall-clock to a single-shot

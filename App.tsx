@@ -24,7 +24,7 @@ import { useBriefLoader } from './hooks/useBriefLoader';
 import { useAutoSave } from './hooks/useAutoSave';
 import { saveBriefState, updateBriefProgress, updateBriefStatus, updateBrief, updateBriefWorkflowStatus, getBrief } from './services/briefService';
 import { saveCompetitors, getCompetitorsForBrief, toCompetitorPages } from './services/competitorService';
-import { getCurrentArticle } from './services/articleService';
+import { getCurrentArticle, getArticle } from './services/articleService';
 import { uploadContextFile, addContextUrl as addContextUrlToDb, deleteContextFile, deleteContextUrl } from './services/contextService';
 import { createGenerationJob, cancelGenerationJob } from './services/generationJobService';
 import { useGenerationSubscription } from './hooks/useGenerationSubscription';
@@ -965,6 +965,26 @@ const App: React.FC<AppProps> = ({
     await handleBackendArticleGeneration();
   };
 
+  // Open a specific article version from the dashboard overview. Reuses the same
+  // article-view-by-id path as the post-generation flow (see activeJob 'article'
+  // completion handler): load by id, hydrate the in-memory article + db id, then
+  // switch to the article view.
+  const handleViewArticle = useCallback(async (articleId: string) => {
+    try {
+      const { data: article, error: articleError } = await getArticle(articleId);
+      if (articleError || !article) {
+        setError(articleError || 'Could not load the selected article.');
+        return;
+      }
+      setGeneratedArticle({ title: article.title, content: article.content });
+      setGeneratedArticleDbId(article.id);
+      setCurrentView('article_view');
+    } catch (err) {
+      console.error('Failed to open article:', err);
+      setError(err instanceof Error ? err.message : 'Could not load the selected article.');
+    }
+  }, []);
+
   // Feature F2: Handle paragraph-level regeneration in generated content with enhanced context
   const handleParagraphRegenerate = useCallback(async (
     fullContent: string,
@@ -1129,6 +1149,7 @@ const App: React.FC<AppProps> = ({
                   competitorData={competitorData}
                   keywordVolumeMap={keywordVolumeMap}
                   onStartContentGeneration={handleStartContentGeneration}
+                  onViewArticle={handleViewArticle}
                   writerInstructions={writerInstructions}
                   setWriterInstructions={setWriterInstructions}
                   // Fun factor props

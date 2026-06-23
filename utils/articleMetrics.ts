@@ -253,6 +253,16 @@ function countHeadings(text: string): { h1: number; h2: number; h3: number } {
 }
 
 /**
+ * Count the number of words in an article's markdown content.
+ * Strips markdown formatting first so syntax tokens (##, **, etc.) don't
+ * inflate the count. Pure utility — safe for display in lists/overviews.
+ */
+export function countArticleWords(articleContent: string): number {
+  if (!articleContent) return 0;
+  return countWords(stripMarkdown(articleContent));
+}
+
+/**
  * Calculate all article metrics from content and brief data.
  * Pure utility — no AI calls, all calculations done in JavaScript.
  */

@@ -1,0 +1,689 @@
+#!/usr/bin/env python3
+"""Mechanical checks on a finished content brief written in Markdown.
+
+Standard library only, Python 3.9+, works on Windows and Linux. Run it before
+the brief is converted to a Google Doc.
+
+Usage
+    python check_brief.py brief.md
+    python check_brief.py brief.md --lang he --variant concise
+    python check_brief.py brief.md --json
+
+Options
+    --lang en|he          Brief language. Auto-detected when omitted (Hebrew
+                          characters in the H1 title means he). Both the English
+                          and the Hebrew labels of the format spec are accepted
+                          in either mode; the language only drives the
+                          language-consistency check.
+    --variant full|concise  full (default) expects a Reasoning bullet on every
+                          outline item; concise warns when Reasoning bullets exist.
+    --json                Print the result as JSON instead of text.
+
+Checks (ERROR fails the brief, WARNING is advice)
+    1  em-dash U+2014 (error), en-dash U+2013 (warning)
+    2  forbidden leftovers: {{ }} <topic> <client> <keyword> [PLACEHOLDER TBD Lorem
+       (allowed: [INTERNAL LINK: ...], [CITE: ...], <!-- TODO (human): ... -->)
+    3  the 15 required sections (Accuracy and brand guardrails is optional) and order
+    4  On-page table: required rows, character limits, slug rules, Chars column
+    5  Keyword table: Primary keyword present, in title / H1 / OG title / slug, volume
+    6  banned title, meta description and AI-cliche phrases
+    7  Article structure: totals, per-item bullets, word count sum, snippet targets
+    8  FAQs: Guidelines bullet, the 40 to 50 word answer rule, no drafted answers
+    9  Competitor table: at least 3 rows, absolute http(s) URLs
+    10 language consistency of section headings
+    11 internal links must be absolute URLs
+
+Output: ERRORS, then WARNINGS, then a one-line summary.
+Exit code: 1 if any error, 0 otherwise, 2 if the file cannot be read.
+"""
+
+import argparse
+import json
+import re
+import sys
+
+EM_DASH = chr(0x2014)  # em-dash, built from its code point
+EN_DASH = chr(0x2013)  # en-dash
+HEBREW_RE = re.compile(r"[֐-׿]")
+
+# (id, required, English heading, Hebrew heading)
+SECTIONS = [
+    ("glance", True, "Brief at a glance", "הבריף במבט אחד"),
+    ("guardrails", False, "Accuracy and brand guardrails", "דגשי דיוק ומותג"),
+    ("strategy", True, "Strategy and goals", "אסטרטגיה ומטרות"),
+    ("intent", True, "Search intent and SERP", "כוונת חיפוש ו-SERP"),
+    ("keywords", True, "Keyword strategy", "אסטרטגיית מילות מפתח"),
+    ("competitive", True, "Competitive analysis", "ניתוח מתחרים"),
+    ("gap", True, "Content gap analysis", "ניתוח פערי תוכן"),
+    ("onpage", True, "On-page SEO", "On Page SEO"),
+    ("structure", True, "Article structure", "מבנה המאמר"),
+    ("faq", True, "Frequently Asked Questions", "שאלות ותשובות"),
+    ("conclusion", True, "Conclusion and CTA", "סיכום וקריאה לפעולה"),
+    ("links", True, "Internal and external links", "קישורים פנימיים וחיצוניים"),
+    ("eeat", True, "E-E-A-T signals", "אותות E-E-A-T"),
+    ("writer", True, "Writer notes", "הנחיות לכותב"),
+    ("technical", True, "Technical notes", "הערות טכניות"),
+    ("sources", True, "Sources and scope", "מקורות והיקף"),
+]
+
+
+def norm_key(text):
+    """Heading key: lowercase, punctuation and spaces removed (Unicode aware)."""
+    return re.sub(r"[\W_]+", "", text.lower())
+
+
+SECTION_BY_KEY = {}
+for _i, (_sid, _req, _en, _he) in enumerate(SECTIONS):
+    SECTION_BY_KEY[norm_key(_en)] = _sid
+    SECTION_BY_KEY[norm_key(_he)] = _sid
+SECTION_INDEX = {s[0]: i for i, s in enumerate(SECTIONS)}
+SECTION_EN = {s[0]: s[2] for s in SECTIONS}
+SECTION_HE = {s[0]: s[3] for s in SECTIONS}
+
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
+ITEM_RE = re.compile(r"^#{3,5} (Hero|H2|H3|H4|Conclusion):\s*(.*?)\s*$")
+BULLET_RE = re.compile(r"^[-*+]\s+\*\*(.+?)\*\*\s*(.*)$")
+NESTED_RE = re.compile(r"^\s+[-*+]\s+(\S.*)$")
+FENCE_RE = re.compile(r"^\s*(```|~~~)")
+
+LABELS = {
+    "word count": "words", "מספר מילים": "words",
+    "angle": "angle", "זווית": "angle",
+    "guidelines": "guidelines", "הנחיות": "guidelines",
+    "keywords": "keywords", "מילות מפתח": "keywords",
+    "covered by": "covered", "מכוסה אצל": "covered",
+    "snippet target": "snippet", "יעד סניפט": "snippet",
+    "resources": "resources", "משאבים נדרשים": "resources",
+    "reasoning": "reasoning", "נימוק": "reasoning",
+}
+
+TOTAL_RE = re.compile(r"\*\*\s*(?:Total word count|סה.{0,3}כ\s+מילים)\s*:?\s*\*\*\s*:?\s*(\d[\d,]*)", re.I)
+FAQ_ALLOW_RE = re.compile(r"\*\*\s*(?:FAQ allowance|הקצאה לשאלות ותשובות)\s*:?\s*\*\*\s*:?\s*(\d[\d,]*)", re.I)
+
+FORBIDDEN = [
+    ("{{", re.compile(r"\{\{")),
+    ("}}", re.compile(r"\}\}")),
+    ("<topic>", re.compile(r"<topic>", re.I)),
+    ("<client>", re.compile(r"<client>", re.I)),
+    ("<keyword>", re.compile(r"<keyword>", re.I)),
+    ("[PLACEHOLDER", re.compile(r"\[PLACEHOLDER", re.I)),
+    ("TBD", re.compile(r"\bTBD\b")),
+    ("Lorem", re.compile(r"Lorem", re.I)),
+]
+ALLOWED_PLACEHOLDERS = [
+    re.compile(r"\[INTERNAL LINK:[^\]]*\]"),
+    re.compile(r"\[CITE:[^\]]*\]"),
+    re.compile(r"<!--\s*TODO \(human\):.*?-->", re.S),
+]
+
+TITLE_BANNED = [
+    ("ultimate guide", r"ultimate guide"),
+    ("complete guide", r"complete guide"),
+    ("definitive guide", r"definitive guide"),
+    ("everything you need to know", r"everything you need to know"),
+    ("101", r"\b101\b"),
+    ("beginner's guide", r"beginner'?s guide"),
+    ("for beginners", r"for beginners"),
+    ("step-by-step guide", r"step[- ]by[- ]step guide"),
+    ("title starting with learn/discover/explore", r"^\s*(?:learn|discover|explore)\b"),
+    ("learn/discover/explore after a colon", r":\s*(?:learn|discover|explore)\b"),
+]
+TITLE_BANNED = [(n, re.compile(p, re.I)) for n, p in TITLE_BANNED]
+DESC_BANNED = [
+    ("learn everything about", r"learn everything about"),
+    ("discover the best", r"discover the best"),
+    ("in this guide, we'll explore", r"in this guide,? we'll explore"),
+    ("comprehensive guide", r"comprehensive guide"),
+]
+DESC_BANNED = [(n, re.compile(p, re.I)) for n, p in DESC_BANNED]
+
+CLICHE_PHRASES = [
+    "delve into", "dive deep", "let's dive in", "let's explore", "leverage",
+    "unlock the power", "harness the power", "navigate the complexities",
+    "seamless", "seamlessly", "robust", "cutting-edge", "game-changer",
+    "revolutionary", "in today's fast-paced world", "ever-evolving landscape",
+    "look no further", "at its core", "at the end of the day", "it's worth noting",
+    "in conclusion", "to sum up", "this comprehensive guide", "everything you need to know",
+]
+CLICHE_OVERRIDES = {
+    "delve into": r"\bdelv(?:e|es|ed|ing) into\b",
+    "dive deep": r"\b(?:dive[sd]?|diving) deep\b",
+    "leverage": r"\bleverag(?:e|es|ed|ing)\b",
+}
+CLICHE_RES = []
+for _p in CLICHE_PHRASES:
+    CLICHE_RES.append((_p, re.compile(CLICHE_OVERRIDES.get(_p, r"\b" + re.escape(_p) + r"\b"), re.I)))
+
+NICE = {"meta title": "Meta title", "meta description": "Meta description", "url slug": "URL slug",
+        "h1": "H1", "og title": "OG title", "og description": "OG description"}
+FILLER_WORDS = {"the", "a", "an", "your", "of", "and", "to", "for", "in"}
+WHAT_IS_RE = re.compile(r"^(?:what is|what's|what\u2019s|מה זה|מהו|מהי)\b", re.I)
+
+
+class Report:
+    def __init__(self):
+        self.items = []  # (level, line, message)
+
+    def error(self, line, msg):
+        self.items.append(("ERROR", line, msg))
+
+    def warn(self, line, msg):
+        self.items.append(("WARNING", line, msg))
+
+    def of(self, level):
+        sel = [(ln, m) for lv, ln, m in self.items if lv == level]
+        return sorted(sel, key=lambda t: (t[0] is None, t[0] or 0))
+
+
+def fmt_lines(nums, limit=15):
+    nums = sorted(set(nums))
+    shown = ", ".join(str(n) for n in nums[:limit])
+    if len(nums) > limit:
+        shown += ", ... (%d more)" % (len(nums) - limit)
+    return shown
+
+
+def strip_fmt(text):
+    """Remove markdown bold and backticks and trim."""
+    return re.sub(r"\*\*|__|`", "", text).strip()
+
+
+def split_row(line):
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|") and not s.endswith("\\|"):
+        s = s[:-1]
+    return [c.replace("\\|", "|").strip() for c in re.split(r"(?<!\\)\|", s)]
+
+
+def is_separator(cells):
+    return bool(cells) and all(re.fullmatch(r":?-+:?", c.replace(" ", "")) for c in cells)
+
+
+def find_tables(lines, lo, hi):
+    """Tables = runs of lines starting with '|'. Returns [{'header': (ln, cells), 'rows': [(ln, cells)]}]."""
+    tables = []
+    cur = None
+    for i in range(lo, hi):
+        if lines[i].lstrip().startswith("|"):
+            cells = split_row(lines[i])
+            if cur is None:
+                cur = {"header": (i + 1, cells), "rows": [], "_seen_header": True}
+                tables.append(cur)
+            elif is_separator(cells):
+                continue
+            else:
+                cur["rows"].append((i + 1, cells))
+        else:
+            cur = None
+    return tables
+
+
+def parse_int(text):
+    m = re.search(r"\d[\d,]*", text or "")
+    return int(m.group(0).replace(",", "")) if m else None
+
+
+def parse_bullets(lines, lo, hi):
+    """Top-level bold-labelled bullets with their nested bullets, between lines lo..hi."""
+    bullets = []
+    last = None
+    for i in range(lo, hi):
+        line = lines[i]
+        m = BULLET_RE.match(line)
+        if m:
+            label = m.group(1).strip().rstrip(":").strip().lower()
+            rest = m.group(2).lstrip(":").strip()
+            last = {"label": LABELS.get(label, label), "raw_label": label, "text": rest,
+                    "nested": [], "line": i + 1}
+            bullets.append(last)
+            continue
+        if re.match(r"^[-*+]\s+", line):
+            last = None
+            continue
+        nm = NESTED_RE.match(line)
+        if nm and last is not None:
+            last["nested"].append(nm.group(1).strip())
+    return bullets
+
+
+def first_bullet(bullets, label):
+    for b in bullets:
+        if b["label"] == label:
+            return b
+    return None
+
+
+def main(argv=None):
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+    ap = argparse.ArgumentParser(description="Mechanical checks on a content brief in Markdown.")
+    ap.add_argument("brief", help="path to the brief (.md)")
+    ap.add_argument("--lang", choices=["en", "he"], help="brief language (auto-detected when omitted)")
+    ap.add_argument("--variant", choices=["full", "concise"], default="full",
+                    help="full (default) expects Reasoning bullets; concise does not")
+    ap.add_argument("--json", action="store_true", help="print the result as JSON")
+    args = ap.parse_args(argv)
+
+    try:
+        with open(args.brief, "r", encoding="utf-8-sig") as fh:
+            text = fh.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        print("error: cannot read %s: %s" % (args.brief, exc), file=sys.stderr)
+        return 2
+    lines = text.splitlines()
+    rep = Report()
+
+    # ---- structure scan: headings (outside code fences) and sections
+    in_fence = [False] * len(lines)
+    fenced = False
+    for i, ln in enumerate(lines):
+        if FENCE_RE.match(ln):
+            fenced = not fenced
+            in_fence[i] = True
+        else:
+            in_fence[i] = fenced
+    headings = []  # (idx, level, text)
+    for i, ln in enumerate(lines):
+        if in_fence[i]:
+            continue
+        m = HEADING_RE.match(ln)
+        if m:
+            headings.append((i, len(m.group(1)), m.group(2)))
+
+    title = next((h for h in headings if h[1] == 1), None)
+    lang = args.lang
+    if lang is None:
+        lang = "he" if (title and HEBREW_RE.search(title[2])) else "en"
+    if title is None:
+        rep.warn(1, "no '# ' title line found (expected '# <Topic> - Content Brief | <Client>')")
+
+    sections = {}  # id -> (heading_idx, lo, hi, heading_text)
+    order = []     # (sid, idx, heading_text)
+    for n, (idx, level, htext) in enumerate(headings):
+        if level != 2:
+            continue
+        sid = SECTION_BY_KEY.get(norm_key(htext))
+        end = len(lines)
+        for (j, lv2, _t) in headings[n + 1:]:
+            if lv2 <= 2:
+                end = j
+                break
+        if sid is not None:
+            order.append((sid, idx, htext))
+            if sid not in sections:
+                sections[sid] = (idx, idx + 1, end, htext)
+
+    def sec_range(sid):
+        s = sections.get(sid)
+        return (s[1], s[2]) if s else None
+
+    # ---- 1. dashes
+    em_lines = [i + 1 for i, ln in enumerate(lines) if EM_DASH in ln]
+    if em_lines:
+        rep.error(em_lines[0], "em-dash (U+2014) found on lines: %s (use a hyphen, comma or colon)" % fmt_lines(em_lines))
+    en_lines = [i + 1 for i, ln in enumerate(lines) if EN_DASH in ln]
+    if en_lines:
+        rep.warn(en_lines[0], "en-dash (U+2013) found on lines: %s" % fmt_lines(en_lines))
+
+    # ---- 2. forbidden leftovers
+    found_forbidden = {}
+    for i, ln in enumerate(lines):
+        scrub = ln
+        for allowed in ALLOWED_PLACEHOLDERS:
+            scrub = allowed.sub(" ", scrub)
+        for name, rx in FORBIDDEN:
+            if rx.search(scrub):
+                found_forbidden.setdefault(name, []).append(i + 1)
+    for name, nums in found_forbidden.items():
+        rep.error(nums[0], 'forbidden leftover "%s" on lines: %s' % (name, fmt_lines(nums)))
+    # multi-line TODO comments: strip them from whole-text scan not needed (line based)
+
+    # ---- 3. required sections and order
+    for sid, required, en, he in SECTIONS:
+        if required and sid not in sections:
+            rep.error(None, "required section missing: '## %s' (HE: '## %s')" % (en, he))
+    max_seen = -1
+    max_name = ""
+    for sid, idx, htext in order:
+        if sections[sid][0] != idx:
+            rep.warn(idx + 1, "duplicate section heading '## %s'" % htext)
+            continue
+        pos = SECTION_INDEX[sid]
+        if pos < max_seen:
+            rep.warn(idx + 1, "section '## %s' is out of order (it should come before '%s')" % (htext, max_name))
+        else:
+            max_seen = pos
+            max_name = htext
+
+    # ---- 4. on-page table
+    onpage = {}
+    r = sec_range("onpage")
+    if r:
+        for t in find_tables(lines, r[0], r[1]):
+            hdr = [strip_fmt(c).lower() for c in t["header"][1]]
+            rec_col = next((k for k, c in enumerate(hdr) if "recommendation" in c or "המלצה" in c), 1)
+            chars_col = next((k for k, c in enumerate(hdr) if c in ("chars", "תווים")), None)
+            for ln, cells in t["rows"]:
+                label = strip_fmt(cells[0]).lower() if cells else ""
+                if label in ("meta title", "meta description", "url slug", "h1", "og title", "og description") \
+                        and label not in onpage:
+                    value = strip_fmt(cells[rec_col]) if len(cells) > rec_col else ""
+                    chars = None
+                    if chars_col is not None and len(cells) > chars_col:
+                        chars = parse_int(strip_fmt(cells[chars_col]))
+                    onpage[label] = {"line": ln, "value": value, "chars": chars}
+        for label in ("meta title", "meta description", "url slug", "h1"):
+            if label not in onpage:
+                rep.error(sections["onpage"][0] + 1, "On-page table is missing the '%s' row" % NICE[label])
+        limits = {"meta title": 60, "meta description": 155, "og title": 60, "og description": 200}
+        for label, limit in limits.items():
+            ent = onpage.get(label)
+            if not ent:
+                continue
+            n = len(ent["value"])
+            if n > limit:
+                rep.error(ent["line"], "%s is %d characters (limit %d)" % (NICE[label], n, limit))
+        for label, ent in onpage.items():
+            if ent["chars"] is not None and abs(ent["chars"] - len(ent["value"])) > 2:
+                rep.warn(ent["line"], "Chars column says %d for %s but the measured length is %d"
+                         % (ent["chars"], label, len(ent["value"])))
+        slug_ent = onpage.get("url slug")
+        if slug_ent:
+            slug = slug_ent["value"].strip()
+            if "/" in slug:
+                parts = [p for p in re.split(r"/+", re.sub(r"^[a-z]+://", "", slug)) if p]
+                slug = parts[-1] if parts else ""
+            if re.search(r"\s", slug):
+                rep.error(slug_ent["line"], "URL slug contains spaces: '%s'" % slug)
+            if re.search(r"[A-Z]", slug):
+                rep.error(slug_ent["line"], "URL slug contains uppercase letters: '%s'" % slug)
+            words = re.split(r"[-\s]+", slug)
+            if "" in words:
+                rep.error(slug_ent["line"], "URL slug has empty hyphen segments: '%s'" % slug)
+            words = [w for w in words if w]
+            if not 3 <= len(words) <= 5:
+                rep.error(slug_ent["line"], "URL slug must be 3 to 5 hyphen-separated words, found %d: '%s'" % (len(words), slug))
+            fillers = [w for w in words if w.lower() in FILLER_WORDS]
+            if fillers:
+                rep.error(slug_ent["line"], "URL slug contains filler word(s): %s" % ", ".join(sorted(set(fillers))))
+
+    # ---- 5. keyword table
+    primary_kw = None
+    r = sec_range("keywords")
+    if r:
+        tables = find_tables(lines, r[0], r[1])
+        ktable = next((t for t in tables if strip_fmt(t["header"][1][0]).lower() in ("type", "סוג")), None)
+        if ktable is None and tables:
+            ktable = tables[0]
+        primaries = []
+        if ktable:
+            for ln, cells in ktable["rows"]:
+                typ = strip_fmt(cells[0]).lower() if cells else ""
+                if typ.startswith("primary") or typ.startswith("ראשית"):
+                    kw = strip_fmt(cells[1]) if len(cells) > 1 else ""
+                    vol = strip_fmt(cells[2]) if len(cells) > 2 else ""
+                    primaries.append((ln, kw, vol))
+        if not primaries:
+            rep.error(sections["keywords"][0] + 1, "Keyword table has no Primary row")
+        else:
+            primary_kw = primaries[0][1]
+            for ln, kw, vol in primaries:
+                digits = vol.replace(",", "").strip()
+                if not digits or digits.lower() in ("n/a", "na", "-") or (digits.isdigit() and int(digits) == 0):
+                    rep.warn(ln, "Primary keyword '%s' has no monthly search volume (%s)" % (kw, vol or "empty"))
+            kl = primary_kw.lower()
+            if kl:
+                for label, nice in (("meta title", "Meta title"), ("h1", "H1"), ("og title", "OG title")):
+                    ent = onpage.get(label)
+                    if ent and kl not in ent["value"].lower():
+                        rep.warn(ent["line"], "Primary keyword '%s' does not appear in the %s" % (primary_kw, nice))
+                slug_ent = onpage.get("url slug")
+                if slug_ent and all(ord(c) < 128 for c in primary_kw):
+                    sl = slug_ent["value"].lower()
+                    missing = [w for w in re.findall(r"[a-z0-9]+", kl) if w not in FILLER_WORDS and w not in sl]
+                    if missing:
+                        rep.warn(slug_ent["line"], "URL slug does not contain the primary keyword words (missing: %s)" % ", ".join(missing))
+
+    # ---- 6. banned phrases
+    for label in ("meta title", "og title"):
+        ent = onpage.get(label)
+        if ent:
+            val = ent["value"].replace(chr(0x2019), "'")
+            for name, rx in TITLE_BANNED:
+                if rx.search(val):
+                    rep.error(ent["line"], "%s uses a banned pattern: %s" % (NICE[label], name))
+    ent = onpage.get("meta description")
+    if ent:
+        val = ent["value"].replace(chr(0x2019), "'")
+        for name, rx in DESC_BANNED:
+            if rx.search(val):
+                rep.error(ent["line"], "Meta description uses a banned pattern: %s" % name)
+    writer = sections.get("writer")
+    skip_lo, skip_hi = (writer[1], writer[2]) if writer else (-1, -1)
+    hits = {}
+    for i, ln in enumerate(lines):
+        if skip_lo <= i < skip_hi:
+            continue
+        low = ln.replace(chr(0x2019), "'")
+        for phrase, rx in CLICHE_RES:
+            if rx.search(low):
+                hits.setdefault(phrase, []).append(i + 1)
+    for phrase, nums in hits.items():
+        rep.warn(nums[0], 'banned phrase "%s" on lines: %s' % (phrase, fmt_lines(nums)))
+
+    # ---- 7. article structure
+    r = sec_range("structure")
+    if r:
+        lo, hi = r
+        total = faq_allow = None
+        for i in range(lo, hi):
+            if total is None:
+                m = TOTAL_RE.search(lines[i])
+                if m:
+                    total = int(m.group(1).replace(",", ""))
+            if faq_allow is None:
+                m = FAQ_ALLOW_RE.search(lines[i])
+                if m:
+                    faq_allow = int(m.group(1).replace(",", ""))
+        hl = sections["structure"][0] + 1
+        if total is None:
+            rep.error(hl, "Article structure is missing '**Total word count:**' (HE: '**סה\"כ מילים:**')")
+        if faq_allow is None:
+            rep.error(hl, "Article structure is missing '**FAQ allowance:**' (HE: '**הקצאה לשאלות ותשובות:**')")
+
+        item_idx = [i for i in range(lo, hi) if ITEM_RE.match(lines[i])]
+        items = []
+        for n, i in enumerate(item_idx):
+            m = ITEM_RE.match(lines[i])
+            end = hi
+            for j in range(i + 1, hi):
+                if HEADING_RE.match(lines[j]) and not in_fence[j]:
+                    end = j
+                    break
+            items.append({"line": i + 1, "kind": m.group(1), "title": m.group(2),
+                          "bullets": parse_bullets(lines, i + 1, end)})
+        if not items:
+            rep.error(hl, "no outline items found (expected headings like '### H2: <heading>')")
+
+        word_sum = 0
+        snippets = []
+        missing_reasoning = []
+        has_reasoning = []
+        current_h2 = None
+        what_is = []
+        for it in items:
+            label = "%s: %s" % (it["kind"], it["title"])
+            b = it["bullets"]
+            wb = first_bullet(b, "words")
+            wc = parse_int(wb["text"]) if wb else None
+            it["wc"] = wc
+            if wb is None:
+                rep.error(it["line"], "%s has no Word count bullet" % label)
+            elif not wc:
+                rep.error(it["line"], "%s has a Word count of 0 or no number" % label)
+            else:
+                word_sum += wc
+            ab = first_bullet(b, "angle")
+            if ab is None or not ab["text"].strip():
+                rep.error(it["line"], "%s has no Angle bullet or it is empty" % label)
+            gb = first_bullet(b, "guidelines")
+            if gb is None or not gb["nested"]:
+                rep.error(it["line"], "%s has no Guidelines bullet with nested bullets" % label)
+            if first_bullet(b, "keywords") is None:
+                rep.warn(it["line"], "%s has no Keywords bullet" % label)
+            rb = first_bullet(b, "reasoning")
+            if rb is None:
+                missing_reasoning.append(it["line"])
+            else:
+                has_reasoning.append(it["line"])
+            for sb in b:
+                if sb["label"] == "snippet":
+                    snippets.append((sb["line"], sb["text"]))
+            if it["kind"] == "H2":
+                current_h2 = it
+                if WHAT_IS_RE.match(it["title"].strip()):
+                    what_is.append(it["line"])
+            elif it["kind"] in ("Hero", "Conclusion"):
+                current_h2 = None
+            elif it["kind"] == "H3" and current_h2 is not None and wc and current_h2.get("wc"):
+                if wc > current_h2["wc"]:
+                    rep.warn(it["line"], "H3 '%s' (%d words) is longer than its parent H2 '%s' (%d words)"
+                             % (it["title"], wc, current_h2["title"], current_h2["wc"]))
+
+        if total is not None and faq_allow is not None and items:
+            grand = word_sum + faq_allow
+            if total <= 0 or abs(grand - total) / float(total) > 0.01:
+                pct = (abs(grand - total) / float(total) * 100.0) if total else 100.0
+                rep.error(hl, "Word counts (%d) + FAQ allowance (%d) = %d, but Total word count is %d (off by %.1f%%, tolerance 1%%)"
+                          % (word_sum, faq_allow, grand, total, pct))
+
+        if len(what_is) > 1:
+            rep.warn(what_is[1], "more than one H2 starts with 'What is' (lines: %s)" % fmt_lines(what_is))
+
+        # snippet targets
+        if len(snippets) > 3:
+            rep.error(snippets[3][0], "%d snippet targets found (maximum 3)" % len(snippets))
+        seen_q = {}
+        for ln, txt in snippets:
+            fmt, _sep, query = txt.partition("|")
+            fmt = strip_fmt(fmt).lower()
+            query = strip_fmt(query)
+            if fmt not in ("paragraph", "list", "table"):
+                rep.error(ln, "snippet target format '%s' must be paragraph, list or table" % fmt)
+            if not query:
+                rep.error(ln, "snippet target has no query (expected '<format> | <query>')")
+            else:
+                qk = query.casefold()
+                if qk in seen_q:
+                    rep.error(ln, "snippet target query '%s' is duplicated (also line %d)" % (query, seen_q[qk]))
+                else:
+                    seen_q[qk] = ln
+        if not snippets:
+            rep.warn(hl, "no snippet target in the outline (informational briefs usually warrant one)")
+
+        if args.variant == "full" and items and missing_reasoning:
+            rep.warn(missing_reasoning[0], "full variant: outline item(s) without a Reasoning bullet at lines: %s" % fmt_lines(missing_reasoning))
+        if args.variant == "concise" and has_reasoning:
+            rep.warn(has_reasoning[0], "concise variant: Reasoning bullets present at lines: %s" % fmt_lines(has_reasoning))
+
+    # ---- 8. FAQs
+    r = sec_range("faq")
+    if r:
+        lo, hi = r
+        qs = [i for i in range(lo, hi) if re.match(r"^###\s+\S", lines[i]) and not in_fence[i]]
+        if len(qs) < 3:
+            rep.warn(sections["faq"][0] + 1, "only %d FAQ question(s) found (expected at least 3)" % len(qs))
+        for i in qs:
+            end = hi
+            for j in range(i + 1, hi):
+                if HEADING_RE.match(lines[j]) and not in_fence[j]:
+                    end = j
+                    break
+            q = HEADING_RE.match(lines[i]).group(2)
+            gb = first_bullet(parse_bullets(lines, i + 1, end), "guidelines")
+            if gb is None or not gb["nested"]:
+                rep.error(i + 1, "FAQ '%s' has no Guidelines bullet with nested bullets" % q)
+                continue
+            first = gb["nested"][0]
+            if "40" not in first or "50" not in first:
+                rep.warn(gb["line"], "FAQ '%s': first guideline should state the 40 to 50 word answer rule" % q)
+            for g in gb["nested"]:
+                if len(g.split()) > 60:
+                    rep.warn(gb["line"], "FAQ '%s': a guideline bullet has %d words and looks like a drafted answer" % (q, len(g.split())))
+
+    # ---- 9. competitor table
+    r = sec_range("competitive")
+    if r:
+        tables = find_tables(lines, r[0], r[1])
+        ctable = None
+        for t in tables:
+            if any(strip_fmt(c).lower() == "url" for c in t["header"][1]):
+                ctable = t
+                break
+        if ctable is None:
+            rep.warn(sections["competitive"][0] + 1, "no competitor table found (header with a URL column)")
+        else:
+            hdr = [strip_fmt(c).lower() for c in ctable["header"][1]]
+            ucol = hdr.index("url")
+            rows = [(ln, c) for ln, c in ctable["rows"] if any(x.strip() for x in c)]
+            if len(rows) < 3:
+                rep.warn(ctable["header"][0], "competitor table has %d data row(s) (expected at least 3)" % len(rows))
+            for ln, cells in rows:
+                raw = cells[ucol] if len(cells) > ucol else ""
+                lm = re.search(r"\]\(\s*<?([^)\s>]+)", raw)
+                cand = lm.group(1) if lm else strip_fmt(raw).strip("<>")
+                token = cand.split()[0] if cand.split() else ""
+                if not re.match(r"^https?://\S+", token, re.I):
+                    rep.error(ln, "competitor URL is not an absolute http(s) URL: '%s'" % (strip_fmt(raw) or "(empty)"))
+
+    # ---- 10. language consistency
+    if lang == "he":
+        for sid, idx, htext in order:
+            k = norm_key(htext)
+            if k == norm_key(SECTION_EN[sid]) and k != norm_key(SECTION_HE[sid]):
+                rep.warn(idx + 1, "English section heading '## %s' in a Hebrew brief (use '## %s')" % (htext, SECTION_HE[sid]))
+    else:
+        for idx, level, htext in headings:
+            if level >= 2 and HEBREW_RE.search(htext):
+                rep.warn(idx + 1, "Hebrew heading '%s' in an English brief" % htext)
+
+    # ---- 11. absolute URLs
+    rel = []
+    for i, ln in enumerate(lines):
+        if re.search(r"\[[^\]\n]*\]\(\s*<?/[^)\s>]*", ln):
+            rel.append(i + 1)
+    if rel:
+        rep.warn(rel[0], "markdown link(s) with a relative target (starts with '/'); use full absolute URLs. Lines: %s" % fmt_lines(rel))
+
+    # ---- output
+    errors = rep.of("ERROR")
+    warnings = rep.of("WARNING")
+    ok = not errors
+    if args.json:
+        payload = {
+            "file": args.brief, "language": lang, "variant": args.variant, "ok": ok,
+            "errors": [{"line": ln, "message": m} for ln, m in errors],
+            "warnings": [{"line": ln, "message": m} for ln, m in warnings],
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        def show(title, entries):
+            print("%s (%d)" % (title, len(entries)))
+            if not entries:
+                print("  none")
+            for ln, m in entries:
+                print("  - %s%s" % ("[line %d] " % ln if ln else "", m))
+            print("")
+        show("ERRORS", errors)
+        show("WARNINGS", warnings)
+        print("%s: %d error(s), %d warning(s) [lang=%s, variant=%s]"
+              % ("FAIL" if errors else "PASS", len(errors), len(warnings), lang, args.variant))
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

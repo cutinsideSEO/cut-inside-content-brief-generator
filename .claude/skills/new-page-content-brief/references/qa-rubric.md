@@ -15,9 +15,11 @@ Exit code 1 means errors. Fix every error and review every warning, then run it 
 reports no errors. Run it on each variant you deliver. What it checks mechanically (so you do not
 redo it by hand): section order and headings, the keyword, competitor and on-page tables, character
 limits, slug word count, outline labels and non-zero word counts, outline sum + FAQ allowance =
-total (1% tolerance), 1 to 3 distinct snippet queries, the 40/50 first FAQ guideline, forbidden
-leftovers (`{{`, `}}`, `<topic>`, `<client>`, `<keyword>`, `[PLACEHOLDER`, `TBD`, `Lorem`),
-em-dashes, and English banned title, meta and phrase patterns. If the script is unavailable, do
+total (1% tolerance), 1 to 3 distinct snippet queries, snippet targets labelled a bet when SERP
+features were not observed, the 40/50 first FAQ guideline, forbidden leftovers (`{{`, `}}`,
+`<topic>`, `<client>`, `<keyword>`, `[PLACEHOLDER`, `TBD`, `Lorem`), any HTML comment `<!--`
+(an error: comments vanish in the Google Doc, so a TODO must be a visible `**TODO (human):**`
+line), em-dashes, and English banned title, meta and phrase patterns. If the script is unavailable, do
 these checks by hand from section 4 and say so in Sources and scope.
 
 ## 2. Correctness criteria (must never fail; one failure blocks delivery)
@@ -34,6 +36,8 @@ these checks by hand from section 4 and say so in Sources and scope.
 | C8 | No invented internal URL | Every internal URL appears in the GSC data; else the placeholder |
 | C9 | Keywords appear exactly as supplied or exported | Diff the table against the list |
 | C10 | The intent verdict matches the observed SERP | The SERP record and the verdict table in SKILL.md step 3 |
+| C11 | No GSC impressions, CTR or position quoted from a window that overlaps the GSC impressions logging error (2025-05-13 to 2026-04-27) without the caveat; SurgeOS `dataNotes` / `compareNote` respected | Every GSC figure's window in the brief and in Sources and scope |
+| C12 | Every human TODO is a visible `**TODO (human):**` line, and the Doc's TODO count equals brief.md's | check_brief.py (no `<!--`); read-back count at step 9 |
 
 Also never fail: no client name, URL or number from a different client; no em-dash; full absolute
 URLs in the links section.
@@ -43,6 +47,10 @@ URLs in the links section.
 Score each criterion 1 to 5 with one line of evidence. **Ship bar: every criterion at 4 or 5.**
 Below 4 on any criterion: fix the brief, re-run the script, score again. Never ship below the bar,
 and never round up.
+
+**Against inflated self-scores:** table stakes is 5 only if every table stake has its own outline
+item (not only a passing mention in another section's guideline). Before scoring, list each table
+stake beside the outline item that carries it; any stake named only in passing caps the score at 4.
 
 | Criterion | The question | A 3 looks like | A 5 looks like |
 |---|---|---|---|
@@ -70,7 +78,7 @@ strengths. They go in your working notes, not the brief.
 - [ ] FAQs: questions as H3, 1 to 3 guideline bullets, first one the 40 to 50 word answer instruction; no drafted answers.
 - [ ] Internal links are full absolute URLs from GSC, or the placeholder.
 - [ ] E-E-A-T lists only what the client can deliver.
-- [ ] Sources and scope: SERP date, market, tools, cost, exports, what was not measured.
+- [ ] Sources and scope: SERP date, market, tools, client files read, GSC window, cost, exports, what was not measured, and the Fact and source bank table.
 - [ ] Concise variant: no Reasoning lines, no Reasoning column; nothing else differs from full.
 - [ ] No Open Items section; nothing about the current page (that goes in a companion note); 15 pages or fewer.
 
@@ -80,7 +88,9 @@ strengths. They go in your working notes, not the brief.
 - **Swap test** on the editorial angle, every section angle and the meta title.
 - **Headings are claims, not labels;** at most one "What is X?"; no 5 parallel "How to" H2s; shapes vary.
 - **Guidelines advance the angle** and name concrete things (a table's columns, an example, a number with `[CITE]`), not "explain clearly".
-- **Claims:** every product, medical, legal or financial claim is supported by the client's materials or marked `[CITE: ...]` / `<!-- TODO (human): ... -->`.
+- **Claims:** every product, medical, legal or financial claim is supported by the client's materials or a source URL read in this run (listed in the Fact and source bank), or marked `[CITE: ...]` / `**TODO (human):** ...`. More than a handful of `[CITE]` markers means the research was skipped: search before shipping.
+- **Snippet bets:** when SERP features were not observed, each snippet target says it is an answer-first bet (at most 2).
+- **Cannibalisation override:** when a new page was chosen over an existing client page, the primary keyword is the distinct sub-intent, not the existing page's head term.
 - **Meta hook matches the intent** of the query.
 - **Brand rules:** banned terms absent, preferred terms used, guardrails honoured.
 - **Standing recommendation changed?** Then the brief says so (house rule 5).
@@ -123,7 +133,8 @@ strengths. They go in your working notes, not the brief.
 | Rubric criterion below 4 | Go back to the step that owns it: intent (step 3), gaps and angle (step 4), outline (step 6), keywords (step 4 then 6); re-score |
 | Outline change after H4 | Show the change to the person before H5 |
 | Hebrew pattern or AI-tell found by reading | Rewrite the line; re-run the script |
-| Claim without support | `[CITE: ...]` or `<!-- TODO (human): ... -->`, or cut it |
+| Claim without support | Search for a source first; else `[CITE: ...]` or `**TODO (human):** ...`, or cut it |
+| HTML comment in the brief | Convert it to a visible `**TODO (human):** ...` line; re-run the script |
 | Mismatch between full and concise | Rebuild concise from full by deletion only |
 
 ## 9. Agency content-brief criteria (Phase 5 scorecard, for reference)

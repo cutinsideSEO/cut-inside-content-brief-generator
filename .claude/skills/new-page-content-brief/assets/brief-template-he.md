@@ -1,6 +1,6 @@
 # {{נושא}} - בריף יצירת תוכן | {{לקוח}}
 
-{{! TEMPLATE NOTES (English, for the strategist), delete this block. Hebrew brief: every heading, label and value is Hebrew except the fixed English labels kept on purpose: the on-page element names (Meta title, Meta description, URL slug, H1, OG title, OG description), the outline prefixes (Hero, H2, H3, H4, Conclusion), the snippet formats (paragraph, list, table) and the placeholder conventions. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete; scripts/check_brief.py --lang he fails the brief while any double brace remains. Copy this blank file for every brief, never an old brief. FULL vs CONCISE: concise deletes every **נימוק:** line, the נימוק column of the on-page table and the rationale paragraphs (מכוסה אצל is optional), nothing else. Read Hebrew headings and titles for Hebrew equivalents of banned patterns (המדריך המלא, כל מה שצריך לדעת, יתרונות וחסרונות, למתחילים). No em-dashes. URLs and numbers inside Hebrew text: keep them on their own or at the end of a phrase so they read correctly right to left. }}
+{{! TEMPLATE NOTES (English, for the strategist), delete this block. Hebrew brief: every heading, label and value is Hebrew except the fixed English labels kept on purpose: the on-page element names (Meta title, Meta description, URL slug, H1, OG title, OG description), the outline prefixes (Hero, H2, H3, H4, Conclusion), the snippet formats (paragraph, list, table) and the placeholder conventions. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete; scripts/check_brief.py --lang he fails the brief while any double brace remains. Copy this blank file for every brief, never an old brief. FULL vs CONCISE: concise deletes every **נימוק:** line, the נימוק column of the on-page table and the rationale paragraphs (מכוסה אצל is optional), nothing else. Read Hebrew headings and titles for Hebrew equivalents of banned patterns (המדריך המלא, כל מה שצריך לדעת, יתרונות וחסרונות, למתחילים). No em-dashes. URLs and numbers inside Hebrew text: keep them on their own or at the end of a phrase so they read correctly right to left. MARKERS: a person's decision or check is a visible line `**TODO (human):** what to decide` (the text may be Hebrew), never an HTML comment (comments vanish in the Google Doc, and check_brief.py fails on any comment opener); `[CITE: ...]` only when a search in the run found no source; `[INTERNAL LINK: anchor -> topic]` when no real URL exists. If the client's brain names a branded template or naming rule, keep this section order and these labels but apply the client's header, branding and file naming. }}
 
 - **תאריך:** {{YYYY-MM-DD}}
 - **שוק:** {{מדינת ה-SERP}}, {{שפת ה-SERP}}
@@ -60,7 +60,7 @@
 
 - **סוג כוונה:** {{אינפורמטיבית}}
 - **פורמט מועדף:** {{מה שהמקומות הראשונים מתגמלים, עם שתיים או שלוש כתובות לדוגמה}}
-- **רכיבי SERP שנצפו:** {{לכל שאילתה: featured snippet, People Also Ask, וידאו, חבילת תמונות, AI Overview; או "לא נצפו"}}
+- **רכיבי SERP שנצפו:** {{לכל שאילתה: featured snippet, People Also Ask, וידאו, חבילת תמונות, AI Overview; או "אין רכיבים" (SERP ממוקם); או "לא נצפו (חיפוש רשת חלופי, לא SERP ממוקם)"}}
 - **מה מדורג:** {{שורה או שתיים: סוגי תוכן ואתרים בעשרייה הראשונה; פורומים, ויקיפדיה או וידאו כסימן לכוונה}}
 - **מקור:** {{DataForSEO live SERP, מיקום, שפה, עומק 20, נמשך YYYY-MM-DD; N שאילתות}}
 - **נימוק:** {{למה זו ההכרעה}}
@@ -96,6 +96,8 @@
 | 3 | {{https://www.example.net/page-3}} | {{9,700}} | {{2,400}} | {{...}} | {{...}} | {{...}} |
 
 ציון משוקלל = סכום על פני השאילתות שנמשכו של נפח x max(1, 21 - דירוג) (`scripts/score_competitors.py`).
+
+{{! No measured volumes: replace the line above with "ציון לפי דירוג בלבד, נפחים לא נמדדו: סכום על פני השאילתות שנמשכו של max(1, 21 - דירוג)." }}
 
 ### שלושת המובילים שנקראו במלואם
 
@@ -201,7 +203,7 @@
 - **מספר מילים:** {{200}}
 - **נימוק:** {{...}}
 
-{{! Check: every מספר מילים above plus the הקצאה לשאלות ותשובות equals סה"כ מילים. At most 3 יעד סניפט lines, each with a different query. }}
+{{! Check: every מספר מילים above plus the הקצאה לשאלות ותשובות equals סה"כ מילים. At most 3 יעד סניפט lines, each with a different query. If SERP features were not observed (web-search fallback), at most 2, each written as: paragraph | <query> (הימור answer-first; רכיבי SERP לא נצפו). }}
 
 ## שאלות ותשובות
 
@@ -255,7 +257,7 @@
 - **ממה להימנע:** {{...}}
 - **מונחים אסורים:** {{המונחים האסורים של הלקוח}}; בלי ביטויי AI שחוקים ובלי המקבילות שלהם בעברית ("לצלול לעומק", "בעולם המשתנה של היום", "חשוב לציין ש", "לסיכום", "כל מה שצריך לדעת", "המדריך המלא").
 - **הנחיות ויזואליות:** {{תמונה ראשית, אינפוגרפיקה, וידאו, טקסט alt לכל תמונה}}
-- **מוסכמות:** `[CITE: ...]` במקום שצריך להוסיף מקור; `[INTERNAL LINK: anchor -> topic]` לקישור שאין לו עדיין כתובת אמיתית; `<!-- TODO (human): ... -->` להחלטה של אדם.
+- **מוסכמות:** `[CITE: ...]` במקום שהמחקר לא מצא מקור וצריך להוסיף אחד; `[INTERNAL LINK: anchor -> topic]` לקישור שאין לו עדיין כתובת אמיתית; שורה מודגשת `TODO (human):` להחלטה של אדם.
 - **YMYL:** {{לנושאי בריאות, כספים או משפט: הערת בדיקת מומחה, רכיב "סימני אזהרה" או "מתי לפנות לעזרה", רשימת מחקרים ומקורות; אחרת למחוק את השורה}}
 
 ## הערות טכניות
@@ -272,6 +274,14 @@
 - **SERP:** {{DataForSEO live SERP, מיקום, שפה, עומק 20, YYYY-MM-DD, N שאילתות}}
 - **מילות מפתח:** {{מקור, נפח מדינה וגלובלי, YYYY-MM-DD}}
 - **עמודים שנקראו:** {{N עמודים, content parsing עם רינדור JS; קריאות שנכשלו והוסרו: N}}
-- **נתוני הלקוח:** {{נכס GSC ב-SurgeOS, חלון YYYY-MM-DD עד YYYY-MM-DD}}
+- **נתוני הלקוח:** {{נכס GSC ב-SurgeOS, חלון YYYY-MM-DD עד YYYY-MM-DD (שלושת החודשים המלאים האחרונים; אם החלון חופף, להוסיף "חופף לתקלת רישום החשיפות ב-GSC בין 2025-05-13 ל-2026-04-27")}}
+- **קבצי לקוח שנקראו:** {{קבצי AI Brain, תדריכי מוצר, בריפים קודמים בנושא; לקובץ גדול מדי לקריאה מלאה, המונחים שחופשו בו}}
 - **עלות:** DataForSEO ${{0.00}} (סכום שדות cost); Ahrefs {{N}} ייצואים בדפדפן, 0 יחידות API
 - **לא נמדד:** {{לדוגמה קושי מילת מפתח, קישורים נכנסים, ציטוטים ב-AI Overview}}
+
+**מאגר עובדות ומקורות**
+
+| טענה | כתובת המקור | תאריך | בשימוש בסעיף |
+|---|---|---|---|
+| {{נתון, מחקר או כלל שהנחיה מבקשת מהכותב להשתמש בו}} | {{https://www.example.gov/source (נקרא בהרצה הזו)}} | {{YYYY-MM-DD}} | {{H2 2}} |
+| {{טענה שלא נמצא לה מקור אמין}} | {{לא נמצא: [CITE] נשאר בהנחיה}} | {{n/a}} | {{שאלה 3}} |

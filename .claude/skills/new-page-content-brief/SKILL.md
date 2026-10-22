@@ -38,7 +38,7 @@ the six checkpoints below.
 
 **What the brief contains** (house format; the templates hold the exact labels):
 
-1. Title line (`<Topic> - Content Brief | <Client>`, Hebrew `<topic> - בריף יצירת תוכן | <client>`), header block (date, market and language, prepared by role, variant) and relevant links.
+1. Title line (`<Topic> - Content Brief | <Client>`, Hebrew `<topic> - בריף יצירת תוכן | <client>`, unless the client's brain sets a document naming rule: step 7), header block (date, market and language, prepared by role, variant) and relevant links.
 2. Brief at a glance: intent and format, editorial angle, word count, primary keyword, title and H1.
 3. Accuracy and brand guardrails (only when the client has rules).
 4. Strategy and goals: page goal, target audience, editorial angle.
@@ -69,7 +69,7 @@ and banned-phrase list it gives the writer: a writer copies the brief's wording.
 |---|---|
 | `references/research-playbook.md` | before step 2 (research): tools, parameters, scoring, digests, market codes, cost |
 | `references/brief-rules.md` | before step 4 (strategy) and again before step 6 (outline) |
-| `references/examples.md` | before step 7 (writing the Doc): format examples only, never content to copy |
+| `references/examples.md` | before step 7 (writing the Doc): format examples only, never content to copy. QA cases must be held out of examples.md: never test the skill on a topic whose gold is excerpted there |
 | `assets/brief-template.md` | at step 7, for an English brief |
 | `assets/brief-template-he.md` | at step 7, for a Hebrew brief |
 | `scripts/score_competitors.py` | at step 2, after the SERP pulls |
@@ -96,6 +96,9 @@ each; otherwise treat it as a batch request (see Batch mode).
 
 1. Resolve the client with SurgeOS `list_clients` (id, name or domain). Note the client's domain (for exclusion), deliverable language and market.
 2. Read brand context: SurgeOS `get_documents` (tone, brand guidelines, product briefs), `get_seo_knowledge` (agency playbook), and the client's AI Brain on Drive (`00. AI Brain`: principles, decisions-log). Extract: voice and tone, do's and don'ts, banned and preferred terms, known competitors, claims the client cannot support, schema rules, standing checks for this topic family. No brand material at all: ask the user for brand notes.
+   - **A file too large to read whole** (a long decisions-log, for example): download it and grep it for the topic terms plus "availability", "launch", "product brief", "do not", "never". Never skip it unread.
+   - **Product briefs:** search the client's Drive folder for product briefs on the topic (availability by market, launch status, claims). Read past content briefs on the same topic for overlap and cannibalisation; never copy from them.
+   - List every file you read (and what you grepped) in Sources and scope.
 3. Choose the keyword route from this table:
 
 | Situation | Route |
@@ -144,12 +147,13 @@ fallbacks, the per-page record and the market codes.
 3. **SERP pulls.** One DataForSEO SERP (organic, live advanced, depth 20, the market's location and language) per representative query. From each response keep the top 10 organic results (URL, rank), every People Also Ask question, and the SERP features actually present. Fallbacks and their labels are in the playbook.
 4. **Score.** Write `serp_rows.csv` (columns `keyword,volume,url,rank`, one row per top-10 organic result per query) and run:
    `python scripts/score_competitors.py serp_rows.csv --exclude-domain <client domain> --top 10`
-   It prints a Markdown table of weighted scores (sum over keywords of volume x max(1, 21 - rank)) and accepts a JSON list instead of CSV; add `--json scores.json` to keep the result, `--priority-url <url>` for each page the user named, `--exclude-keyword <brand term>` for brand queries. Use its output, not your own arithmetic.
+   It prints a Markdown table of weighted scores (sum over keywords of volume x max(1, 21 - rank)) and accepts a JSON list instead of CSV; add `--json scores.json` to keep the result, `--priority-url <url>` for each page the user named, `--exclude-keyword <brand term>` for brand queries. Use its output, not your own arithmetic. With no measured volumes, pass `--rank-only` (every row weighted as volume 1); the script switches to it on its own, with a notice, when every volume is 0 or missing. Label such scores "rank-only score, volumes not measured" in the brief.
 5. **Flag, do not outline against:** the client's own URLs (excluded; a client page in the top 10 for the primary query means a refresh, flag it at H3), forums and UGC, Wikipedia, video results. They are intent signals, not competitors.
 6. **Read pages.** Priority pages first, then by score, at most 10. Record for each: H1 to H3, word count, and a 90 to 130 word digest in the five-part form. A page that fails to parse is dropped as evidence; never describe a page you did not read.
-7. **Top 3 ground truth.** Priority pages first, then the highest scores, until there are 3 real editorial pages read in full.
+7. **Top 3 ground truth.** Priority pages first, then the highest scores, until there are 3 real editorial pages read in full. Each must be on the topic (not an adjacent asset class, product or subject) and in the brief's market language, unless none exists. When you prefer a lower-scored page, say why in the brief.
 8. **Cannibalisation and site coverage.** SurgeOS `gsc_query_page` for the primary keyword and `search_gsc_queries` for the topic, plus a `site:` search. Recommending a topic the site already covers is a known miss.
 9. **Internal link candidates.** SurgeOS `search_gsc_pages` and `search_gsc_queries` for real, indexable client URLs on related topics.
+   - **GSC window rule (steps 2.8 and 2.9):** default to the last 3 full months. Never quote impressions, CTR or position from a window that overlaps the GSC impressions logging error (2025-05-13 to 2026-04-27) without the caveat "spans the GSC impressions logging error 2025-05-13 to 2026-04-27"; prefer windows starting 2026-04-28 or later. Always read and respect the `dataNotes` / `compareNote` SurgeOS returns.
 10. **Log spend.** Sum the `cost` field of every DataForSEO response and count Ahrefs exports as you go.
 
 **When a connector is missing** (say which route you took at H1, and label the data as the playbook says):
@@ -160,6 +164,8 @@ fallbacks, the per-page record and the market codes.
 | Ahrefs browser | Ask (re-login, wait, or DataForSEO volume with approval); never the Ahrefs MCP |
 | SurgeOS | Ask the user for brand notes; `site:` search for coverage; internal links as placeholders only |
 | Both DataForSEO and Ahrefs | Stop at H1 and ask: only a user-supplied list with sourced volumes plus web-search SERPs (labelled approximate) can proceed; otherwise house rule 4 cannot be met |
+
+Web search is not a located SERP (its engine location is the US). For a non-US market, say at H1 that a located SERP is unavailable and offer the person the option to paste the local top 10 (for example from google.co.il). Labels: `references/research-playbook.md` section 1.
 
 ## Step 3: Intent verdict
 
@@ -176,6 +182,8 @@ Classify from the SERP you observed, not from the keyword. This is the stop rule
 | A client page ranks in the top 10 for the primary query | refresh, not a new page | Stop at H3; recommend `existing-article-content-refresh` unless the person decides otherwise |
 | A client page covers the topic but ranks lower | possible cannibalisation | Stop at H3; the person chooses: new page with a distinct angle, or a refresh |
 
+**Cannibalisation override.** When the person chooses a new page with a distinct angle (in either of the last two rows), re-choose the primary keyword for the distinct sub-intent so the new page does not target the existing page's head term. Keep every user string exactly; retype the old head term as Secondary or "Existing page (do not target)" as needed, and show the before and after at H3.
+
 Never proceed silently on a mismatch.
 
 ## Step 4: Strategy
@@ -188,7 +196,7 @@ the editorial angle and, later, the outline skeleton: those decide whether the a
 3. **Competitor breakdown:** for every scored competitor, one-sentence description, strengths, weaknesses (written as concrete, reusable gaps); then the differentiation summary, grounded in the rankings (name keyword clusters, volumes and ranks), not in the score alone.
 4. **Content gap:** table stakes (in most competitors' headings, or keyword clusters most rank for) and strategic opportunities (in 1 or 2 competitors or absent; high-volume clusters weakly covered), each with heading or keyword evidence, weighed by volume.
 5. **Editorial angle:** a 1 to 2 sentence thesis that takes a position, is specific, passes the swap test, fits informational intent (an explanatory thesis) and cites at least one competitor gap or strength. Re-check it against the gap analysis; if the gaps point to a sharper angle, revise now.
-6. **Keyword strategy:** every keyword exact, typed Primary / Secondary / Question / Commercial (route, do not target) / Brand (excluded), each with a placement note. The informational head term stays primary even when a transactional term is bigger.
+6. **Keyword strategy:** every keyword exact, typed Primary / Secondary / Question / Commercial (route, do not target) / Brand (excluded) / Existing page (do not target), each with a placement note. The informational head term stays primary even when a transactional term is bigger. "Exact" means the strings are unchanged, not that the user's term must stay primary (see the cannibalisation override in step 3).
 
 **Checkpoint H3:** show the intent verdict with its evidence, the keyword table, the competitor set
 (scored table plus what was flagged or excluded), the page goal, the audience and the editorial
@@ -200,13 +208,22 @@ approves angle and outline). On a non-informational verdict or a refresh flag, s
 1. **Total word count:** the user's target if given; otherwise the average word count of the top 3 and priority pages, rounded to the nearest 50. Write the calculation into the brief's reasoning.
 2. **FAQ set:** every keyword phrased as a question first, then PAA questions, then gap-driven questions. Usually 4 to 8.
 3. **FAQ allowance:** questions x 80 words by default (60 to 100 a question when the questions are lighter or heavier). Outline budget = total minus FAQ allowance. The app budgets FAQs from whatever is left, which leaves nothing when the outline uses the whole total, so reserve the allowance explicitly.
-4. **Snippet plan:** 1 to 3 snippet targets with distinct queries, each with the format Google shows (paragraph, list, table), only where the SERP supports it. None when the SERP shows no opportunity.
+4. **Snippet plan:** 1 to 3 snippet targets with distinct queries, each with the format Google shows (paragraph, list, table), only where the SERP supports it. None when the SERP shows no opportunity. When SERP features were not observed (web-search fallback), write `Snippet target: <format> | <query> (answer-first bet; SERP features not observed)`, at most 2.
 5. **SERP-feature blocks:** for each feature actually observed (video, image pack, PAA or "things to know", knowledge panel), the matching block you will place in a section. Never a block for a feature the SERP did not show.
 
 ## Step 6: Outline
 
-Before this step, read `references/brief-rules.md` again (section 7, article structure). Build the
-outline in three passes, in this order:
+Before this step, read `references/brief-rules.md` again (section 7, article structure). Checklist
+(the essentials, so the run never depends on memory of that file):
+
+- H2 > H3 > H4, three levels at most; Hero only with a real hook; no FAQ section in the outline.
+- Every H2 states a claim or answer, passes the mini-title test; at most one "What is X?".
+- No "Benefits of", "Pros and Cons", "101", "for Beginners", five parallel "How to" H2s, or their translations.
+- Every item: Angle (a facet of the editorial angle, passes the swap test), Guidelines, Keywords, non-zero Word count; Reasoning in full.
+- Every table stake has its own outline item; every opportunity has a home, at least two in depth.
+- Outline sum + FAQ allowance = total; H2s get more than their H3s; 1 to 3 snippet targets, distinct queries.
+
+Build the outline in these passes, in this order:
 
 1. **Skeleton.** Headings (Hero only with a real hook, H2 > H3 > H4, Conclusion, no FAQ section in the outline), and for every item: section angle (written first, a facet of the editorial angle), guidelines that advance the angle, word count, snippet target where planned, reasoning that links back to a table stake or opportunity. The primary directive: cover every table stake and exploit every strategic opportunity. If a template page was given, follow its heading structure and adapt it to the topic.
 2. **Heading check.** Apply heading rules 1 to 6 (claims not labels, at most one "What is X?", no banned patterns or their translations, varied shapes, the mini-title test, Hero is not an introduction). Check every section angle against the swap test.
@@ -215,20 +232,25 @@ outline in three passes, in this order:
 5. **Sums.** Every item has a non-zero word count; H2s get more than their H3s; the outline sum plus the FAQ allowance equals the total.
 
 **Checkpoint H4:** show the outline with section angles, the word budget (per item and the sum),
-the FAQ allowance and the snippet targets. The person approves or changes the outline.
+the FAQ allowance and the snippet targets. The person approves or changes the outline. If any
+heading changes after H4, show the diff (old and new heading) before H5.
 
 ## Step 7: Write the Doc
 
 Before this step, read `references/examples.md` for the format (never copy its content). Copy the
 blank template, `assets/brief-template.md` (English) or `assets/brief-template-he.md` (Hebrew),
 into the working folder as `brief.md`, and fill it. Always start from the blank template, never
-from a previous brief: copy-paste leftovers are the most common miss in past briefs.
+from a previous brief: copy-paste leftovers are the most common miss in past briefs. If the
+client's brain names a branded template or a naming rule for documents, keep the skill's section
+order and labels but apply the client's header, branding and file naming (title line included);
+note the choice at H4.
 
 1. Fill every section in template order, in the brief's language only (headings, labels and FAQ heading included).
 2. Write the FAQs (step 5 set): questions as H3, 1 to 3 guideline bullets, the first always the self-contained 40 to 50 word answer instruction. Guidelines, never drafted answers.
 3. Write on-page SEO with the title workflow (three candidates: benefit, specificity, curiosity; keep the winner; say why the others lost in full mode). Check the limits and banned patterns in `references/brief-rules.md` section 9.
 4. Write CTA strategy, links (real GSC URLs as full absolute URLs; otherwise `[INTERNAL LINK: anchor -> topic]`), E-E-A-T (only what the client can deliver), writer notes, technical notes, and sources and scope.
 5. Add the Accuracy and brand guardrails section when the client's brain or brand docs have rules.
+   - **Sources, not placeholders:** for every claim a guideline requires (a figure, a study, a date, a rule), run one free web search within the run and put the source URL in the brief and in the Fact and source bank (Sources and scope). Use `[CITE: ...]` only when nothing reliable is found; count them for H6.
 6. Apply the variant and YMYL tables below.
 7. Make every figure identical wherever it repeats (word counts, volumes, title, H1).
 
@@ -242,26 +264,27 @@ from a previous brief: copy-paste leftovers are the most common miss in past bri
 |---|---|
 | Health or medical | A review-by-expert note (named role, not a person you invent); a red-flags or "when to get help" element in the outline; a studies and sources list (publisher, date, link) for the writer to verify; claims only from the client's own materials |
 | Finance, crypto, tax | A not-advice disclaimer note; no figures (fees, returns, rates) unless the client supplied them; jurisdiction caveats; reviewer in technical notes |
-| Legal | Jurisdiction and date-of-law note; primary sources (statute, regulator) as external links; a `<!-- TODO (human): legal review -->` on sensitive lines |
+| Legal | Jurisdiction and date-of-law note; primary sources (statute, regulator) as external links; a `**TODO (human):** legal review` on sensitive lines |
 
 Raise any brand or legal wording risk inside the brief with a safe generic fallback; never hold a
 brief waiting on legal. Unsupported product or medical claims become `[CITE: ...]` or a
-`<!-- TODO (human): ... -->`.
+visible `**TODO (human):** ...` line. Never use HTML comments: they vanish in the Google Doc.
 
 ## Step 8: Self-check
 
 Before this step, read `references/qa-rubric.md`.
 
-1. Run `python scripts/check_brief.py brief.md` (add `--lang he` for a Hebrew brief, `--variant concise` for the concise one). It exits with code 1 on errors. Fix every error and review every warning, then run it again until it is clean.
+1. Run `python scripts/check_brief.py brief.md` (add `--lang he` for a Hebrew brief, `--variant concise` for the concise one). It exits with code 1 on errors. Fix every error and review every warning, then run it again until it is clean. Its "Markers" line gives the TODO (human) and [CITE] counts for step 9 and H6.
 2. Read for what the script cannot see: Hebrew equivalents of banned title, meta and heading patterns; off-topic words from another brief; claims without a source; an angle that fails the swap test.
 3. Score the five rubric criteria 1 to 5 with one line of evidence each. Ship bar: every criterion at 4 or 5. Below 4 on any criterion: fix the brief and score again; never ship below the bar.
 4. Confirm every correctness criterion in the rubric holds. One failure blocks delivery.
 
 ## Step 9: Deliver
 
-1. **Checkpoint H5:** before anything client-visible (sharing the Doc, placing it in a folder the client can open, updating a content table the client sees), show the finished brief and its self-check. If you are not sure whether the named folder is client-visible, ask. Wait for approval.
+1. **Checkpoint H5:** before anything client-visible (sharing the Doc, placing it in a folder the client can open, updating a content table the client sees), show the finished brief and its self-check. Always state the H5 decision in one line before `create_file`: "folder X is not client-visible, creating it there", or ask whether it is. Wait for approval.
+   Before `create_file`, convert any remaining `<!-- ... -->` comment to a visible `**TODO (human):** X` line (comments do not survive the Doc conversion), re-run `check_brief.py`, and count the TODOs in brief.md.
 2. Create the Doc with Google Drive `create_file`: `title` = the brief's title line, `textContent` = the Markdown, `contentMimeType` = `text/markdown`, `parentId` = the folder the user named, conversion ON (do not set `disableConversionToGoogleType`) so it becomes a Google Doc. Create the concise variant the same way with " (concise)" at the end of the title when both are needed.
-3. Verify by reading it back with `read_file_content`: headings present, tables rendered, no `{{`, no em-dash. If the Markdown conversion fails or tables break, create it again from the same content converted to HTML with `contentMimeType` = `text/html`. If Drive is unavailable, hand the user the Markdown file.
+3. Verify by reading it back with `read_file_content`: headings present, tables rendered, no `{{`, no em-dash, and the number of "TODO (human)" lines in the Doc equals the count in brief.md. If the Markdown conversion fails or tables break, create it again from the same content converted to HTML with `contentMimeType` = `text/html`. If Drive is unavailable, hand the user the Markdown file.
 4. Never share the Doc, change its permissions or touch a client-visible system before H5.
 
 ## Step 10: Final message
@@ -273,6 +296,7 @@ Before this step, read `references/qa-rubric.md`.
 Doc: <link>   (variant: full | concise | both)
 Self-check: intent <n>/5, table stakes <n>/5, opportunities <n>/5, keywords <n>/5, advantage <n>/5
 check_brief.py: clean (0 errors, <w> warnings reviewed)
+Open markers: <t> TODO (human), <c> [CITE]; <n> claims sourced in the Fact and source bank
 Cost: DataForSEO $<summed cost> (<q> SERP pulls, <p> page reads); Ahrefs <n> browser exports, 0 API units
 Not measured: <for example: keyword difficulty, backlinks of ranking pages, the client's GA4 Key Events>
 Decisions made at H3/H4: <one line each>
@@ -305,3 +329,6 @@ topic, one brief per topic, never one brief covering several topics.
 | Brand terms counted as topic demand | Type them Brand (excluded); no score, no target |
 | Topic the site already covers | Site-coverage check before H3 |
 | Leftovers from another brief or the template | Blank template every time; check_brief.py flags tokens; read for off-topic words |
+| TODOs hidden in HTML comments | Visible `**TODO (human):**` lines; check_brief.py errors on `<!--` |
+| GSC numbers across the 2025-05-13 to 2026-04-27 logging error | Last 3 full months; caveat or a later window; read `dataNotes` |
+| New page keeps the existing page's head term | Cannibalisation override: re-choose the primary at H3 |

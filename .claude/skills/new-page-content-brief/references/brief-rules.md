@@ -96,13 +96,14 @@ one line naming what was excluded or flagged (the client's own URLs, forums, Wik
 
 1. Analyse the list against the competitor data (top-scoring and priority pages) and the page goal.
 2. **Primary:** one or more keywords that best represent the core intent. Pick the single strongest one for the on-page elements.
-3. **Every other keyword is categorised:** Secondary, Question, Commercial (route, do not target), or Brand (excluded). Nothing is dropped.
+3. **Every other keyword is categorised:** Secondary, Question, Commercial (route, do not target), Brand (excluded), or Existing page (do not target). Nothing is dropped.
 4. **A note on every keyword:** its strategic value and where it goes ("H1 and opening paragraph", "H2 of section 3", "FAQ 2", "anchor text to the commercial page").
 5. **Rationale** (full variant): why these primaries, how the secondaries support them.
 
 Constraints:
 
-- "Use the exact keywords provided. Do not add, change, or remove any keywords from the list." Exported lists are trimmed only for topic fit, and the trim is stated.
+- "Use the exact keywords provided. Do not add, change, or remove any keywords from the list." Exported lists are trimmed only for topic fit, and the trim is stated. "Exact" means the strings stay unchanged; it does not mean the user's term must stay primary.
+- **Cannibalisation override.** When a client page already covers the topic and the person chooses a new page with a distinct angle (SKILL.md step 3), re-choose the primary keyword for the distinct sub-intent, so the new page does not target the existing page's head term. Keep every user string exactly; retype the old head term as Secondary or "Existing page (do not target)" (its note names the existing URL and says to link to it, not compete with it). Show the change (old primary, new primary, why) at H3.
 - **The informational head term stays primary.** An informational page chasing a bigger transactional head term loses to retail and cannibalises the commercial page. Commercial terms become "Commercial (route, do not target)" rows whose note says which page they route to (an internal link), and they do not shape the outline.
 - **Brand and navigational terms** (a brand name, a product name, a site name) are typed "Brand (excluded)": brand demand is not topic demand. They are excluded from scoring and targeting.
 - **Zero or unmeasured volume on the primary keyword** must be said in the note ("0 in <country>, <month>; chosen because ..."), never left silent.
@@ -179,7 +180,7 @@ CTA to our product page')."
 |---|---|
 | "Explain the topic clearly." | "Open with the 45-word answer, then a table comparing the two methods (columns: time per week, months to usable result, cost, best for)." |
 | "Mention the benefits." | "Name the one condition under which the method loses money, with a worked example; no competitor in the top 3 shows a losing case." |
-| "Add some statistics." | "Cite the regulator's current threshold [CITE: regulator page, current year]; do not use a figure without a source." |
+| "Add some statistics." | "Cite the regulator's current threshold from https://www.regulator.example/thresholds (read in this run, dated); do not use a figure without a source." |
 
 **Reasoning** (full variant): why the item is included, linked back to the gap analysis ("Covers
 the table stake X", "Exploits the opportunity to discuss Y in more depth than competitors").
@@ -200,6 +201,7 @@ the table stake X", "Exploits the opportunity to discuss Y in more depth than co
 - Choose the sections most likely to win: those that directly answer a specific question.
 - Format = what Google shows for that query: **paragraph** for definitions (a direct 40 to 60 word answer in the first 1 to 2 sentences), **list** for steps or items (5 to 8 clear items), **table** for comparisons (a real table with headers).
 - Only where there is a genuine opportunity. "A single strong target beats three weak ones." For informational queries at least one target is usually warranted. With no featured snippet and no clear answer query in the SERP, an AI Overview or answer-first target is still reasonable for the main question; say which.
+- **SERP features not observed** (web-search fallback, no located SERP): label each target a bet, at most 2: `Snippet target: <format> | <query> (answer-first bet; SERP features not observed)`. In a Hebrew brief: `(הימור answer-first; רכיבי SERP לא נצפו)`.
 - No opportunity anywhere: no snippet targets.
 
 ### 7.7 Match the observed SERP features
@@ -351,16 +353,23 @@ followed by its own answer ("What is X? X is...") outside a designated definitio
 **Visual guidelines:** hero image (authentic over stock), infographics, video, charts, a
 downloadable asset if useful, alt text for every image.
 
-**Conventions:** `[CITE: source to add]` wherever a fact needs a source the writer must find;
-`[INTERNAL LINK: anchor -> topic]` where a link is needed but no real URL exists; `<!-- TODO
-(human): ... -->` for a decision or verification a person must make. No invented statistics,
+**Conventions:** `[INTERNAL LINK: anchor -> topic]` where a link is needed but no real URL exists;
+a visible `**TODO (human):** ...` line (bold label, on its own line or at the end of a bullet) for
+a decision or verification a person must make. Never an HTML comment (`<!-- -->`): comments vanish
+when the Markdown becomes a Google Doc, and the reviewer never sees them. No invented statistics,
 quotes or citations. Every number in the article carries its base and source.
+
+**Sources before placeholders.** For every claim a guideline requires (a figure, a named study, a
+date, a rule or threshold), run one free web search within the run and put the source URL in the
+guideline and in the Fact and source bank (section 16). Use `[CITE: what is needed]` only when no
+reliable source is found in the run, and report the number of `[CITE]` markers in the H6 message.
+A brief with a dozen `[CITE]` markers has moved the research to the writer.
 
 ## 13. YMYL extras (health, finance, legal)
 
 - **Health:** a review-by-expert note (role, not an invented name); a red-flags or "when to get help" element in the outline (for example a "when to see a doctor" list); a studies and sources list (publisher, date, link) for the writer to verify; a repeated per-condition structure where the topic has several conditions (what it is, symptoms, first steps); claims only from the client's own materials; a fact-check line in technical notes.
 - **Finance, crypto, tax:** a not-financial-advice or not-tax-advice note; no fees, returns or rates unless the client supplied them; jurisdiction caveats; the local angle (the market's tax or regulator rules) is often the strategic opportunity.
-- **Legal:** jurisdiction and the date of the law; primary sources (statute, regulator) as external links; institution point of view where the client is an institution with positions; `<!-- TODO (human): legal review -->` on sensitive lines.
+- **Legal:** jurisdiction and the date of the law; primary sources (statute, regulator) as external links, read in this run; institution point of view where the client is an institution with positions; `**TODO (human):** legal review` on sensitive lines.
 - Raise a brand-name or legal wording risk inside the brief with a generic fallback (a device class instead of a third-party brand, for example). Never hold the brief waiting on legal.
 
 ## 14. Technical notes (defaults)
@@ -385,6 +394,13 @@ recommendation in the log is being changed, say so here (house rule 5).
 ## 16. Sources and scope
 
 The SERP pull date, market (country, language), tools used per step with their confidence label,
-the keyword source and date, the DataForSEO cost summed from the `cost` fields, the number of
-Ahrefs exports (and 0 API units), checkpoint waivers if any (batch), and what was not measured
-(for example: keyword difficulty, backlinks, AI Overview citations, GA4 Key Events).
+the keyword source and date, the client files read (and what was grepped in files too large to
+read whole), the GSC window (with the logging-error caveat when it applies), the DataForSEO cost
+summed from the `cost` fields, the number of Ahrefs exports (and 0 API units), checkpoint waivers
+if any (batch), and what was not measured (for example: keyword difficulty, backlinks, AI Overview
+citations, GA4 Key Events).
+
+**Fact and source bank:** a table of every factual claim the guidelines ask the writer to use,
+with columns `Claim | Source URL | Date | Used in section`. Every row has a URL found and read in
+this run; a claim with no source found stays a `[CITE: ...]` in its guideline and is listed here
+with "not found" as its source.

@@ -10,8 +10,8 @@ source, geo and date. Prices, codes and quotas move; read them at the point of u
 |---|---|---|---|---|
 | Client context | voice, do's and don'ts, banned and preferred terms, known competitors, playbook rules | SurgeOS `list_clients`, `get_documents`, `get_seo_knowledge`; the client's AI Brain on Drive (`00. AI Brain`: principles, decisions-log) | ask the user for brand notes | none |
 | Cannibalisation and site coverage | does a client page already rank for or cover this topic? | SurgeOS `gsc_query_page`, `search_gsc_queries`, `search_gsc_pages` | `site:<client domain> <topic>` web search | none (shared BigQuery budget) |
-| Keyword list | which keywords and volumes the brief targets | the user's list, or Ahrefs Keywords Explorer through `ahrefs-navigator` (browser export, country and global volume) | DataForSEO Google Ads search volume for a list; GSC queries only for the client's own demand | Ahrefs: browser exports, no API units; DataForSEO: one flat price per task |
-| SERP per query | top-10 organic URLs and ranks, PAA, SERP features | DataForSEO SERP Google organic, live advanced, depth 20 | Ahrefs SERP overview export through `ahrefs-navigator`; web search as last resort | DataForSEO per SERP page of 10 |
+| Keyword list | which keywords and volumes the brief targets | the user's list, or Ahrefs Keywords Explorer through `ahrefs-navigator` (browser export, country and global volume) | DataForSEO Google Ads search volume for a list; GSC queries only for the client's own demand; Google autocomplete for ideas only (no volume) | Ahrefs: browser exports, no API units; DataForSEO: one flat price per task |
+| SERP per query | top-10 organic URLs and ranks, PAA, SERP features | DataForSEO SERP Google organic, live advanced, depth 20 | Ahrefs SERP overview export through `ahrefs-navigator`; web search as last resort (US engine location, not located) | DataForSEO per SERP page of 10 |
 | Competitor strength | is a winner strong because of the page or the domain? | Ahrefs SERP overview export (DR, traffic per URL) for a competitive topic | skip; the score stands on volume x rank | browser export |
 | Page content | headings, word count, body text | DataForSEO on-page content parsing, live, JavaScript rendering on | WebFetch of the URL | DataForSEO per page |
 | Internal links | real client URLs to link to | SurgeOS `search_gsc_pages`, `search_gsc_queries` | `[INTERNAL LINK: anchor -> topic]` placeholders | none |
@@ -30,16 +30,24 @@ label the data as below.
 | DataForSEO live SERP with the market's location and language | located SERP, `<date>` |
 | Ahrefs SERP overview export | Ahrefs SERP snapshot, `<country>`, `<date of Ahrefs crawl>` (may lag the live SERP) |
 | Ahrefs overview read from screen (no export control) | Ahrefs SERP read from screen, `<date>` |
-| Web search | approximate ranks (web search, not a located SERP), `<date>`; SERP features not observed |
+| Web search | approximate ranks, web search (engine location US; not a located SERP), `<date>`; SERP features not observed |
+| Google autocomplete or related searches (free fallback for keyword ideas) | Google autocomplete, `<country>`, `<date>`: ideas only, no volume |
 | WebFetch page read | page read without JS rendering; word count approximate |
-| GSC through SurgeOS | GSC `<property>`, `<country or all>`, `<start>` to `<end>` |
+| GSC through SurgeOS | GSC `<property>`, `<country or all>`, `<start>` to `<end>` (plus the logging-error caveat when the window overlaps it, section 11) |
+
+Web search runs from a US engine location whatever query language you use, so it never meets a
+non-US market's located-SERP requirement. For a non-US market, say at H1 that a located SERP is
+unavailable and offer the person the option to paste the local top 10 (for example the google.co.il
+top 10); label pasted results "user-pasted SERP, `<country>`, `<date>`". Never call mixed-locale
+web-search results "US results" or "Israel results".
 
 ## 2. Client context (step 1)
 
 1. `list_clients` with the client's name, id or domain. Record domain(s), deliverable language, market.
 2. `get_documents` for brand guidelines, tone references, product briefs; `get_seo_knowledge` for playbook rules on content and AI search.
-3. Search Drive for the client's `00. AI Brain` folder: read principles and `decisions-log.md` for rulings on briefs (naming bans, schema choice, claims, standing topic checks, CTA rules). These feed the Accuracy and brand guardrails section.
-4. Note known competitors so you can flag them when they appear in the SERP.
+3. Search Drive for the client's `00. AI Brain` folder: read principles and `decisions-log.md` for rulings on briefs (naming bans, schema choice, claims, standing topic checks, CTA rules, branded templates or document naming rules). These feed the Accuracy and brand guardrails section. A file too large to read whole: download it and grep it for the topic terms plus "availability", "launch", "product brief", "do not", "never".
+4. Search the client's Drive folder for product briefs on the topic (availability by market, launch status, allowed claims), and for past content briefs on the same topic (read for overlap and cannibalisation; never copy). List every file read in Sources and scope.
+5. Note known competitors so you can flag them when they appear in the SERP.
 
 ## 3. Keyword list (step 2.1)
 
@@ -73,6 +81,12 @@ and say so.
 
 ### GSC queries
 `search_gsc_queries` shows the client's own demand and ranking. It is never the only demand source.
+
+### Free fallback: Google autocomplete and related searches
+When no keyword tool is available, Google autocomplete suggestions and the related searches at the
+foot of a results page can supply keyword ideas: **ideas only, no volume**. Label them "Google
+autocomplete, `<country>`, `<date>`" in the keyword table (volume `not measured`) and in Sources
+and scope. They never replace a measured primary keyword volume (house rule 4).
 
 ## 4. Building the query set (step 2.2)
 
@@ -133,6 +147,12 @@ keyword,volume,url,rank
 python scripts/score_competitors.py serp_rows.csv --exclude-domain <client domain> --top 10
 ```
 
+**No measured volumes** (web-search or autocomplete route): pass `--rank-only`. Every row is then
+weighted as volume 1 (score = sum of max(1, 21 - rank)) and the output header says "rank-only
+score, volumes not measured". The script switches to rank-only by itself, with a printed notice,
+when every volume in the file is 0 or missing. Write the same label next to the competitor table in
+the brief.
+
 It also accepts a JSON list of objects with the same four keys, prints a Markdown table (URL,
 weighted score, the queries it ranks for with rank and volume), and with `--json scores.json`
 writes the result for later steps. Useful extra flags: `--priority-url <url>` (repeatable) for the
@@ -190,6 +210,11 @@ evidence. Read the next page by score if the budget allows. Never describe a pag
 3. Read these three in full (body text, not only headings): they set the table stakes, the competitive word count and the bar to beat.
 4. Fewer than 3 readable editorial pages: read further down the score table. If it still falls short, say so at H3; never list a page you did not read.
 
+Ground-truth pages must be on the topic (not an adjacent asset class, product or subject) and in
+the brief's market language, unless none exists. When you prefer a lower-scored page to a
+higher-scored one, say why in the brief (for example "the #2 page is about a different coin's
+crash, so #5 is read instead").
+
 Priority pages get significantly more weight in every later step; mention them in reasoning when
 they shaped a decision.
 
@@ -201,6 +226,14 @@ keywords from the keyword list. This pool feeds the FAQ set (step 5) and PAA-sty
 
 ## 11. Cannibalisation and site coverage (step 2.8)
 
+**GSC data-break rule (applies here and to section 12).** Default window: the last 3 full months.
+Google's Search Console impressions logging error runs from 2025-05-13 to 2026-04-27. Never quote
+impressions, CTR or position from a window that overlaps it without the caveat "spans the GSC
+impressions logging error 2025-05-13 to 2026-04-27"; prefer windows starting 2026-04-28 or later.
+Clicks are less affected but carry the same caveat when compared across the break. Always read and
+respect the `dataNotes`, `compareNote` and `rangeNote` that SurgeOS returns with a result: when one
+says two periods are not comparable, do not compare them.
+
 1. `gsc_query_page` for the primary keyword on the client's property, a closed window of the last 3 full months: which client URL gets impressions, at what position.
 2. `search_gsc_queries` with the topic's stem (contains or regex): queries the client already ranks for nearby.
 3. `search_gsc_pages` for URLs containing the topic's slug words.
@@ -210,7 +243,7 @@ keywords from the keyword list. This pool feeds the FAQ set (step 5) and PAA-sty
 |---|---|
 | No client page on the topic | New page; continue |
 | A client page in the top 10 for the primary query | Refresh, not a new page: flag at H3 |
-| A client page covers the topic, ranks below 10 | Cannibalisation risk: the person decides at H3 |
+| A client page covers the topic, ranks below 10 | Cannibalisation risk: the person decides at H3. If they choose a new page, re-choose the primary for the distinct sub-intent (SKILL.md step 3) |
 | Client pages on adjacent topics | Internal link candidates (section 12) |
 
 ## 12. Internal link candidates (step 2.9)

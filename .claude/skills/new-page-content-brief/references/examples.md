@@ -8,7 +8,11 @@ Use them to calibrate **specificity, evidence and tone**. Never copy their topic
 
 The originals used slightly different labels (for example `Targets`, `Covered By`, `Additional Resources Required`, `Page Goal`, section marks like "§3", or "Cover:" and "Format:" lines). Here they are shown with the labels the skill's template uses (`Keywords`, `Covered by`, `Resources`, `Angle`, `Guidelines`, `Word count`, `Snippet target`). Where an original had no such field (for example Gold B has no per-item word counts, Gold C and D have no per-item angle), the excerpt simply omits it. Your brief must include them.
 
-Two deliberate departures from the originals: (1) in Gold B, C and D the first FAQ guideline (the self-contained 40 to 50 word answer) was added to match the house FAQ rule; the originals lacked it. (2) Excerpt A1's "decision needed" box came from an internal-facing brief. In a brief that goes to a client or a freelancer, settle such decisions with the person at H3 or H4 and keep only the resolved guardrail: no Open Items section ships.
+**Held out of QA.** QA cases must be held out of examples.md: never test the skill on a topic whose gold is excerpted here.
+
+**Not to imitate.** A line or cell marked `[not to imitate: reason]` breaks a house rule or a rule in `brief-rules.md`. It is kept, or summarised where it was removed, so you can see the trap; never reproduce it. Where a note and the excerpt disagree, the note and the rules win.
+
+Two deliberate departures from the originals: (1) in Gold B, C and D the first FAQ guideline (the self-contained 40 to 50 word answer) was added to match the house FAQ rule; the originals lacked it. (2) Excerpt A1's "decision needed" box came from an internal-facing brief. In a brief that goes to a client or a freelancer, settle such decisions with the person at H3 or H4 and keep only the resolved guardrail: no Open Items section ships. (3) TODO markers are shown in the visible form `**TODO (human):** ...`; the originals used HTML comments, which vanish in a Google Doc.
 
 | Gold | Language | Best at |
 | --- | --- | --- |
@@ -24,6 +28,8 @@ Two deliberate departures from the originals: (1) in Gold B, C and D the first F
 ```markdown
 ## Accuracy and brand guardrails
 
+[not to imitate: an open "decision needed" box is an Open Items section in disguise. Settle the CTA posture at H3 or H4 and write only the resolved guardrail. What to keep is the habit: the product brief was read, and the availability conflict is surfaced with a safe fallback.]
+
 **DECISION NEEDED FROM STAFF: market availability.** The product brief lists the target country as
 not enabled at launch, but this task targets searchers in that country. The draft therefore serves
 informational intent and builds brand association, and deliberately avoids any "use <product> here
@@ -31,7 +37,7 @@ today" call to action. The product CTA is soft and carries an availability cavea
 availability where you are"). Please confirm the CTA posture before publishing: (a) keep it
 education-first with the caveat, or (b) if access is coming, give the timing and the CTA is sharpened.
 
-<!-- TODO (human): confirm availability / CTA -->
+**TODO (human):** confirm availability / CTA
 ```
 
 ### A2. Editorial angle with swap test
@@ -84,7 +90,7 @@ move?", which is where <product> belongs.
 | Meta title | Prediction Markets vs. Polls: When Markets Win | 46 | Takes a position (markets win conditionally) with the exact-match primary keyword at the front. Rejected: "Prediction Markets vs. Polls: Which Is More Accurate?" (generic, fails the swap test) and "Why Prediction Markets Beat the Polls" (drops the exact keyword and overclaims by hiding the failure cases). |
 | Meta description | Prediction markets beat the polls in 2024 but missed Brexit and 2016. Here's exactly when a market price is the sharper signal, and when a poll still wins. | 155 | Leads with the surprising two-sided fact, then promises the decision rule. |
 | URL slug | prediction-markets-vs-polls | 27 | Exact-match keyword, three hyphenated content words. |
-| H1 | Prediction Markets vs. Polls: When a Market Price Beats a Poll | 62 | Differs from the title: serves the on-page reader with the practical framing. |
+| H1 | Prediction Markets vs. Polls: When a Market Price Beats a Poll | 62 | Differs from the title: serves the on-page reader with the practical framing. [not to imitate: 62 characters; keep the H1 at 60 or fewer, like the titles] |
 | OG title | Prediction Markets vs. Polls: What 2024 Actually Settled | 56 | Social framing: a concrete event, a hint of resolution. |
 | OG description | In 2024, market prices tracked the result better than the polling averages, especially in swing states. But markets missed 2016 and Brexit. When to trust which, in plain English. | 178 | Both sides of the evidence, plain-English promise. |
 ```
@@ -104,10 +110,12 @@ move?", which is where <product> belongs.
 - **Word count:** 90
 - **Snippet target:** paragraph | prediction markets vs polls
 
+[not to imitate: this SERP showed no featured snippet, and the target does not say so. Label it `(answer-first bet; no featured snippet observed)`.]
+
 ### H2: When markets get it wrong: 2016 and Brexit
 - **Angle:** The credibility section the promo pages skip: markets are not oracles.
 - **Guidelines:**
-  - Cite the two named misses and the mechanism of failure: traders anchored on the current price and treated it as truth.
+  - Cite the two named misses and the mechanism of failure: traders anchored on the current price and treated it as truth. [not to imitate: no source URL; find a dated source for each miss in the run and put it here and in the Fact and source bank]
   - Cover thin or manipulated markets and favourite-longshot bias; close on "a market is only as good as its liquidity and the independence of its traders".
   - Do not soften the misses to protect the product story.
 - **Keywords:** prediction markets or polls
@@ -118,7 +126,7 @@ move?", which is where <product> belongs.
 - **Guidelines:**
   - Show that price equals implied probability (62 cents is about a 62% chance), then give three rules: watch volume and movement not just the level, read a sudden move as news, cross-check against a polling average.
   - Bridge to <product> in two or three sentences, using only claims the product brief supports (no invented experience), then add the availability caveat and a soft CTA.
-  - <!-- TODO (human): confirm availability / CTA -->
+  - **TODO (human):** confirm availability / CTA
 - **Word count:** 300
 ```
 
@@ -148,6 +156,8 @@ move?", which is where <product> belongs.
 | Secondary | how to clone ssd | 500 | n/a | Covers the SSD-to-SSD path (for example SATA to NVMe), a key topic in the forum threads. Use in a specific scenario H2. |
 | Secondary | how to clone hdd to ssd | 300 | n/a | The acronym tech-savvy searchers use. Use in the prerequisites section to confirm spinning-platter drives are covered. |
 | Secondary | how to clone an ssd | 200 | n/a | Natural phrasing for the FAQ and troubleshooting, for example "Can I clone if the target drive is smaller?". |
+
+[not to imitate: the original had no source-and-date line under the table; yours must have one (tool, country and global, date).]
 ```
 
 ### B2. Differentiation summary (a competitive read that decides the angle)
@@ -164,6 +174,9 @@ troubleshooting-heavy advice found in the forums.
 
 ```markdown
 ### H2: Step 2: How to clone a hard drive to SSD (step-by-step)
+
+[not to imitate: a label heading; an H2 states a claim or answer (brief-rules 7.3), and the item needs an Angle and a Word count.]
+
 - **Guidelines:**
   - Use a numbered list, one action per step, to target the featured snippet.
   - Keep the steps tool-agnostic but use the terms of one popular free imaging tool as the baseline ("Select Source", "Select Destination").
@@ -208,7 +221,7 @@ troubleshooting-heavy advice found in the forums.
 ## ניתוח מתחרים
 
 ### Differentiation summary
-המתחרים המובילים מתחלקים לשתי קבוצות: אתרי חדשות סמכותיים המספקים עדכונים מיידיים אך דלים בתוכן לימודי, ואתרים בינלאומיים המספקים מדריכים מקיפים אך סובלים מתרגום מכונה או מחוסר התאמה לקהל הישראלי. ההזדמנות של <client> היא ליצור את "המדריך הישראלי המלא": שילוב של המבנה הלימודי של מתחרה אחד (הגדרות + אסטרטגיות) עם העומק האנליטי של מתחרה אחר, אך בעברית טבעית ונגישה, מותאמת למשקיע המקומי.
+המתחרים המובילים מתחלקים לשתי קבוצות: אתרי חדשות סמכותיים המספקים עדכונים מיידיים אך דלים בתוכן לימודי, ואתרים בינלאומיים המספקים מדריכים מקיפים אך סובלים מתרגום מכונה או מחוסר התאמה לקהל הישראלי. ההזדמנות של <client> היא ליצור את "המדריך הישראלי המלא" [not to imitate: "המדריך המלא" is a banned pattern in Hebrew; name the gap instead]: שילוב של המבנה הלימודי של מתחרה אחד (הגדרות + אסטרטגיות) עם העומק האנליטי של מתחרה אחר, אך בעברית טבעית ונגישה, מותאמת למשקיע המקומי.
 ```
 
 ### C2. Outline items: snippet-ready definition, resources, local angle
@@ -216,22 +229,24 @@ troubleshooting-heavy advice found in the forums.
 ```markdown
 ### H3: ההגדרה הטכנית: מתי ירידה הופכת לשוק דובי?
 - **הנחיות:**
-  - התחל במשפט ישיר שמתאים ל-Featured Snippet: "שוק דובי בקריפטו מוגדר כירידה של 20% ומעלה מהשיא האחרון לאורך תקופה של חודשיים לפחות".
-  - הסבר את ההבדל בין ההגדרה בשוק ההון המסורתי (20%) לבין הקריפטו, שם הירידות לעיתים חדות יותר (40% עד 80%), כפי שמצוין אצל מתחרה בינלאומי.
+  - התחל במשפט ישיר שמתאים ל-Featured Snippet: "שוק דובי בקריפטו מוגדר כירידה של 20% ומעלה מהשיא האחרון לאורך תקופה של חודשיים לפחות". [not to imitate: a drafted answer with an unsourced threshold; say what the opening must define and give the source URL read in the run]
+  - הסבר את ההבדל בין ההגדרה בשוק ההון המסורתי (20%) לבין הקריפטו, שם הירידות לעיתים חדות יותר (40% עד 80%), כפי שמצוין אצל מתחרה בינלאומי. [not to imitate: a competitor is not a source for a figure; cite a primary or data source with its date]
 - **יעד סניפט:** paragraph | שוק דובי בקריפטו
 
 ### H3: מדד הפחד והתאוותנות (Fear & Greed Index)
+
+[not to imitate: a label heading; write it as a claim or a reader question.]
+
 - **הנחיות:**
   - הסבר כיצד המדד פועל (מ-0 ל-100) ומה המשמעות של "פחד קיצוני".
-  - ציין שמשקיעים מנוסים משתמשים במדד כאינדיקטור הפוך: "קנה כשאחרים מפחדים".
+  - ציין שמשקיעים מנוסים משתמשים במדד כאינדיקטור הפוך: "קנה כשאחרים מפחדים". [not to imitate: reads as investment advice in a finance (YMYL) brief; describe how the index is used, never what to buy]
   - הבא דוגמה מספרית אחת ממקור מצוטט (ציון נמוך במיוחד שדווח באתר חדשות פיננסי).
 - **משאבים נדרשים:**
   - ויז'ואל של שעון מדד הפחד והתאוותנות
 
 ### H3: הזדמנות לקיזוז הפסדים מול רשות המיסים
 - **הנחיות:**
-  - הסבר את המושג "מגן מס": מימוש הפסדים בשוק הדובי כדי לקזז אותם מול רווחים עתידיים או רווחים בשוק ההון.
-  - הצג זאת כדרך חכמה להפוך ירידה בערך לחיסכון במס.
+  - [not to imitate, removed: two lines that stated the loss-offset tax rule flatly and pitched it as a way to save tax, with no source, jurisdiction or date. Write instead: the rule only as the tax authority's page states it (URL read in the run, with its date), no promise of a saving, and a **TODO (human):** tax review line.]
   - הוסף דיסקליימר שמומלץ להתייעץ עם רואה חשבון או יועץ מס.
 ```
 
@@ -240,7 +255,7 @@ troubleshooting-heavy advice found in the forums.
 ```markdown
 ### מה ההבדל בין "תיקון בשוק" לבין "שוק דובי"?
 - **הנחיות:**
-  - פתח בתשובה עצמאית של 40 עד 50 מילים: תיקון הוא ירידה קצרת טווח של עד 10% עד 20% בתוך מגמת עלייה כללית, שוק דובי הוא ירידה של מעל 20% לאורך זמן ושינוי במגמה הראשית.
+  - פתח בתשובה עצמאית של 40 עד 50 מילים: תיקון הוא ירידה קצרת טווח של עד 10% עד 20% בתוך מגמת עלייה כללית, שוק דובי הוא ירידה של מעל 20% לאורך זמן ושינוי במגמה הראשית. [not to imitate: the answer's figures are drafted into the guideline without a source; name what the answer must contrast and where the thresholds come from]
   - הסבר שתיקונים הם חלק בריא וטבעי משוק שורי, בעוד ששוק דובי משקף שינוי בסנטימנט המאקרו-כלכלי.
 ```
 
@@ -269,7 +284,7 @@ troubleshooting-heavy advice found in the forums.
 - **הנחיות:**
   - הצג דוגמאות לשימוש בעוזר AI לכתיבת מכתבי פנייה.
   - הסבר איך להשתמש ב-AI כדי לבצע סימולציות של ראיונות עבודה.
-  - הדגש כי הכרת כלי AI היא כבר לא מיומנות רשות אלא דרישת סף מודרנית.
+  - הדגש כי הכרת כלי AI היא כבר לא מיומנות רשות אלא דרישת סף מודרנית. [not to imitate: an unsourced market claim; back it with a dated survey or job-market source found in the run, or soften it]
 - **משאבים נדרשים:**
   - צילומי מסך או סרטון הדגמה קצר של שימוש ב-AI לחיפוש עבודה ולסימולציות ראיון
 ```
@@ -292,5 +307,5 @@ troubleshooting-heavy advice found in the forums.
 - **Imperative, concrete guidelines.** Each bullet is an instruction a writer can execute: a number to cite, a format (numbered list, table, symptom/solution), a warning to include, a forbidden shortcut.
 - **Honesty built in.** Failure cases, caveats, availability notes and legal disclaimers are planned in the brief, not left to the writer.
 - **Products appear late and softly.** The client or product enters through a genuine reader need, in two or three sentences, with only claims the product facts support.
-- **Local and situational detail.** Tax rules, reserve duty, laptop slot limits: real constraints of the audience become sections competitors lack.
+- **Local and situational detail.** Tax rules (stated from a dated official source), reserve duty, laptop slot limits: real constraints of the audience become sections competitors lack.
 - **Everything is traceable.** Keywords have placement notes, on-page elements have counts and reasons, resources (tables, visuals, calculators) are listed so design work is requested up front, and FAQ answers are written to be quoted standalone.

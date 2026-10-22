@@ -1,6 +1,6 @@
 # {{Topic}} - Content Brief | {{Client}}
 
-{{! TEMPLATE NOTES, delete this block. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete. scripts/check_brief.py fails the brief while any double brace remains. Copy this blank file for every brief; never start from an old brief. Labels in bold, table headers and outline prefixes are machine-checked: keep them exactly. FULL vs CONCISE: the full variant keeps every **Reasoning:** line, the Reasoning column of the on-page table and the rationale paragraphs; the concise variant deletes exactly those (Covered by is optional in concise) and nothing else. Write in the brief's language; no em-dashes. }}
+{{! TEMPLATE NOTES, delete this block. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete. scripts/check_brief.py fails the brief while any double brace remains. Copy this blank file for every brief; never start from an old brief. Labels in bold, table headers and outline prefixes are machine-checked: keep them exactly. FULL vs CONCISE: the full variant keeps every **Reasoning:** line, the Reasoning column of the on-page table and the rationale paragraphs; the concise variant deletes exactly those (Covered by is optional in concise) and nothing else. Write in the brief's language; no em-dashes. MARKERS: a person's decision or check is a visible line `**TODO (human):** what to decide`, never an HTML comment (comments vanish in the Google Doc, and check_brief.py fails on any comment opener); `[CITE: ...]` only when a search in the run found no source; `[INTERNAL LINK: anchor -> topic]` when no real URL exists. If the client's brain names a branded template or naming rule, keep this section order and these labels but apply the client's header, branding and file naming. }}
 
 - **Date:** {{YYYY-MM-DD}}
 - **Market:** {{SERP country}}, {{SERP language}}
@@ -60,7 +60,7 @@
 
 - **Intent type:** {{informational}}
 - **Preferred format:** {{what the top positions reward, with two or three example URLs}}
-- **SERP features observed:** {{per query: featured snippet, People Also Ask, video, image pack, AI Overview; or "none observed"}}
+- **SERP features observed:** {{per query: featured snippet, People Also Ask, video, image pack, AI Overview; or "none present" (located SERP); or "not observed (web-search fallback, not a located SERP)"}}
 - **What ranks:** {{one or two lines: content types and domain types in the top 10; forums, Wikipedia or video noted as an intent signal}}
 - **Source:** {{DataForSEO live SERP, location, language, depth 20, pulled YYYY-MM-DD; N queries}}
 - **Reasoning:** {{why this verdict}}
@@ -96,6 +96,8 @@ Source: {{tool and report}}, {{country}} and global volume, pulled {{YYYY-MM-DD}
 | 3 | {{https://www.example.net/page-3}} | {{9,700}} | {{2,400}} | {{...}} | {{...}} | {{...}} |
 
 Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts/score_competitors.py`).
+
+{{! No measured volumes: replace the line above with "Rank-only score, volumes not measured: sum over pulled queries of max(1, 21 - rank)." }}
 
 ### Top 3 read in full
 
@@ -201,7 +203,7 @@ Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts
 - **Word count:** {{200}}
 - **Reasoning:** {{...}}
 
-{{! Check: every Word count above plus the FAQ allowance equals the Total word count. At most 3 Snippet target lines, each with a different query. }}
+{{! Check: every Word count above plus the FAQ allowance equals the Total word count. At most 3 Snippet target lines, each with a different query. If SERP features were not observed (web-search fallback), at most 2, each written as: paragraph | <query> (answer-first bet; SERP features not observed). }}
 
 ## Frequently Asked Questions
 
@@ -255,7 +257,7 @@ Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts
 - **Don't:** {{...}}
 - **Banned terms:** {{client's banned terms}}; no AI-tell phrases ("delve into", "unlock", "seamless", "in today's fast-paced world", "it's worth noting", "in conclusion", "everything you need to know").
 - **Visual guidelines:** {{hero image, infographic, video, alt text for every image}}
-- **Conventions:** `[CITE: ...]` where a source must be added; `[INTERNAL LINK: anchor -> topic]` where a link has no real URL yet; `<!-- TODO (human): ... -->` for a person's decision.
+- **Conventions:** `[CITE: ...]` where no source was found in research and one must be added; `[INTERNAL LINK: anchor -> topic]` where a link has no real URL yet; a bold `TODO (human):` line for a person's decision.
 - **YMYL:** {{for health, finance or legal topics: reviewer note, red flags or when-to-get-help element, studies and sources list; otherwise delete this line}}
 
 ## Technical notes
@@ -272,6 +274,14 @@ Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts
 - **SERP:** {{DataForSEO live SERP, location, language, depth 20, YYYY-MM-DD, N queries}}
 - **Keywords:** {{source, country and global, YYYY-MM-DD}}
 - **Pages read:** {{N pages, content parsing with JS rendering; failed reads dropped: N}}
-- **Client data:** {{SurgeOS GSC property, window YYYY-MM-DD to YYYY-MM-DD}}
+- **Client data:** {{SurgeOS GSC property, window YYYY-MM-DD to YYYY-MM-DD (last 3 full months; add "spans the GSC impressions logging error 2025-05-13 to 2026-04-27" if it overlaps)}}
+- **Client files read:** {{AI Brain files, product briefs, past briefs on the topic; for a file too large to read whole, the terms grepped}}
 - **Cost:** DataForSEO ${{0.00}} (summed cost fields); Ahrefs {{N}} browser exports, 0 API units
 - **Not measured:** {{for example keyword difficulty, backlinks, AI Overview citations}}
+
+**Fact and source bank**
+
+| Claim | Source URL | Date | Used in section |
+|---|---|---|---|
+| {{a figure, study or rule a guideline asks the writer to use}} | {{https://www.example.gov/source (read in this run)}} | {{YYYY-MM-DD}} | {{H2 2}} |
+| {{claim with no reliable source found}} | {{not found: [CITE] left in the guideline}} | {{n/a}} | {{FAQ 3}} |

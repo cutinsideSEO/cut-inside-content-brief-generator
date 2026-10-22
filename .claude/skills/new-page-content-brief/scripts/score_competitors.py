@@ -14,6 +14,13 @@ Rule
     recorded). Volumes may contain thousands commas.
     The same URL appearing twice for one keyword counts once (best rank).
 
+Rank-only mode
+    --rank-only weights every row as volume 1 (score = sum of max(1, 21 - rank)),
+    for runs where volumes were not measured (web-search or autocomplete
+    route). The output header then says "rank-only score, volumes not
+    measured". The script switches to rank-only by itself, with a printed
+    notice, when every scored row's volume is 0 or missing.
+
 URL normalisation
     Lowercase scheme and host, strip 'www.', strip the fragment, strip utm_*,
     gclid and fbclid query parameters, strip a trailing slash (except root).
@@ -24,6 +31,7 @@ Usage
     python score_competitors.py serp.json --top 15 --json scores.json
     python score_competitors.py serp.csv --exclude-domain client.com \\
         --exclude-keyword "client brand" --priority-url https://rival.com/page
+    python score_competitors.py serp.csv --rank-only
 
 Options
     --exclude-domain D   repeatable. Matches the domain and its subdomains. Pages
@@ -38,6 +46,7 @@ Options
                          in the ranking but are marked as an intent signal, not
                          a template.
     --priority-url U     repeatable. Starred pages: always shown, marked priority.
+    --rank-only          weight every row as volume 1 (volumes not measured).
     --top N              rows to show in the table (default 10).
     --json OUT           write the full results as JSON to OUT.
 
@@ -208,7 +217,14 @@ def load_rows(path):
 
 # ---------------------------------------------------------------- scoring
 
-def compute(rows, exclude_domains, exclude_keywords, flag_domains, priority_urls):
+def all_volumes_missing(rows, exclude_keywords):
+    """True when every row that would be scored has a volume of 0 or none."""
+    excl_kw = [k.strip().lower() for k in exclude_keywords if k.strip()]
+    scored = [r for r in rows if not any(k in r[1].lower() for k in excl_kw)]
+    return bool(scored) and all(parse_volume(r[2]) == 0 for r in scored)
+
+
+def compute(rows, exclude_domains, exclude_keywords, flag_domains, priority_urls, rank_only=False):
     excl_kw = [k.strip().lower() for k in exclude_keywords if k.strip()]
     best = {}  # (norm_url, keyword_key) -> dict
     dropped_kw = dropped_rank = merged = 0
@@ -235,7 +251,8 @@ def compute(rows, exclude_domains, exclude_keywords, flag_domains, priority_urls
     pages = {}
     for (norm, _kw), rec in best.items():
         page = pages.setdefault(norm, {"url": norm, "score": 0, "rankings": []})
-        page["score"] += rec["volume"] * max(1, 21 - rec["rank"])
+        weight = 1 if rank_only else rec["volume"]
+        page["score"] += weight * max(1, 21 - rec["rank"])
         page["rankings"].append(
             {"keyword": rec["keyword"], "rank": rec["rank"], "volume": rec["volume"]})
 
@@ -288,10 +305,20 @@ def md_cell(text):
     return str(text).replace("|", "\\|")
 
 
-def render(competitors, client_pages, top3, missing_priority, summary, top_n, has_client_domains):
+RANK_ONLY_LABEL = "rank-only score, volumes not measured"
+
+
+def render(competitors, client_pages, top3, missing_priority, summary, top_n, has_client_domains,
+           rank_only=False):
     out = []
     shown = [p for p in competitors if p["position"] <= top_n or p["priority"]]
-    out.append("| # | URL | Weighted score | Keywords ranked | Best rank | Flags |")
+    if rank_only:
+        out.append("**Scores: %s** (every row weighted as volume 1: score = sum of max(1, 21 - rank))"
+                   % RANK_ONLY_LABEL.capitalize())
+        out.append("")
+        out.append("| # | URL | Rank-only score | Keywords ranked | Best rank | Flags |")
+    else:
+        out.append("| # | URL | Weighted score | Keywords ranked | Best rank | Flags |")
     out.append("| --- | --- | --- | --- | --- | --- |")
     for p in shown:
         out.append("| %d | %s | %s | %d | %d | %s |" % (
@@ -351,6 +378,8 @@ def build_parser():
                    help="extra domain to flag as UGC/video/encyclopedia; repeatable")
     p.add_argument("--priority-url", action="append", default=[], metavar="U",
                    help="starred URL, always shown and marked priority; repeatable")
+    p.add_argument("--rank-only", action="store_true",
+                   help="weight every row as volume 1 (volumes not measured)")
     p.add_argument("--top", type=int, default=10, metavar="N", help="rows to show (default 10)")
     p.add_argument("--json", dest="json_out", metavar="OUT", help="write full results as JSON to OUT")
     return p
@@ -370,18 +399,28 @@ def main(argv=None):
         exclude_domains = [d for d in (clean_domain(x) for x in args.exclude_domain) if d]
         flag_domains = DEFAULT_FLAG_DOMAINS + [d for d in (clean_domain(x) for x in args.flag_domain) if d]
         priority = {normalize_url(u) for u in args.priority_url if u.strip()}
+        rank_only = args.rank_only
+        auto_rank_only = not rank_only and all_volumes_missing(rows, args.exclude_keyword)
+        if auto_rank_only:
+            rank_only = True
         competitors, client_pages, top3, missing_priority, summary = compute(
-            rows, exclude_domains, args.exclude_keyword, flag_domains, priority)
+            rows, exclude_domains, args.exclude_keyword, flag_domains, priority, rank_only)
     except InputError as exc:
         print("error: %s" % exc, file=sys.stderr)
         return 2
 
+    if auto_rank_only:
+        print("Notice: every volume is 0 or missing, so the scores below are rank-only "
+              "(as with --rank-only). Label them \"%s\" in the brief." % RANK_ONLY_LABEL)
+        print("")
     print(render(competitors, client_pages, top3, missing_priority, summary,
-                 args.top, bool(exclude_domains)))
+                 args.top, bool(exclude_domains), rank_only))
 
     if args.json_out:
         payload = {
             "summary": summary,
+            "score_mode": RANK_ONLY_LABEL if rank_only else "weighted (volume x rank weight)",
+            "rank_only_auto": auto_rank_only,
             "options": {
                 "exclude_domains": exclude_domains,
                 "exclude_keywords": args.exclude_keyword,

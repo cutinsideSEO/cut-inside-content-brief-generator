@@ -22,18 +22,25 @@ Options
 Checks (ERROR fails the brief, WARNING is advice)
     1  em-dash U+2014 (error), en-dash U+2013 (warning)
     2  forbidden leftovers: {{ }} <topic> <client> <keyword> [PLACEHOLDER TBD Lorem
-       (allowed: [INTERNAL LINK: ...], [CITE: ...], <!-- TODO (human): ... -->)
+       (allowed: [INTERNAL LINK: ...], [CITE: ...], **TODO (human):** ...)
+       and any HTML comment '<!--' (error: comments do not survive the Google
+       Doc conversion, so a TODO must be a visible **TODO (human):** line)
     3  the 15 required sections (Accuracy and brand guardrails is optional) and order
     4  On-page table: required rows, character limits, slug rules, Chars column
     5  Keyword table: Primary keyword present, in title / H1 / OG title / slug, volume
     6  banned title, meta description and AI-cliche phrases
-    7  Article structure: totals, per-item bullets, word count sum, snippet targets
+    7  Article structure: totals, per-item bullets, word count sum, snippet targets;
+       when the Search intent section says SERP features were not observed
+       ("not observed" / "לא נצפו"), every snippet line must say it is a bet
+       ("bet" / "הימור") and there should be at most 2 (warnings)
     8  FAQs: Guidelines bullet, the 40 to 50 word answer rule, no drafted answers
     9  Competitor table: at least 3 rows, absolute http(s) URLs
     10 language consistency of section headings
     11 internal links must be absolute URLs
 
-Output: ERRORS, then WARNINGS, then a one-line summary.
+Output: ERRORS, then WARNINGS, a marker count line (TODO (human), [CITE],
+[INTERNAL LINK], outside inline code; compare the TODO count with the Doc at
+read-back and report the CITE count at H6), then a one-line summary.
 Exit code: 1 if any error, 0 otherwise, 2 if the file cannot be read.
 """
 
@@ -113,8 +120,16 @@ FORBIDDEN = [
 ALLOWED_PLACEHOLDERS = [
     re.compile(r"\[INTERNAL LINK:[^\]]*\]"),
     re.compile(r"\[CITE:[^\]]*\]"),
-    re.compile(r"<!--\s*TODO \(human\):.*?-->", re.S),
+    re.compile(r"\*\*TODO \(human\):\*\*"),
 ]
+TODO_RE = re.compile(r"\*\*TODO \(human\):\*\*")
+CITE_RE = re.compile(r"\[CITE:")
+INTERNAL_LINK_RE = re.compile(r"\[INTERNAL LINK:")
+HTML_COMMENT_RE = re.compile(r"<!--")
+NOT_OBSERVED_RE = re.compile(r"not observed|לא נצפו", re.I)
+BET_RE = re.compile(r"\bbets?\b|הימור", re.I)
+FILL_TOKEN_RE = re.compile(r"\{\{.*?\}\}")
+CODE_SPAN_RE = re.compile(r"`[^`]*`")
 
 TITLE_BANNED = [
     ("ultimate guide", r"ultimate guide"),
@@ -340,7 +355,17 @@ def main(argv=None):
                 found_forbidden.setdefault(name, []).append(i + 1)
     for name, nums in found_forbidden.items():
         rep.error(nums[0], 'forbidden leftover "%s" on lines: %s' % (name, fmt_lines(nums)))
-    # multi-line TODO comments: strip them from whole-text scan not needed (line based)
+    comment_lines = [i + 1 for i, ln in enumerate(lines) if HTML_COMMENT_RE.search(ln)]
+    if comment_lines:
+        rep.error(comment_lines[0], "HTML comment '<!--' on lines: %s (comments vanish in the Google Doc; "
+                  "write a visible '**TODO (human):** ...' line instead)" % fmt_lines(comment_lines))
+    # markers in use (inline code spans, such as the Conventions line, are not counted)
+    plain = [CODE_SPAN_RE.sub(" ", ln) for ln in lines]
+    markers = {
+        "todo_human": sum(len(TODO_RE.findall(ln)) for ln in plain),
+        "cite": sum(len(CITE_RE.findall(ln)) for ln in plain),
+        "internal_link": sum(len(INTERNAL_LINK_RE.findall(ln)) for ln in plain),
+    }
 
     # ---- 3. required sections and order
     for sid, required, en, he in SECTIONS:
@@ -584,6 +609,16 @@ def main(argv=None):
                     seen_q[qk] = ln
         if not snippets:
             rep.warn(hl, "no snippet target in the outline (informational briefs usually warrant one)")
+        ir = sec_range("intent")
+        if ir and snippets:
+            intent_text = "\n".join(FILL_TOKEN_RE.sub(" ", lines[i]) for i in range(ir[0], ir[1]))
+            if NOT_OBSERVED_RE.search(intent_text):
+                unlabelled = [ln for ln, txt in snippets if not BET_RE.search(txt)]
+                if unlabelled:
+                    rep.warn(unlabelled[0], "SERP features were not observed, but snippet target(s) are not labelled a bet "
+                             "(add '(answer-first bet; SERP features not observed)') at lines: %s" % fmt_lines(unlabelled))
+                if len(snippets) > 2:
+                    rep.warn(snippets[2][0], "SERP features were not observed: at most 2 snippet bets (found %d)" % len(snippets))
 
         if args.variant == "full" and items and missing_reasoning:
             rep.warn(missing_reasoning[0], "full variant: outline item(s) without a Reasoning bullet at lines: %s" % fmt_lines(missing_reasoning))
@@ -665,7 +700,7 @@ def main(argv=None):
     ok = not errors
     if args.json:
         payload = {
-            "file": args.brief, "language": lang, "variant": args.variant, "ok": ok,
+            "file": args.brief, "language": lang, "variant": args.variant, "ok": ok, "markers": markers,
             "errors": [{"line": ln, "message": m} for ln, m in errors],
             "warnings": [{"line": ln, "message": m} for ln, m in warnings],
         }
@@ -680,6 +715,8 @@ def main(argv=None):
             print("")
         show("ERRORS", errors)
         show("WARNINGS", warnings)
+        print("Markers: %d TODO (human), %d [CITE], %d [INTERNAL LINK]"
+              % (markers["todo_human"], markers["cite"], markers["internal_link"]))
         print("%s: %d error(s), %d warning(s) [lang=%s, variant=%s]"
               % ("FAIL" if errors else "PASS", len(errors), len(warnings), lang, args.variant))
     return 0 if ok else 1

@@ -9,15 +9,18 @@ source, geo and date. Prices, codes and quotas move; read them at the point of u
 | Step | Question | First choice | Fallback | Cost |
 |---|---|---|---|---|
 | Client context | voice, do's and don'ts, banned and preferred terms, known competitors, playbook rules | SurgeOS `list_clients`, `get_documents`, `get_seo_knowledge`; the client's AI Brain on Drive (`00. AI Brain`: principles, decisions-log) | ask the user for brand notes | none |
-| Cannibalisation and site coverage | does a client page already rank for or cover this topic? | SurgeOS `gsc_query_page`, `search_gsc_queries`, `search_gsc_pages` | `site:<client domain> <topic>` web search | none (shared BigQuery budget) |
-| Keyword list | which keywords and volumes the brief targets | the user's list, or Ahrefs Keywords Explorer through `ahrefs-navigator` (browser export, country and global volume) | DataForSEO Google Ads search volume for a list; GSC queries only for the client's own demand; Google autocomplete for ideas only (no volume) | Ahrefs: browser exports, no API units; DataForSEO: one flat price per task |
-| SERP per query | top-10 organic URLs and ranks, PAA, SERP features | DataForSEO SERP Google organic, live advanced, depth 20 | Ahrefs SERP overview export through `ahrefs-navigator`; web search as last resort (US engine location, not located) | DataForSEO per SERP page of 10 |
+| Cannibalisation and site coverage | does a client page already rank for or cover this topic? | the client's own position per query from the SERP export; SurgeOS `gsc_query_page`, `search_gsc_queries`, `search_gsc_pages`; the latest site crawl via `get_crawl_pages` / `get_sitemap_urls` with `search` | `site:<client domain> <topic>` web search | none (shared BigQuery budget; site crawl already run) |
+| Keyword list | which keywords and volumes the brief targets | SurgeOS `get_search_visibility_keywords` / `get_keyword_rankings` for keywords the client already tracks (check first); then the user's list, or Ahrefs Keywords Explorer through `ahrefs-navigator` (browser export, country and global volume) | DataForSEO Google Ads search volume for a list; GSC queries only for the client's own demand; SERP-export related searches or Google autocomplete for ideas only (no volume) | SurgeOS tracked: free; Ahrefs: browser exports, no API units; DataForSEO: one flat price per task |
+| SERP per query | top-10 organic URLs and ranks, PAA, SERP features, AI Overview | SurgeOS SERP export (`run_serp_export` + `get_serp_export`), one export per brief, depth 20 (section 5.1) | 1) DataForSEO MCP SERP Google organic, live advanced, depth 20; 2) Ahrefs SERP overview export through `ahrefs-navigator`; 3) web search as last resort (US engine location, not located) | export: price per keyword at the depth, from the tool; DataForSEO per SERP page of 10 |
 | Competitor strength | is a winner strong because of the page or the domain? | Ahrefs SERP overview export (DR, traffic per URL) for a competitive topic | skip; the score stands on volume x rank | browser export |
-| Page content | headings, word count, body text | DataForSEO on-page content parsing, live, JavaScript rendering on | WebFetch of the URL | DataForSEO per page |
+| Page content | headings, word count, body text | SurgeOS `request_crawl` (one domain per crawl) for word count, title, meta, H1, plus WebFetch for headings and body (section 8.1) | WebFetch alone; DataForSEO on-page content parsing, live, JavaScript rendering on (with approval of its cost) | crawler: no DataForSEO cost; DataForSEO per page |
 | Internal links | real client URLs to link to | SurgeOS `search_gsc_pages`, `search_gsc_queries` | `[INTERNAL LINK: anchor -> topic]` placeholders | none |
-| Balance and prices | can we afford the plan? | DataForSEO `appendix/user_data` | none: without it, ask before spending | free |
+| Balance and prices | can we afford the plan? | the SERP export's price from the tool's answer or estimate; DataForSEO `appendix/user_data` for balance and fallback prices | none: without a price, ask before spending | free |
 
-DataForSEO MCP tool names vary by install: look for the organic live SERP tool (named like
+SurgeOS full tool names: `mcp__SurgeOS__run_serp_export`, `mcp__SurgeOS__get_serp_export`,
+`mcp__SurgeOS__request_crawl`, `mcp__SurgeOS__get_crawls`, `mcp__SurgeOS__get_crawl`,
+`mcp__SurgeOS__get_crawl_file`, `mcp__SurgeOS__get_crawl_pages`, `mcp__SurgeOS__get_sitemap_urls`.
+DataForSEO MCP (fallback) tool names vary by install: look for the organic live SERP tool (named like
 `serp_organic_live_advanced`), the content-parsing tool (named like `on_page_content_parsing`), the
 Google Ads volume tool (named like `keywords_data_google_ads_search_volume`) and the user-data tool
 (named like `appendix_user_data`). If no DataForSEO connector is present, use the fallbacks and
@@ -27,7 +30,10 @@ label the data as below.
 
 | Data came from | Label |
 |---|---|
-| DataForSEO live SERP with the market's location and language | located SERP, `<date>` |
+| SurgeOS SERP export with the market's country and language | located SERP, SurgeOS SERP export `<jobId>`, `<country>`, `<language>`, `<device>`, depth 20, `<date>`; SERP features and AI Overview observed |
+| SurgeOS crawl of a competitor page | crawled `<crawl id>`, `<date>`: word count, title, meta and H1 from the crawler |
+| SurgeOS crawl only (WebFetch refused) | crawl fields only, `<crawl id>`, `<date>`: digest partial (no H2/H3 tree or body read) |
+| DataForSEO live SERP with the market's location and language | located SERP, DataForSEO fallback, `<date>` |
 | Ahrefs SERP overview export | Ahrefs SERP snapshot, `<country>`, `<date of Ahrefs crawl>` (may lag the live SERP) |
 | Ahrefs overview read from screen (no export control) | Ahrefs SERP read from screen, `<date>` |
 | Web search | approximate ranks, web search (engine location US; not a located SERP), `<date>`; SERP features not observed |
@@ -50,6 +56,14 @@ web-search results "US results" or "Israel results".
 5. Note known competitors so you can flag them when they appear in the SERP.
 
 ## 3. Keyword list (step 2.1)
+
+### Route 0: keywords the client already tracks (check first, free)
+SurgeOS `get_search_visibility_keywords` and `get_keyword_rankings` return volume (and live rank)
+for keywords already in the client's Search Visibility tracking. Use them for every brief keyword
+they cover; label "SurgeOS Search Visibility, `<country>`, `<date>`". Never add keywords to Search
+Visibility tracking for a brief (`add_search_visibility_keywords`: recurring cost, writes into the
+client project) unless the person asks. The SERP export returns no volume, so every keyword not
+tracked goes through Route A, B or C.
 
 ### Route A: the user's list
 Use every keyword exactly as written (spelling, prefixes, word order). Check it carries country
@@ -97,7 +111,44 @@ and scope. They never replace a measured primary keyword volume (house rule 4).
 
 ## 5. SERP pulls (step 2.3)
 
-DataForSEO SERP, Google organic, **live advanced**, one task per representative query:
+### 5.1 SurgeOS SERP export (primary)
+
+A queue-based job pulling live Google results for up to 1,000 keywords; two calls.
+
+1. **List first:** `get_serp_export` without `jobId` lists the team's recent exports. A same-day export for the same keywords and market is reused (record its `jobId`, cost $0); never pay twice.
+2. **Start:** `run_serp_export`, one export per brief with all representative queries (at most 15):
+
+| Parameter | Value |
+|---|---|
+| `keywords` (required) | the representative queries, exactly |
+| `country` (required) | the market's country (section 13; check the accepted format in the tool's schema) |
+| `language` | the SERP language |
+| `depth` | 20 (allowed: 10, 20, 30, 50, 100; default 10) |
+| `device` | `mobile` unless the user says otherwise (`desktop` or `mobile`) |
+| `client` | the brief's client: adds the client's own position for every keyword |
+| `waitForAiOverview` | true |
+
+   Cost: about $0.0006 a keyword at depth 10 (owner, 2026-10-26), deeper pages cost more; read the price from the tool's answer or estimate at run time, never from this file. It is charged to the agency's shared DataForSEO budget.
+3. **Name it clearly** (for example `brief research: <topic>: <market>`) where the tool allows a name. Every export is visible to the whole team in the SERP Explorer history (app.cutinside.com/serp): internal, not client-visible, so no H5 is needed.
+4. **Poll:** `get_serp_export` with the `jobId` until the job is done. Results take a few minutes: never busy-loop; in Claude Code use a short background wait between polls. A job that fails or stays stuck: fall back to 5.2 and re-estimate at H2.
+5. **Read per keyword:** organic results, SERP features, People Also Ask, AI Overview text and its sources, related searches, ads, the client's position.
+
+What to keep from the results:
+
+- **Organic top 10** (URL, rank) per query: build `serp_rows.csv` (section 6); volume comes from the keyword list, never from the export.
+- **PAA:** every question into the FAQ pool (section 10).
+- **SERP features:** recorded per query as OBSERVED, with the date. This replaces the "not observed / answer-first bet" fallback when the export succeeded.
+- **AI Overview:** present or absent per query, a one-line gist of what it says, and its cited sources (full URLs). Goes on the AI Overview line in Search intent and SERP; the cited sources are evidence candidates for citable facts (read a source before citing it).
+- **Related searches:** keyword ideas only, no volume (label as ideas).
+- **Client position:** flags a refresh or cannibalisation at step 3 (section 11).
+- **Ads:** a commercial signal for the intent verdict only.
+- **`jobId` and cost:** into Sources and scope and the final message.
+
+### 5.2 DataForSEO SERP (fallback)
+
+DataForSEO SERP, Google organic, **live advanced**, one task per representative query, only when
+the export is unavailable, failed or stuck. Then Ahrefs SERP overview through `ahrefs-navigator`,
+then web search, labelled as in section 1.
 
 | Parameter | Value |
 |---|---|
@@ -105,7 +156,7 @@ DataForSEO SERP, Google organic, **live advanced**, one task per representative 
 | `location_name` (or `location_code`) | the market's country (table in section 13) |
 | `language_name` (or `language_code`) | the SERP language; Hebrew is `iw` |
 | `depth` | 20 |
-| `device` | desktop (default) unless the client's audience is mobile-first and the user asks |
+| `device` | mobile, as for the export, unless the user says otherwise |
 
 From each response record:
 
@@ -114,6 +165,7 @@ From each response record:
 - **SERP features present:** the item types actually returned, for example `featured_snippet`, `people_also_ask`, `video`, `images`, `knowledge_graph`, `ai_overview`, `related_searches`, `discussions_and_forums`, `top_stories`. Record them per query with the date. Never add a feature that was not returned.
 - **Related searches:** keep them as FAQ and gap candidates.
 - **The `cost` field:** add it to the run total.
+- **AI Overview:** if an `ai_overview` item is returned, record its gist and sources as in 5.1.
 
 Pause between calls if the connector rate-limits; retry a failed call up to 3 times; never pull the
 same query twice in one run.
@@ -179,8 +231,44 @@ in Search intent and SERP: the editorial field is weak, which is an opportunity.
 
 ## 8. Reading pages (step 2.6)
 
-DataForSEO on-page **content parsing, live**, with JavaScript rendering on (`enable_javascript:
-true`), at most 10 pages, priority pages first, then by score. Fallback: WebFetch (label it).
+At most 10 pages, priority pages first, then by score.
+
+### 8.1 SurgeOS crawler for competitor pages (primary)
+
+`request_crawl` accepts URLs outside the client's domain, but ONE DOMAIN PER CRAWL: a list mixing
+domains is rejected. One request per competitor domain (usually one URL each):
+
+| Parameter | Value |
+|---|---|
+| `mode` | `list` |
+| `urls` | the competitor URL(s) on that one domain |
+| `client` | the brief's client |
+| `maxUrls` | the number of URLs in the list |
+| `priority` | 7 |
+| `title` | `brief research: <topic>: <domain>` |
+| `renderJavaScript` | only if the page needs it (slower; waits for crawler memory) |
+
+It is queued on the shared office crawler, one crawl at a time: check `get_crawls` for the queue
+(a 1-URL crawl took about 35 s on 2026-10-26). Read the result with `get_crawl` (`status`,
+`possiblyBlocked`) and `get_crawl_file` with `export` = `internal_all`, the crawl's `jobId`, and
+`columns`: Address, Status Code, Indexability, Title 1, Meta Description 1, H1-1, H2-1, H2-2, Word
+Count, Language, Canonical Link Element 1.
+
+This gives a reliable Word Count (used for the length target, SKILL.md step 5.1) and the title,
+meta and H1. It does NOT give the full H2/H3 tree or the body text, so the digest still needs the
+page text: WebFetch the URL for headings and body. If WebFetch is refused (403) but the crawl
+succeeded, use the crawl's fields and label the digest partial; never invent content. Record
+every crawl id for Sources and scope.
+
+**The client's own site** (coverage check, section 11): the latest site crawl already holds the
+client's pages; `get_crawl_pages` or `get_sitemap_urls` with `search` finds topic pages at no extra
+cost. Do not queue a new client crawl for a brief.
+
+### 8.2 Fallbacks
+
+WebFetch alone (label it); DataForSEO on-page **content parsing, live**, with JavaScript rendering
+on (`enable_javascript: true`), when WebFetch is refused and the crawl failed, with approval of
+its cost.
 
 Per-page record (keep it in the working notes; the brief uses it for the competitor table, gaps,
 covered by, and the top 3):
@@ -189,10 +277,10 @@ covered by, and the top 3):
 |---|---|
 | URL, weighted score, queries it ranks for | from the score table |
 | H1, H2s, H3s | from the parsed headings |
-| Word count | whitespace-split count of the main content text (not nav, footer, comments) |
+| Word count | the crawl's Word Count; otherwise a whitespace-split count of the main content text (not nav, footer, comments) |
 | Content type and domain type | guide, listicle, definition, tool, forum; brand, publisher, affiliate, UGC, institution |
 | Digest | 90 to 130 words, below |
-| Read status | read, read without JS, failed (dropped) |
+| Read status | read (crawl + WebFetch), crawl only (digest partial), read without JS, failed (dropped); crawl id |
 
 **Digest form** (the app's own instruction): "In 90-130 words, summarize this competitor page for
 an SEO strategist. Cover, in order: (1) what it covers (scope/subtopics), (2) its angle or point of
@@ -220,9 +308,11 @@ they shaped a decision.
 
 ## 10. PAA, related searches and questions
 
-Collect every PAA question from every pull, de-duplicate (case and punctuation), drop questions
+Collect every PAA question from the SERP export (or every fallback pull), de-duplicate (case and punctuation), drop questions
 off the page's intent, and keep the language of the brief. Add related searches and the question
 keywords from the keyword list. This pool feeds the FAQ set (step 5) and PAA-style in-body blocks.
+AI Overview cited sources are evidence candidates for citable facts in the Fact and source bank;
+read each one before citing it.
 
 ## 11. Cannibalisation and site coverage (step 2.8)
 
@@ -234,10 +324,12 @@ Clicks are less affected but carry the same caveat when compared across the brea
 respect the `dataNotes`, `compareNote` and `rangeNote` that SurgeOS returns with a result: when one
 says two periods are not comparable, do not compare them.
 
-1. `gsc_query_page` for the primary keyword on the client's property, a closed window of the last 3 full months: which client URL gets impressions, at what position.
-2. `search_gsc_queries` with the topic's stem (contains or regex): queries the client already ranks for nearby.
-3. `search_gsc_pages` for URLs containing the topic's slug words.
-4. `site:<client domain> <topic>` web search for pages GSC may miss (new or unindexed).
+1. The client's own position per query from the SERP export (`client` set): a top-10 position for the primary query flags a refresh; a lower one, cannibalisation risk.
+2. `gsc_query_page` for the primary keyword on the client's property, a closed window of the last 3 full months: which client URL gets impressions, at what position.
+3. `search_gsc_queries` with the topic's stem (contains or regex): queries the client already ranks for nearby.
+4. `search_gsc_pages` for URLs containing the topic's slug words.
+5. The latest site crawl: `get_crawl_pages` or `get_sitemap_urls` with `search` = the topic's slug words (free, no new crawl).
+6. `site:<client domain> <topic>` web search for pages GSC may miss (new or unindexed).
 
 | Finding | Action |
 |---|---|
@@ -262,16 +354,17 @@ does not show becomes `[INTERNAL LINK: anchor -> topic]`.
 | United States, English | United States / 2840 | English / `en` | `us` | google.com |
 | United Kingdom, English | United Kingdom / 2826 | English / `en` | `gb` | google.co.uk |
 
-Codes change rarely but do change: confirm them against DataForSEO's locations and languages lists
+The SurgeOS SERP export takes `country` and `language`: confirm the accepted values in the tool's
+schema at first use for a market. Codes change rarely but do change: confirm them against DataForSEO's locations and languages lists
 (free) or the Ahrefs country selector before the first pull of a new market. Hebrew uses `iw`, not
 `he`, in DataForSEO. An Israeli client with an English-language market is a separate market row:
 ask, never assume.
 
 ## 14. Cost arithmetic and guards
 
-1. Read balance and prices with `appendix/user_data` before H1.
-2. Estimate: SERP pulls = queries x 2 pages (depth 20) x price per SERP page; page reads = pages x price per content parse; volumes = tasks (one per up to 1,000 keywords) x price per task.
-3. Caps per brief: 15 SERP pulls, 10 page reads, no re-fetches.
-4. Threshold: $1 of DataForSEO or 5,000 Ahrefs API units per run (the skill uses no API units). Above it, H2.
-5. Track: sum every response's `cost` field; count Ahrefs exports. Report both in Sources and scope and in the final message, beside the estimate.
-6. Last seen in the agency's connectors guide, for scale only: $0.0006 a SERP page of 10 results in the standard queue (live costs more). Never quote it as a price; use the numbers `appendix/user_data` returns.
+1. Before H1: list recent SERP exports (reuse a same-day match); read the export's price per keyword at depth 20 from the tool's answer or estimate; read balance and fallback prices with `appendix/user_data` when a DataForSEO line is planned (the export draws on the same budget).
+2. Estimate: SERP export = queries x price per keyword at the chosen depth (from the tool; $0 when reused); crawls = count only (office crawler, no DataForSEO cost); and only for fallback lines actually used: DataForSEO SERPs = queries x 2 pages (depth 20) x price per SERP page; page reads = pages x price per content parse; volumes = tasks (one per up to 1,000 keywords) x price per task. SurgeOS tracked-keyword volumes are free.
+3. Caps per brief: one SERP export of at most 15 queries, 10 page reads, no re-fetches.
+4. Threshold: $1 (SERP export plus DataForSEO fallbacks) or 5,000 Ahrefs API units per run (the skill uses no API units). Above it, H2.
+5. Track: the export `jobId` and its cost from the tool; every crawl id; the `cost` field of every DataForSEO response; the Ahrefs export count. Report them in Sources and scope and in the final message, beside the estimate.
+6. For scale only: about $0.0006 a keyword at depth 10 on the SERP export (owner, 2026-10-26); deeper pages cost more. Never quote it as a price; use what the tool and `appendix/user_data` return.

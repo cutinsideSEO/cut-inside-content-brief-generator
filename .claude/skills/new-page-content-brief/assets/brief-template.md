@@ -60,9 +60,10 @@
 
 - **Intent type:** {{informational}}
 - **Preferred format:** {{what the top positions reward, with two or three example URLs}}
-- **SERP features observed:** {{per query: featured snippet, People Also Ask, video, image pack, AI Overview; or "none present" (located SERP); or "not observed (web-search fallback, not a located SERP)"}}
+- **SERP features observed:** {{per query: featured snippet, People Also Ask, video, image pack, AI Overview, ads; or "none present" (located SERP); or "not observed (Ahrefs or web-search fallback, not a located SERP)"}}
+- **AI Overview:** {{per query: present or absent; one-line gist of what it says; cited sources as full URLs; or "not observed (fallback route)"}}
 - **What ranks:** {{one or two lines: content types and domain types in the top 10; forums, Wikipedia or video noted as an intent signal}}
-- **Source:** {{DataForSEO live SERP, location, language, depth 20, pulled YYYY-MM-DD; N queries}}
+- **Source:** {{SurgeOS SERP export <jobId>, country, language, device, depth 20, pulled YYYY-MM-DD; N queries (or the fallback used, with its label)}}
 - **Reasoning:** {{why this verdict}}
 
 ## Keyword strategy
@@ -203,7 +204,7 @@ Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts
 - **Word count:** {{200}}
 - **Reasoning:** {{...}}
 
-{{! Check: every Word count above plus the FAQ allowance equals the Total word count. At most 3 Snippet target lines, each with a different query. If SERP features were not observed (web-search fallback), at most 2, each written as: paragraph | <query> (answer-first bet; SERP features not observed). }}
+{{! Check: every Word count above plus the FAQ allowance equals the Total word count. At most 3 Snippet target lines, each with a different query. If SERP features were not observed (Ahrefs or web-search fallback), at most 2, each written as: paragraph | <query> (answer-first bet; SERP features not observed). }}
 
 ## Frequently Asked Questions
 
@@ -271,13 +272,13 @@ Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts
 
 ## Sources and scope
 
-- **SERP:** {{DataForSEO live SERP, location, language, depth 20, YYYY-MM-DD, N queries}}
+- **SERP:** {{SurgeOS SERP export <jobId> (new or reused), country, language, device, depth 20, YYYY-MM-DD, N queries; or the fallback used, with its label}}
 - **Keywords:** {{source, country and global, YYYY-MM-DD}}
-- **Pages read:** {{N pages, content parsing with JS rendering; failed reads dropped: N}}
+- **Pages read:** {{N pages: SurgeOS crawl ids <id>, <id> (word count, title, meta, H1) plus WebFetch for headings and body; crawl-only partial digests: N; failed reads dropped: N}}
 - **Client data:** {{SurgeOS GSC property, window YYYY-MM-DD to YYYY-MM-DD (last 3 full months; add "spans the GSC impressions logging error 2025-05-13 to 2026-04-27" if it overlaps)}}
 - **Client files read:** {{AI Brain files, product briefs, past briefs on the topic; for a file too large to read whole, the terms grepped}}
-- **Cost:** DataForSEO ${{0.00}} (summed cost fields); Ahrefs {{N}} browser exports, 0 API units
-- **Not measured:** {{for example keyword difficulty, backlinks, AI Overview citations}}
+- **Cost:** SERP export ${{0.00}} ({{jobId}}, from the tool; $0 if reused); {{N}} crawls; DataForSEO fallback ${{0.00}} (summed cost fields, or none); Ahrefs {{N}} browser exports, 0 API units
+- **Not measured:** {{for example keyword difficulty, backlinks, citations in AI assistants other than Google's AI Overview}}
 
 **Fact and source bank**
 

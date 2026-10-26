@@ -3,7 +3,7 @@ name: new-page-content-brief
 description: >-
   Produces an SEO content brief (not the article) for one NEW informational article (guide, "what
   is", "how to") as a Google Doc a writer can execute without further research: questions first,
-  live SERP research (DataForSEO, SurgeOS, Ahrefs via the ahrefs-navigator browser skill),
+  live SERP research (SurgeOS SERP export and crawler, DataForSEO, Ahrefs via ahrefs-navigator),
   competitor scoring, intent verdict, editorial angle, gaps, a nested outline with section angles,
   word budgets and snippet targets, FAQs, on-page SEO, E-E-A-T, a self-check, and human checkpoints.
   Use for "brief for X", "content brief", "article outline", "make briefs (n/27)", "create 3
@@ -19,6 +19,7 @@ description: >-
 > informational briefs across 7 clients and their decisions-logs (anonymised). Wording reused from
 > our own agent-content-briefs skill where it was good. Approved by the skill owner (contract,
 > 2026-10-20). QA pending (Phase 5).
+> 2026-10-26: SurgeOS SERP export and any-URL crawler added as the primary research route (round-1 QA ran without them).
 
 # New page content brief (informational, v0.1)
 
@@ -32,9 +33,10 @@ article copy (several clients' contracts are brief-only; drafting is `blog-artic
 brief describes the TARGET page only; anything about a current page goes in a companion note.
 No Open Items section: decisions are settled with the person at H3 and H4. Aim for 15 pages or fewer.
 
-**Who does what:** Claude does the research and writing with its tools; Ahrefs work happens in a
-browser through the `ahrefs-navigator` skill (never the Ahrefs MCP or API); the person decides at
-the six checkpoints below.
+**Who does what:** Claude does the research and writing with its tools (SurgeOS SERP export and
+crawler first; DataForSEO MCP and Ahrefs as fallbacks); Ahrefs work happens in a browser through
+the `ahrefs-navigator` skill (never the Ahrefs MCP or API); the person decides at the six
+checkpoints below.
 
 **What the brief contains** (house format; the templates hold the exact labels):
 
@@ -103,37 +105,42 @@ each; otherwise treat it as a batch request (see Batch mode).
 
 | Situation | Route |
 |---|---|
+| Keywords the client already tracks in SurgeOS | Check first, free: `get_search_visibility_keywords` / `get_keyword_rankings` give volume and live rank. Never add keywords to Search Visibility tracking for a brief (recurring cost, writes into the client project) unless the person asks |
 | User supplies a list with country volumes measured this month | Use it exactly as supplied; add global volume if missing (Ahrefs export) |
 | User list is older than the current month, or has no source or date | Re-check volumes live (Ahrefs through ahrefs-navigator if a browser is available; otherwise DataForSEO Google Ads search volume). Old lists have been 5 to 10x wrong |
 | User asks Claude to build the list | Ahrefs Keywords Explorer through `ahrefs-navigator`: matching terms, questions, related terms; CSV export with country and global volume |
 | Ahrefs browser route blocked (session kicked, no browser) | Stop and ask: re-login, wait, or DataForSEO volume with explicit approval. Never offer the Ahrefs MCP |
 | Only the client's GSC queries are available | Not enough on its own: GSC shows the client's demand, not the topic's. Run a demand check on the top keywords from Ahrefs or DataForSEO as well |
 
-4. Read the DataForSEO balance and prices with `appendix/user_data` (free). Never take prices from memory or from this file.
-5. Write the plan: keyword route, the representative queries you will pull (at most 15), the pages you will read (at most 10), the tools per step, and the cost arithmetic below.
+   The SERP export does NOT return search volume: volumes always come from this table.
+4. List recent SERP exports with SurgeOS `get_serp_export` (no `jobId`, free). A same-day export for the same keywords and market is reused, never paid for twice. Read the export's price per keyword at the chosen depth from the tool's answer or estimate at run time. When a DataForSEO fallback line is in the plan (or the connector is present), read the balance and prices with `appendix/user_data` (free): the export draws on the same agency DataForSEO budget. Never take prices from memory or from this file.
+5. Write the plan: keyword route, the representative queries for the one SERP export (at most 15), device (mobile unless the user says otherwise), the pages you will read (at most 10) and the crawls that implies (one per competitor domain), the tools per step, and the cost arithmetic below.
 
 **Cost guard (show the arithmetic at H1):**
 
 ```
-Prices read from appendix/user_data at <time>; balance $<balance>
-SERP pulls:  <q> queries x 2 pages (depth 20) x $<price per SERP page> = $<a>
-Page reads:  <p> pages x $<price per content parse>                  = $<b>
-Volumes:     <t> tasks (up to 1,000 keywords each) x $<price per task> = $<c>
-Total DataForSEO: $<a+b+c> against a threshold of $1.00
+SERP export: <q> queries x $<price per keyword at depth 20, from the tool> = $<a>
+             (or: reusing same-day export <jobId>, $0)
+Crawls:      <k> one-domain crawls on the office crawler (counted; no DataForSEO cost)
+Fallbacks (only lines actually used; prices from appendix/user_data at <time>, balance $<balance>):
+  DataForSEO SERPs:  <q2> queries x 2 pages (depth 20) x $<price per SERP page> = $<b>
+  Page reads:        <p> pages x $<price per content parse>                   = $<c>
+  Volumes:           <t> tasks (up to 1,000 keywords each) x $<price per task>  = $<d>
+Total: $<a+b+c+d> against a threshold of $1.00
 Ahrefs: <n> browser exports, 0 API units (threshold 5,000 units; this skill uses none)
 ```
 
-For scale only: the agency's connectors guide last showed $0.0006 a SERP page of 10 results in the
-standard queue; the live endpoint this skill uses is priced higher and content parsing has its own
-price, so always use what `appendix/user_data` returns at run time. At the caps (15 queries, 10 page
-reads) a typical brief costs a few cents. Guards: at most 15 SERP pulls (merge spelling variants
-into one representative query; low-volume long tails stay in the keyword table without their own
-SERP), at most 10 page reads, never re-fetch a SERP or page already pulled in this run.
+For scale only (owner, 2026-10-26): the SERP export costs about $0.0006 a keyword at depth 10;
+depth 20 costs more, so the price always comes from the tool at run time, never from this file.
+At the caps (15 queries, 10 page reads) a typical brief costs a few cents. Guards: one SERP export
+per brief, at most 15 queries in it (merge spelling variants into one representative query;
+low-volume long tails stay in the keyword table without their own SERP), at most 10 page reads,
+never re-fetch a SERP or page already pulled in this run.
 
 **Checkpoint H1:** show the plan and the cost arithmetic. The person says go, change or stop.
 Spend nothing before this answer.
 
-**Checkpoint H2:** if the estimate is above $1 of DataForSEO (or would use any Ahrefs API units),
+**Checkpoint H2:** if the estimate is above $1 (SERP export plus any DataForSEO fallback; or would use any Ahrefs API units),
 or if the run later needs more pulls than the approved plan, stop, show the new arithmetic and the
 balance, and wait for approval of the spend.
 
@@ -142,28 +149,30 @@ balance, and wait for approval of the spend.
 Before this step, read `references/research-playbook.md`. It has the exact tool names, parameters,
 fallbacks, the per-page record and the market codes.
 
-1. **Keyword list.** Build or check it per the route chosen at step 1. Keep every keyword exactly as supplied or exported. Flag brand and navigational terms (they are not topic demand). Record source, country and date.
+1. **Keyword list.** Build or check it per the route chosen at step 1 (SurgeOS tracked keywords first, free). Keep every keyword exactly as supplied or exported. Flag brand and navigational terms (they are not topic demand). Record source, country and date.
 2. **Query set.** Merge spelling and prefix variants into representative queries, highest volume first, at most 15.
-3. **SERP pulls.** One DataForSEO SERP (organic, live advanced, depth 20, the market's location and language) per representative query. From each response keep the top 10 organic results (URL, rank), every People Also Ask question, and the SERP features actually present. Fallbacks and their labels are in the playbook.
-4. **Score.** Write `serp_rows.csv` (columns `keyword,volume,url,rank`, one row per top-10 organic result per query) and run:
+3. **SERP pulls.** One SurgeOS SERP export per brief: `run_serp_export` with every representative query, `depth` 20, the market's `country` and `language`, `device` mobile unless the user says otherwise, `client` = the brief's client, `waitForAiOverview` true (or the reused same-day export). Poll `get_serp_export` with the `jobId` until done: a few minutes, a short background wait between polls, never a busy loop. Name it clearly: every export is visible to the whole team in the SERP Explorer history (internal, not client-visible, so no H5). Per query keep: the organic top 10 (URL, rank), every PAA question (FAQ pool), the SERP features present (observed), AI Overview presence, gist and cited sources, related searches (keyword ideas only, no volume) and the client's own position (step 2.8). Fallbacks and labels: playbook sections 1 and 5.
+4. **Score.** Write `serp_rows.csv` (columns `keyword,volume,url,rank`, one row per organic top-10 result per query, from the export; volume from the keyword list, since the export has none) and run:
    `python scripts/score_competitors.py serp_rows.csv --exclude-domain <client domain> --top 10`
    It prints a Markdown table of weighted scores (sum over keywords of volume x max(1, 21 - rank)) and accepts a JSON list instead of CSV; add `--json scores.json` to keep the result, `--priority-url <url>` for each page the user named, `--exclude-keyword <brand term>` for brand queries. Use its output, not your own arithmetic. With no measured volumes, pass `--rank-only` (every row weighted as volume 1); the script switches to it on its own, with a notice, when every volume is 0 or missing. Label such scores "rank-only score, volumes not measured" in the brief.
 5. **Flag, do not outline against:** the client's own URLs (excluded; a client page in the top 10 for the primary query means a refresh, flag it at H3), forums and UGC, Wikipedia, video results. They are intent signals, not competitors.
-6. **Read pages.** Priority pages first, then by score, at most 10. Record for each: H1 to H3, word count, and a 90 to 130 word digest in the five-part form. A page that fails to parse is dropped as evidence; never describe a page you did not read.
+6. **Read pages.** Priority pages first, then by score, at most 10. Crawl them with SurgeOS `request_crawl`: one domain per crawl (a mixed list is rejected), mode `list`, priority 7 (parameters in playbook section 8). The crawl gives a reliable word count, title, meta and H1; WebFetch gives the H2/H3 tree and body for the digest. Record for each: H1 to H3, word count, and a 90 to 130 word digest in the five-part form. WebFetch refused but the crawl succeeded: use the crawl's fields and mark the digest partial. A page with neither is dropped as evidence; never describe a page you did not read or invent its content.
 7. **Top 3 ground truth.** Priority pages first, then the highest scores, until there are 3 real editorial pages read in full. Each must be on the topic (not an adjacent asset class, product or subject) and in the brief's market language, unless none exists. When you prefer a lower-scored page, say why in the brief.
-8. **Cannibalisation and site coverage.** SurgeOS `gsc_query_page` for the primary keyword and `search_gsc_queries` for the topic, plus a `site:` search. Recommending a topic the site already covers is a known miss.
+8. **Cannibalisation and site coverage.** The client's own position per query from the SERP export; SurgeOS `gsc_query_page` for the primary keyword and `search_gsc_queries` for the topic; the latest site crawl searched for topic pages (`get_crawl_pages` / `get_sitemap_urls` with `search`, free); a `site:` search. Recommending a topic the site already covers is a known miss.
 9. **Internal link candidates.** SurgeOS `search_gsc_pages` and `search_gsc_queries` for real, indexable client URLs on related topics.
    - **GSC window rule (steps 2.8 and 2.9):** default to the last 3 full months. Never quote impressions, CTR or position from a window that overlaps the GSC impressions logging error (2025-05-13 to 2026-04-27) without the caveat "spans the GSC impressions logging error 2025-05-13 to 2026-04-27"; prefer windows starting 2026-04-28 or later. Always read and respect the `dataNotes` / `compareNote` SurgeOS returns.
-10. **Log spend.** Sum the `cost` field of every DataForSEO response and count Ahrefs exports as you go.
+10. **Log spend.** Record the SERP export `jobId` and its cost (from the tool), every crawl id, the `cost` field of every DataForSEO fallback response, and the Ahrefs export count, as you go.
 
 **When a connector is missing** (say which route you took at H1, and label the data as the playbook says):
 
 | Missing | Do instead |
 |---|---|
-| DataForSEO | SERPs from Ahrefs SERP overview exports through `ahrefs-navigator` (one per representative query); pages through WebFetch; PAA and features from a web search, marked approximate. Cost: $0, exports counted |
+| SurgeOS SERP export (unavailable, failed or stuck) | DataForSEO MCP SERP (live advanced, depth 20); then Ahrefs SERP overview exports through `ahrefs-navigator`; then web search, labelled approximate. Re-estimate cost at H2 |
+| SurgeOS crawler (queue blocked, `possiblyBlocked`, failed) | WebFetch for the page; DataForSEO content parsing when WebFetch is refused, with approval of its cost |
+| SERP export and DataForSEO both | SERPs from Ahrefs SERP overview exports through `ahrefs-navigator` (one per representative query); pages through WebFetch; PAA and features from a web search, marked approximate. Cost: $0, exports counted |
 | Ahrefs browser | Ask (re-login, wait, or DataForSEO volume with approval); never the Ahrefs MCP |
-| SurgeOS | Ask the user for brand notes; `site:` search for coverage; internal links as placeholders only |
-| Both DataForSEO and Ahrefs | Stop at H1 and ask: only a user-supplied list with sourced volumes plus web-search SERPs (labelled approximate) can proceed; otherwise house rule 4 cannot be met |
+| SurgeOS (whole connector) | Ask the user for brand notes; `site:` search for coverage; internal links as placeholders only; SERP and crawl fallbacks as in the first two rows |
+| SERP export, DataForSEO and Ahrefs all | Stop at H1 and ask: only a user-supplied list with sourced volumes plus web-search SERPs (labelled approximate) can proceed; otherwise house rule 4 cannot be met |
 
 Web search is not a located SERP (its engine location is the US). For a non-US market, say at H1 that a located SERP is unavailable and offer the person the option to paste the local top 10 (for example from google.co.il). Labels: `references/research-playbook.md` section 1.
 
@@ -191,7 +200,7 @@ Never proceed silently on a mismatch.
 Before this step, read `references/brief-rules.md` (sections 1 to 6). Spend the most reasoning on
 the editorial angle and, later, the outline skeleton: those decide whether the article is distinctive.
 
-1. **Search intent and SERP:** intent type, preferred format, the SERP features actually observed (per query), source and date of the pulls.
+1. **Search intent and SERP:** intent type, preferred format, the SERP features actually observed (per query), the AI Overview line (present or not, gist, cited sources), source (export `jobId`) and date of the pulls.
 2. **Page goal and target audience**, each with reasoning that cites the top-scoring and priority pages and the keyword clusters they own or miss.
 3. **Competitor breakdown:** for every scored competitor, one-sentence description, strengths, weaknesses (written as concrete, reusable gaps); then the differentiation summary, grounded in the rankings (name keyword clusters, volumes and ranks), not in the score alone.
 4. **Content gap:** table stakes (in most competitors' headings, or keyword clusters most rank for) and strategic opportunities (in 1 or 2 competitors or absent; high-volume clusters weakly covered), each with heading or keyword evidence, weighed by volume.
@@ -206,9 +215,9 @@ approves angle and outline). On a non-informational verdict or a refresh flag, s
 ## Step 5: Length, FAQ set and snippet plan
 
 1. **Total word count:** the user's target if given; otherwise the average word count of the top 3 and priority pages, rounded to the nearest 50. Write the calculation into the brief's reasoning.
-2. **FAQ set:** every keyword phrased as a question first, then PAA questions, then gap-driven questions. Usually 4 to 8.
+2. **FAQ set:** every keyword phrased as a question first, then PAA questions (from the export), then gap-driven questions. Usually 4 to 8.
 3. **FAQ allowance:** questions x 80 words by default (60 to 100 a question when the questions are lighter or heavier). Outline budget = total minus FAQ allowance. The app budgets FAQs from whatever is left, which leaves nothing when the outline uses the whole total, so reserve the allowance explicitly.
-4. **Snippet plan:** 1 to 3 snippet targets with distinct queries, each with the format Google shows (paragraph, list, table), only where the SERP supports it. None when the SERP shows no opportunity. When SERP features were not observed (web-search fallback), write `Snippet target: <format> | <query> (answer-first bet; SERP features not observed)`, at most 2.
+4. **Snippet plan:** 1 to 3 snippet targets with distinct queries, each with the format Google shows (paragraph, list, table), only where the observed SERP supports it: when the export (or the DataForSEO fallback) succeeded, features are OBSERVED, so use the featured snippets it returned and no bet label. None when the SERP shows no opportunity. Only when SERP features were not observed (Ahrefs or web-search fallback), write `Snippet target: <format> | <query> (answer-first bet; SERP features not observed)`, at most 2.
 5. **SERP-feature blocks:** for each feature actually observed (video, image pack, PAA or "things to know", knowledge panel), the matching block you will place in a section. Never a block for a feature the SERP did not show.
 
 ## Step 6: Outline
@@ -250,7 +259,7 @@ note the choice at H4.
 3. Write on-page SEO with the title workflow (three candidates: benefit, specificity, curiosity; keep the winner; say why the others lost in full mode). Check the limits and banned patterns in `references/brief-rules.md` section 9.
 4. Write CTA strategy, links (real GSC URLs as full absolute URLs; otherwise `[INTERNAL LINK: anchor -> topic]`), E-E-A-T (only what the client can deliver), writer notes, technical notes, and sources and scope.
 5. Add the Accuracy and brand guardrails section when the client's brain or brand docs have rules.
-   - **Sources, not placeholders:** for every claim a guideline requires (a figure, a study, a date, a rule), run one free web search within the run and put the source URL in the brief and in the Fact and source bank (Sources and scope). Use `[CITE: ...]` only when nothing reliable is found; count them for H6.
+   - **Sources, not placeholders:** for every claim a guideline requires (a figure, a study, a date, a rule), use the AI Overview's cited sources from the export as evidence when they support it (read them first), otherwise run one free web search within the run, and put the source URL in the brief and in the Fact and source bank (Sources and scope). Use `[CITE: ...]` only when nothing reliable is found; count them for H6.
 6. Apply the variant and YMYL tables below.
 7. Make every figure identical wherever it repeats (word counts, volumes, title, H1).
 
@@ -297,7 +306,7 @@ Doc: <link>   (variant: full | concise | both)
 Self-check: intent <n>/5, table stakes <n>/5, opportunities <n>/5, keywords <n>/5, advantage <n>/5
 check_brief.py: clean (0 errors, <w> warnings reviewed)
 Open markers: <t> TODO (human), <c> [CITE]; <n> claims sourced in the Fact and source bank
-Cost: DataForSEO $<summed cost> (<q> SERP pulls, <p> page reads); Ahrefs <n> browser exports, 0 API units
+Cost: SERP export <jobId> $<cost> (<q> queries, depth 20; or reused, $0); <k> crawls (<ids>); DataForSEO fallback $<summed cost> (<q2> SERPs, <p> page reads, or none); Ahrefs <n> browser exports, 0 API units
 Not measured: <for example: keyword difficulty, backlinks of ranking pages, the client's GA4 Key Events>
 Decisions made at H3/H4: <one line each>
 ```
@@ -318,7 +327,10 @@ topic, one brief per topic, never one brief covering several topics.
 | Trap | What to do |
 |---|---|
 | Commercial SERP briefed as informational | Intent verdict from the observed SERP; stop at H3 |
-| One SERP pull per spelling variant | Merge variants; cap 15 pulls |
+| One SERP pull per spelling variant | Merge variants; one export per brief, cap 15 queries |
+| Paying twice for the same SERP | List recent exports first; reuse a same-day export for the same keywords and market |
+| Crawl list mixing competitor domains | One `request_crawl` per domain; a mixed list is rejected |
+| Brief keywords added to Search Visibility | Never, unless the person asks (recurring cost, writes into the client project) |
 | Client's own page in the competitor set | `--exclude-domain`; a top-10 client page flags a refresh |
 | Forums, Wikipedia or video dominate | Intent signal, not competitors to outline against |
 | Section budgets leave FAQs nothing | Explicit FAQ allowance; outline + FAQ = total |

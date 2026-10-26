@@ -32,7 +32,7 @@ these checks by hand from section 4 and say so in Sources and scope.
 | C4 | Headings in the brief's language only (no English FAQ heading in a Hebrew brief) | Every `##` and FAQ heading |
 | C5 | Figures identical wherever they repeat (total words, FAQ allowance, volumes, title, H1, slug) | Brief at a glance vs body |
 | C6 | Every volume and rank is from a tool call in this run, with source and geo | Source line under the keyword table; Sources and scope |
-| C7 | Every competitor URL is real and was read | Page-read record |
+| C7 | Every competitor URL is real and was read (a crawl-only read counts only with its digest labelled partial) | Page-read record and crawl ids |
 | C8 | No invented internal URL | Every internal URL appears in the GSC data; else the placeholder |
 | C9 | Keywords appear exactly as supplied or exported | Diff the table against the list |
 | C10 | The intent verdict matches the observed SERP | The SERP record and the verdict table in SKILL.md step 3 |
@@ -78,7 +78,8 @@ strengths. They go in your working notes, not the brief.
 - [ ] FAQs: questions as H3, 1 to 3 guideline bullets, first one the 40 to 50 word answer instruction; no drafted answers.
 - [ ] Internal links are full absolute URLs from GSC, or the placeholder.
 - [ ] E-E-A-T lists only what the client can deliver.
-- [ ] Sources and scope: SERP date, market, tools, client files read, GSC window, cost, exports, what was not measured, and the Fact and source bank table.
+- [ ] Sources and scope: SERP date, market, tools, the SERP export `jobId` and crawl ids, client files read, GSC window, cost, exports, what was not measured, and the Fact and source bank table.
+- [ ] Search intent and SERP: SERP features marked observed when the export succeeded, and an AI Overview line per query (present or absent, gist, cited sources).
 - [ ] Concise variant: no Reasoning lines, no Reasoning column; nothing else differs from full.
 - [ ] No Open Items section; nothing about the current page (that goes in a companion note); 15 pages or fewer.
 
@@ -89,7 +90,7 @@ strengths. They go in your working notes, not the brief.
 - **Headings are claims, not labels;** at most one "What is X?"; no 5 parallel "How to" H2s; shapes vary.
 - **Guidelines advance the angle** and name concrete things (a table's columns, an example, a number with `[CITE]`), not "explain clearly".
 - **Claims:** every product, medical, legal or financial claim is supported by the client's materials or a source URL read in this run (listed in the Fact and source bank), or marked `[CITE: ...]` / `**TODO (human):** ...`. More than a handful of `[CITE]` markers means the research was skipped: search before shipping.
-- **Snippet bets:** when SERP features were not observed, each snippet target says it is an answer-first bet (at most 2).
+- **Snippet bets:** when SERP features were not observed (Ahrefs or web-search fallback), each snippet target says it is an answer-first bet (at most 2); when the SERP export succeeded, features are observed and no bet label is used.
 - **Cannibalisation override:** when a new page was chosen over an existing client page, the primary keyword is the distinct sub-intent, not the existing page's head term.
 - **Meta hook matches the intent** of the query.
 - **Brand rules:** banned terms absent, preferred terms used, guardrails honoured.

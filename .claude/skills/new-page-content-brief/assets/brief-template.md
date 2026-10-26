@@ -204,7 +204,7 @@ Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts
 - **Word count:** {{200}}
 - **Reasoning:** {{...}}
 
-{{! Check: every Word count above plus the FAQ allowance equals the Total word count. At most 3 Snippet target lines, each with a different query. If SERP features were not observed (Ahrefs or web-search fallback), at most 2, each written as: paragraph | <query> (answer-first bet; SERP features not observed). }}
+{{! Check: every Word count above plus the FAQ allowance equals the Total word count. At most 3 Snippet target lines, each with a different query. Every query must be one pulled in the export (in the keyword table). If SERP features were not observed (Ahrefs or web-search fallback), at most 2, each written as: paragraph | <query> (answer-first bet; SERP features not observed). If the export shows no featured snippet but an AI Overview, at most 2, each written as: paragraph | <query> (AI Overview answer block; no featured snippet observed). }}
 
 ## Frequently Asked Questions
 
@@ -236,7 +236,7 @@ Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts
 
 | Anchor | URL | Placement | Why |
 |---|---|---|---|
-| {{anchor text}} | {{https://www.example.com/blog/related-guide/}} | {{section 2}} | {{next step for this reader}} |
+| {{anchor text}} | {{https://www.example.com/blog/related-guide/}} | {{section 2}} | {{next step for this reader; source: GSC, or "sitemap, indexed"}} |
 | {{anchor text}} | [INTERNAL LINK: {{anchor}} -> {{topic}}] | {{section 4}} | {{no real URL in the GSC data yet}} |
 
 **External (authoritative, non-competitor):**

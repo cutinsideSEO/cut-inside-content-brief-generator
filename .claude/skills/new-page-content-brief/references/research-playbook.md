@@ -13,8 +13,8 @@ source, geo and date. Prices, codes and quotas move; read them at the point of u
 | Keyword list | which keywords and volumes the brief targets | SurgeOS `get_search_visibility_keywords` / `get_keyword_rankings` for keywords the client already tracks (check first); then the user's list, or Ahrefs Keywords Explorer through `ahrefs-navigator` (browser export, country and global volume) | DataForSEO Google Ads search volume for a list; GSC queries only for the client's own demand; SERP-export related searches or Google autocomplete for ideas only (no volume) | SurgeOS tracked: free; Ahrefs: browser exports, no API units; DataForSEO: one flat price per task |
 | SERP per query | top-10 organic URLs and ranks, PAA, SERP features, AI Overview | SurgeOS SERP export (`run_serp_export` + `get_serp_export`), one export per brief, depth 20 (section 5.1) | 1) DataForSEO MCP SERP Google organic, live advanced, depth 20; 2) Ahrefs SERP overview export through `ahrefs-navigator`; 3) web search as last resort (US engine location, not located) | export: price per keyword at the depth, from the tool; DataForSEO per SERP page of 10 |
 | Competitor strength | is a winner strong because of the page or the domain? | Ahrefs SERP overview export (DR, traffic per URL) for a competitive topic | skip; the score stands on volume x rank | browser export |
-| Page content | headings, word count, body text | SurgeOS `request_crawl` (one domain per crawl) for word count, title, meta, H1, plus WebFetch for headings and body (section 8.1) | WebFetch alone; DataForSEO on-page content parsing, live, JavaScript rendering on (with approval of its cost) | crawler: no DataForSEO cost; DataForSEO per page |
-| Internal links | real client URLs to link to | SurgeOS `search_gsc_pages`, `search_gsc_queries` | `[INTERNAL LINK: anchor -> topic]` placeholders | none |
+| Page content | headings, word count, body text | WebFetch first for headings and body; SurgeOS `request_crawl` (one domain per crawl, at most 3 domains per brief, shared daily cap) for word count, title, meta, H1 where WebFetch fails or the length needs reliable counts (section 8.1) | WebFetch alone; DataForSEO on-page content parsing, live, JavaScript rendering on (with approval of its cost) | crawler: no DataForSEO cost; DataForSEO per page |
+| Internal links | real client URLs to link to | SurgeOS `search_gsc_pages`, `search_gsc_queries` | SurgeOS `get_sitemap_urls` with indexed status for hosts outside the default GSC view (labelled "sitemap, indexed"); else `[INTERNAL LINK: anchor -> topic]` placeholders | none |
 | Balance and prices | can we afford the plan? | the SERP export's price from the tool's answer or estimate; DataForSEO `appendix/user_data` for balance and fallback prices | none: without a price, ask before spending | free |
 
 SurgeOS full tool names: `mcp__SurgeOS__run_serp_export`, `mcp__SurgeOS__get_serp_export`,
@@ -38,6 +38,8 @@ label the data as below.
 | Ahrefs overview read from screen (no export control) | Ahrefs SERP read from screen, `<date>` |
 | Web search | approximate ranks, web search (engine location US; not a located SERP), `<date>`; SERP features not observed |
 | Google autocomplete or related searches (free fallback for keyword ideas) | Google autocomplete, `<country>`, `<date>`: ideas only, no volume |
+| A seed query the model proposed for the export (no volume tool) | seed query, proposed, not observed: kept out of the keyword table unless the export or GSC shows it, then labelled with that source |
+| SurgeOS crawler cap reached (WebFetch used instead) | crawl cap reached `<date>`: page read by WebFetch, word count approximate |
 | WebFetch page read | page read without JS rendering; word count approximate |
 | GSC through SurgeOS | GSC `<property>`, `<country or all>`, `<start>` to `<end>` (plus the logging-error caveat when the window overlaps it, section 11) |
 
@@ -102,9 +104,16 @@ foot of a results page can supply keyword ideas: **ideas only, no volume**. Labe
 autocomplete, `<country>`, `<date>`" in the keyword table (volume `not measured`) and in Sources
 and scope. They never replace a measured primary keyword volume (house rule 4).
 
+### No volume tool at all (no Ahrefs browser, no DataForSEO)
+Say so once, in the pre-H1 message (SKILL.md step 1.7). Candidate keywords come only from: user
+strings, the client's GSC queries (last 3 full months), SurgeOS tracked keywords, and the PAA
+questions and related searches the export returns. Model-proposed seed queries may go into the
+export (at most 5, labelled "seed query, proposed, not observed") but enter the keyword table only
+if the export or GSC shows them, labelled with that source. Every volume "not measured".
+
 ## 4. Building the query set (step 2.2)
 
-1. Cluster keywords that a single SERP would answer: singular and plural, spelling variants, word-order variants, and Hebrew prefix variants (ה, ו, ב, ל, מ, ש attached to the same word).
+1. Cluster keywords that a single SERP would answer: singular and plural, spelling variants, word-order variants, Hebrew prefix variants (ה, ו, ב, ל, מ, ש attached to the same word), and transliterations and English/Hebrew names of the same term (for example an English finance term and its Hebrew transliteration). Leave genuinely different intents separate.
 2. Pick the highest-volume member of each cluster as its representative query.
 3. Pull SERPs for representatives in volume order, at most 15. Low-volume long tails stay in the keyword table without their own SERP.
 4. Always include the primary keyword and the top question keyword.
@@ -128,7 +137,7 @@ A queue-based job pulling live Google results for up to 1,000 keywords; two call
 | `client` | the brief's client: adds the client's own position for every keyword |
 | `waitForAiOverview` | true |
 
-   Cost: about $0.0006 a keyword at depth 10 (owner, 2026-10-26), deeper pages cost more; read the price from the tool's answer or estimate at run time, never from this file. It is charged to the agency's shared DataForSEO budget.
+   Cost: price per keyword = cost / keywords of the most recent listed export with the same depth, device and `waitForAiOverview`; if none exists, the tool's documented schedule, labelled "estimate, no same-config export". Never multiply by an assumed factor; never from this file. It is charged to the agency's shared DataForSEO budget.
 3. **Name it clearly** (for example `brief research: <topic>: <market>`) where the tool allows a name. Every export is visible to the whole team in the SERP Explorer history (app.cutinside.com/serp): internal, not client-visible, so no H5 is needed.
 4. **Poll:** `get_serp_export` with the `jobId` until the job is done. Results take a few minutes: never busy-loop; in Claude Code use a short background wait between polls. A job that fails or stays stuck: fall back to 5.2 and re-estimate at H2.
 5. **Read per keyword:** organic results, SERP features, People Also Ask, AI Overview text and its sources, related searches, ads, the client's position.
@@ -231,9 +240,16 @@ in Search intent and SERP: the editorial field is weak, which is an opportunity.
 
 ## 8. Reading pages (step 2.6)
 
-At most 10 pages, priority pages first, then by score.
+At most 10 pages, priority pages first, then by score. WebFetch first for every page.
 
-### 8.1 SurgeOS crawler for competitor pages (primary)
+### 8.1 SurgeOS crawler for competitor pages (word counts, and pages WebFetch cannot read)
+
+**Shared daily cap.** The office crawler has a shared daily write cap (20 crawl writes a day on
+2026-10-26, for the whole agency; two briefs once used 18 of them). Before H1, read the remaining
+budget (`get_crawls`, or the last refusal message) and show it in the cost block as
+`Crawls: k of <remaining> daily writes`. Crawl at most 3 domains per brief (the top-3 candidates),
+and crawl a page only when WebFetch fails or a reliable word count is needed for the length
+derivation. Cap reached: WebFetch only, word counts labelled approximate (section 1).
 
 `request_crawl` accepts URLs outside the client's domain, but ONE DOMAIN PER CRAWL: a list mixing
 domains is rejected. One request per competitor domain (usually one URL each):
@@ -335,7 +351,7 @@ says two periods are not comparable, do not compare them.
 |---|---|
 | No client page on the topic | New page; continue |
 | A client page in the top 10 for the primary query | Refresh, not a new page: flag at H3 |
-| A client page covers the topic, ranks below 10 | Cannibalisation risk: the person decides at H3. If they choose a new page, re-choose the primary for the distinct sub-intent (SKILL.md step 3) |
+| A client page covers the topic, ranks below 10 | Cannibalisation risk: the person decides at H3. If they choose a new page, re-choose the primary for the distinct sub-intent (SKILL.md step 3): only for the terms that page ranks or gets impressions for (export or `gsc_query_page`), and never a synonym or translation of its head term |
 | Client pages on adjacent topics | Internal link candidates (section 12) |
 
 ## 12. Internal link candidates (step 2.9)
@@ -343,8 +359,10 @@ says two periods are not comparable, do not compare them.
 From `search_gsc_pages` and `search_gsc_queries`: client URLs with impressions on related queries,
 sibling articles in the same cluster, and the commercial page that "route, do not target" keywords
 should link to. Write them as full absolute URLs with a suggested anchor and placement. Use only
-URLs seen in the data (indexable, receiving impressions). A link the article needs but the data
-does not show becomes `[INTERNAL LINK: anchor -> topic]`.
+URLs seen in the data (indexable, receiving impressions). A host outside the client's default GSC
+view (a support subdomain, for example): use SurgeOS `get_sitemap_urls` and keep only URLs with
+indexed status, labelled "sitemap, indexed" in the links table. A link the article needs but the
+data does not show becomes `[INTERNAL LINK: anchor -> topic]`.
 
 ## 13. Market codes (verify at run time)
 
@@ -362,9 +380,9 @@ ask, never assume.
 
 ## 14. Cost arithmetic and guards
 
-1. Before H1: list recent SERP exports (reuse a same-day match); read the export's price per keyword at depth 20 from the tool's answer or estimate; read balance and fallback prices with `appendix/user_data` when a DataForSEO line is planned (the export draws on the same budget).
-2. Estimate: SERP export = queries x price per keyword at the chosen depth (from the tool; $0 when reused); crawls = count only (office crawler, no DataForSEO cost); and only for fallback lines actually used: DataForSEO SERPs = queries x 2 pages (depth 20) x price per SERP page; page reads = pages x price per content parse; volumes = tasks (one per up to 1,000 keywords) x price per task. SurgeOS tracked-keyword volumes are free.
-3. Caps per brief: one SERP export of at most 15 queries, 10 page reads, no re-fetches.
+1. Before H1: list recent SERP exports (reuse a same-day match); take the price per keyword from the most recent export with the same depth, device and `waitForAiOverview` (cost / keywords), else the tool's schedule labelled "estimate, no same-config export"; read the crawler's remaining daily writes (`get_crawls`); read balance and fallback prices with `appendix/user_data` when a DataForSEO line is planned (the export draws on the same budget).
+2. Estimate: SERP export = queries x price per keyword at the chosen depth (from the tool; $0 when reused); crawls = count against the remaining daily writes (office crawler, no DataForSEO cost); and only for fallback lines actually used: DataForSEO SERPs = queries x 2 pages (depth 20) x price per SERP page; page reads = pages x price per content parse; volumes = tasks (one per up to 1,000 keywords) x price per task. SurgeOS tracked-keyword volumes are free.
+3. Caps per brief: one SERP export of at most 15 queries, 10 page reads, at most 3 crawled competitor domains, no re-fetches.
 4. Threshold: $1 (SERP export plus DataForSEO fallbacks) or 5,000 Ahrefs API units per run (the skill uses no API units). Above it, H2.
 5. Track: the export `jobId` and its cost from the tool; every crawl id; the `cost` field of every DataForSEO response; the Ahrefs export count. Report them in Sources and scope and in the final message, beside the estimate.
-6. For scale only: about $0.0006 a keyword at depth 10 on the SERP export (owner, 2026-10-26); deeper pages cost more. Never quote it as a price; use what the tool and `appendix/user_data` return.
+6. For scale only: about $0.0006 a keyword at depth 10 on the SERP export (owner, 2026-10-26); a same-config export priced a depth-20 mobile run with AI Overview at about $0.0017 a keyword (2026-10-26). Never quote either as a price; use a same-config export, the tool and `appendix/user_data`.

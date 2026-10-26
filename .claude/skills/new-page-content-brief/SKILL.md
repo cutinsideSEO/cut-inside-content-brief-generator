@@ -20,6 +20,7 @@ description: >-
 > our own agent-content-briefs skill where it was good. Approved by the skill owner (contract,
 > 2026-10-20). QA pending (Phase 5).
 > 2026-10-26: SurgeOS SERP export and any-URL crawler added as the primary research route (round-1 QA ran without them).
+> 2026-10-26: QA round 2 fixes (crawler cap, override primary, keyword sourcing without a volume tool, length vs required items, export price, AI Overview answer blocks, one pre-H1 message, transliteration merging, medical and finance compliance TODO, verified competitor weaknesses, Covered by read pages only, indexed sitemap URLs, Hebrew On Page SEO label, branded template at H4).
 
 # New page content brief (informational, v0.1)
 
@@ -111,17 +112,20 @@ each; otherwise treat it as a batch request (see Batch mode).
 | User asks Claude to build the list | Ahrefs Keywords Explorer through `ahrefs-navigator`: matching terms, questions, related terms; CSV export with country and global volume |
 | Ahrefs browser route blocked (session kicked, no browser) | Stop and ask: re-login, wait, or DataForSEO volume with explicit approval. Never offer the Ahrefs MCP |
 | Only the client's GSC queries are available | Not enough on its own: GSC shows the client's demand, not the topic's. Run a demand check on the top keywords from Ahrefs or DataForSEO as well |
+| No volume tool at all (no Ahrefs browser, no DataForSEO) | Say so once, in the pre-H1 message. Candidate keywords come only from: user strings, client GSC queries (last 3 full months), SurgeOS tracked keywords, and the PAA questions and related searches the export returns. Model-proposed seed queries may go into the export (at most 5, labelled "seed") but enter the keyword table only if the export or GSC shows them. Every volume "not measured" |
 
    The SERP export does NOT return search volume: volumes always come from this table.
-4. List recent SERP exports with SurgeOS `get_serp_export` (no `jobId`, free). A same-day export for the same keywords and market is reused, never paid for twice. Read the export's price per keyword at the chosen depth from the tool's answer or estimate at run time. When a DataForSEO fallback line is in the plan (or the connector is present), read the balance and prices with `appendix/user_data` (free): the export draws on the same agency DataForSEO budget. Never take prices from memory or from this file.
-5. Write the plan: keyword route, the representative queries for the one SERP export (at most 15), device (mobile unless the user says otherwise), the pages you will read (at most 10) and the crawls that implies (one per competitor domain), the tools per step, and the cost arithmetic below.
+4. List recent SERP exports with SurgeOS `get_serp_export` (no `jobId`, free). A same-day export for the same keywords and market is reused, never paid for twice. **Price per keyword** = cost / keywords of the most recent export in that list with the same depth, device and `waitForAiOverview`; if none exists, use the tool's documented schedule and say "estimate, no same-config export". Never multiply by an assumed factor (a depth-20 guess missed by 31%). When a DataForSEO fallback line is in the plan (or the connector is present), read the balance and prices with `appendix/user_data` (free): the export draws on the same agency DataForSEO budget. Never take prices from memory or from this file.
+5. Read the crawler's remaining daily budget: the office crawler has a shared daily write cap (20 crawl writes a day on 2026-10-26, for the whole agency). Read it from `get_crawls` or the last refusal message.
+6. Write the plan: keyword route, the representative queries for the one SERP export (at most 15), device (mobile unless the user says otherwise), the pages you will read (at most 10, WebFetch first) and the crawls (at most 3 competitor domains, step 2.6), the tools per step, and the cost arithmetic below.
+7. **One message before H1.** Between Step 0 and H1 send at most one message, combining: past briefs found, the list's age and the re-check route (when no re-check tool exists, say so; do not ask whether to re-check), missing connectors and the proposed fallback, and the offer to add observed keywords. H1 itself may be that message.
 
 **Cost guard (show the arithmetic at H1):**
 
 ```
 SERP export: <q> queries x $<price per keyword at depth 20, from the tool> = $<a>
              (or: reusing same-day export <jobId>, $0)
-Crawls:      <k> one-domain crawls on the office crawler (counted; no DataForSEO cost)
+Crawls:      <k> of <remaining> daily crawl writes left (shared agency cap; at most 3 per brief; no DataForSEO cost)
 Fallbacks (only lines actually used; prices from appendix/user_data at <time>, balance $<balance>):
   DataForSEO SERPs:  <q2> queries x 2 pages (depth 20) x $<price per SERP page> = $<b>
   Page reads:        <p> pages x $<price per content parse>                   = $<c>
@@ -131,7 +135,7 @@ Ahrefs: <n> browser exports, 0 API units (threshold 5,000 units; this skill uses
 ```
 
 For scale only (owner, 2026-10-26): the SERP export costs about $0.0006 a keyword at depth 10;
-depth 20 costs more, so the price always comes from the tool at run time, never from this file.
+the price always comes from a same-config recent export or the tool (step 1.4), never from this file.
 At the caps (15 queries, 10 page reads) a typical brief costs a few cents. Guards: one SERP export
 per brief, at most 15 queries in it (merge spelling variants into one representative query;
 low-volume long tails stay in the keyword table without their own SERP), at most 10 page reads,
@@ -149,17 +153,17 @@ balance, and wait for approval of the spend.
 Before this step, read `references/research-playbook.md`. It has the exact tool names, parameters,
 fallbacks, the per-page record and the market codes.
 
-1. **Keyword list.** Build or check it per the route chosen at step 1 (SurgeOS tracked keywords first, free). Keep every keyword exactly as supplied or exported. Flag brand and navigational terms (they are not topic demand). Record source, country and date.
-2. **Query set.** Merge spelling and prefix variants into representative queries, highest volume first, at most 15.
+1. **Keyword list.** Build or check it per the route chosen at step 1 (SurgeOS tracked keywords first, free). Keep every keyword exactly as supplied or exported. Flag brand and navigational terms (they are not topic demand). Record source, country and date. With no volume tool, keyword rows come only from the sources in the step 1.3 row; a seed query the export did not confirm stays out of the table.
+2. **Query set.** Merge spelling, prefix and word-order variants, transliterations and the English and local names of the same term into representative queries, highest volume first, at most 15. Keep genuinely different intents separate.
 3. **SERP pulls.** One SurgeOS SERP export per brief: `run_serp_export` with every representative query, `depth` 20, the market's `country` and `language`, `device` mobile unless the user says otherwise, `client` = the brief's client, `waitForAiOverview` true (or the reused same-day export). Poll `get_serp_export` with the `jobId` until done: a few minutes, a short background wait between polls, never a busy loop. Name it clearly: every export is visible to the whole team in the SERP Explorer history (internal, not client-visible, so no H5). Per query keep: the organic top 10 (URL, rank), every PAA question (FAQ pool), the SERP features present (observed), AI Overview presence, gist and cited sources, related searches (keyword ideas only, no volume) and the client's own position (step 2.8). Fallbacks and labels: playbook sections 1 and 5.
 4. **Score.** Write `serp_rows.csv` (columns `keyword,volume,url,rank`, one row per organic top-10 result per query, from the export; volume from the keyword list, since the export has none) and run:
    `python scripts/score_competitors.py serp_rows.csv --exclude-domain <client domain> --top 10`
    It prints a Markdown table of weighted scores (sum over keywords of volume x max(1, 21 - rank)) and accepts a JSON list instead of CSV; add `--json scores.json` to keep the result, `--priority-url <url>` for each page the user named, `--exclude-keyword <brand term>` for brand queries. Use its output, not your own arithmetic. With no measured volumes, pass `--rank-only` (every row weighted as volume 1); the script switches to it on its own, with a notice, when every volume is 0 or missing. Label such scores "rank-only score, volumes not measured" in the brief.
 5. **Flag, do not outline against:** the client's own URLs (excluded; a client page in the top 10 for the primary query means a refresh, flag it at H3), forums and UGC, Wikipedia, video results. They are intent signals, not competitors.
-6. **Read pages.** Priority pages first, then by score, at most 10. Crawl them with SurgeOS `request_crawl`: one domain per crawl (a mixed list is rejected), mode `list`, priority 7 (parameters in playbook section 8). The crawl gives a reliable word count, title, meta and H1; WebFetch gives the H2/H3 tree and body for the digest. Record for each: H1 to H3, word count, and a 90 to 130 word digest in the five-part form. WebFetch refused but the crawl succeeded: use the crawl's fields and mark the digest partial. A page with neither is dropped as evidence; never describe a page you did not read or invent its content.
+6. **Read pages.** Priority pages first, then by score, at most 10. **WebFetch first** for every page (H2/H3 tree and body for the digest). Crawl with SurgeOS `request_crawl` only the pages WebFetch cannot read, or the top 3 when a reliable word count is needed for the length (step 5.1): **at most 3 competitor domains per brief**, one domain per crawl (a mixed list is rejected), mode `list`, priority 7 (playbook section 8.1). The crawler's daily write cap is shared by the whole agency: two briefs once used 18 of 20. Cap reached: WebFetch only, word counts labelled approximate. Record for each: H1 to H3, word count, and a 90 to 130 word digest in the five-part form. WebFetch refused but the crawl succeeded: use the crawl's fields and mark the digest partial. A page with neither is dropped as evidence; never describe a page you did not read or invent its content.
 7. **Top 3 ground truth.** Priority pages first, then the highest scores, until there are 3 real editorial pages read in full. Each must be on the topic (not an adjacent asset class, product or subject) and in the brief's market language, unless none exists. When you prefer a lower-scored page, say why in the brief.
 8. **Cannibalisation and site coverage.** The client's own position per query from the SERP export; SurgeOS `gsc_query_page` for the primary keyword and `search_gsc_queries` for the topic; the latest site crawl searched for topic pages (`get_crawl_pages` / `get_sitemap_urls` with `search`, free); a `site:` search. Recommending a topic the site already covers is a known miss.
-9. **Internal link candidates.** SurgeOS `search_gsc_pages` and `search_gsc_queries` for real, indexable client URLs on related topics.
+9. **Internal link candidates.** SurgeOS `search_gsc_pages` and `search_gsc_queries` for real, indexable client URLs on related topics. A URL outside the default GSC view (a support host, for example) is allowed only from SurgeOS `get_sitemap_urls` with indexed status, labelled "sitemap, indexed" in the links table.
    - **GSC window rule (steps 2.8 and 2.9):** default to the last 3 full months. Never quote impressions, CTR or position from a window that overlaps the GSC impressions logging error (2025-05-13 to 2026-04-27) without the caveat "spans the GSC impressions logging error 2025-05-13 to 2026-04-27"; prefer windows starting 2026-04-28 or later. Always read and respect the `dataNotes` / `compareNote` SurgeOS returns.
 10. **Log spend.** Record the SERP export `jobId` and its cost (from the tool), every crawl id, the `cost` field of every DataForSEO fallback response, and the Ahrefs export count, as you go.
 
@@ -193,6 +197,10 @@ Classify from the SERP you observed, not from the keyword. This is the stop rule
 
 **Cannibalisation override.** When the person chooses a new page with a distinct angle (in either of the last two rows), re-choose the primary keyword for the distinct sub-intent so the new page does not target the existing page's head term. Keep every user string exactly; retype the old head term as Secondary or "Existing page (do not target)" as needed, and show the before and after at H3.
 
+- Apply it only to the terms the existing client page actually ranks or gets impressions for (export position, or GSC `gsc_query_page` query x page, last 3 full months). Other user strings keep their type.
+- The new primary names the distinct sub-intent ("X vs Y", "how to do X with Y", a narrower question), never a synonym, abbreviation expansion, translation or transliteration of the existing page's head term.
+- If no user string expresses the sub-intent, use an observed query (PAA, related search, client GSC query) as primary and say so at H3.
+
 Never proceed silently on a mismatch.
 
 ## Step 4: Strategy
@@ -202,7 +210,7 @@ the editorial angle and, later, the outline skeleton: those decide whether the a
 
 1. **Search intent and SERP:** intent type, preferred format, the SERP features actually observed (per query), the AI Overview line (present or not, gist, cited sources), source (export `jobId`) and date of the pulls.
 2. **Page goal and target audience**, each with reasoning that cites the top-scoring and priority pages and the keyword clusters they own or miss.
-3. **Competitor breakdown:** for every scored competitor, one-sentence description, strengths, weaknesses (written as concrete, reusable gaps); then the differentiation summary, grounded in the rankings (name keyword clusters, volumes and ranks), not in the score alone.
+3. **Competitor breakdown:** for every scored competitor, one-sentence description, strengths, weaknesses (written as concrete, reusable gaps; check every "it lacks X" claim against the page text you read before writing it); then the differentiation summary, grounded in the rankings (name keyword clusters, volumes and ranks), not in the score alone.
 4. **Content gap:** table stakes (in most competitors' headings, or keyword clusters most rank for) and strategic opportunities (in 1 or 2 competitors or absent; high-volume clusters weakly covered), each with heading or keyword evidence, weighed by volume.
 5. **Editorial angle:** a 1 to 2 sentence thesis that takes a position, is specific, passes the swap test, fits informational intent (an explanatory thesis) and cites at least one competitor gap or strength. Re-check it against the gap analysis; if the gaps point to a sharper angle, revise now.
 6. **Keyword strategy:** every keyword exact, typed Primary / Secondary / Question / Commercial (route, do not target) / Brand (excluded) / Existing page (do not target), each with a placement note. The informational head term stays primary even when a transactional term is bigger. "Exact" means the strings are unchanged, not that the user's term must stay primary (see the cannibalisation override in step 3).
@@ -214,10 +222,14 @@ approves angle and outline). On a non-informational verdict or a refresh flag, s
 
 ## Step 5: Length, FAQ set and snippet plan
 
-1. **Total word count:** the user's target if given; otherwise the average word count of the top 3 and priority pages, rounded to the nearest 50. Write the calculation into the brief's reasoning.
+1. **Total word count:** the user's target if given; otherwise the average word count of the top 3 and priority pages, rounded to the nearest 50. Write the calculation into the brief's reasoning. When the user sets a total, divide the outline budget by the table stakes plus the opportunities planned as sections. Below about 120 words an item, say so at H4 with two options: raise the total (propose one), or name which stake or opportunity moves to an FAQ or a link. Never drop a table stake silently.
 2. **FAQ set:** every keyword phrased as a question first, then PAA questions (from the export), then gap-driven questions. Usually 4 to 8.
 3. **FAQ allowance:** questions x 80 words by default (60 to 100 a question when the questions are lighter or heavier). Outline budget = total minus FAQ allowance. The app budgets FAQs from whatever is left, which leaves nothing when the outline uses the whole total, so reserve the allowance explicitly.
-4. **Snippet plan:** 1 to 3 snippet targets with distinct queries, each with the format Google shows (paragraph, list, table), only where the observed SERP supports it: when the export (or the DataForSEO fallback) succeeded, features are OBSERVED, so use the featured snippets it returned and no bet label. None when the SERP shows no opportunity. Only when SERP features were not observed (Ahrefs or web-search fallback), write `Snippet target: <format> | <query> (answer-first bet; SERP features not observed)`, at most 2.
+4. **Snippet plan:** distinct queries, each with the format Google shows (paragraph, list, table), and every query one pulled in the export (in the keyword table). Never a target on a query that was not pulled.
+   - Featured snippet observed: target it (1 to 3), no label.
+   - No featured snippet but an AI Overview observed: at most 2, written `Snippet target: <format> | <query> (AI Overview answer block; no featured snippet observed)`.
+   - Neither observed on a located SERP: none.
+   - SERP features not observed (Ahrefs or web-search fallback): at most 2, written `Snippet target: <format> | <query> (answer-first bet; SERP features not observed)`.
 5. **SERP-feature blocks:** for each feature actually observed (video, image pack, PAA or "things to know", knowledge panel), the matching block you will place in a section. Never a block for a feature the SERP did not show.
 
 ## Step 6: Outline
@@ -241,8 +253,10 @@ Build the outline in these passes, in this order:
 5. **Sums.** Every item has a non-zero word count; H2s get more than their H3s; the outline sum plus the FAQ allowance equals the total.
 
 **Checkpoint H4:** show the outline with section angles, the word budget (per item and the sum),
-the FAQ allowance and the snippet targets. The person approves or changes the outline. If any
-heading changes after H4, show the diff (old and new heading) before H5.
+the FAQ allowance, the snippet targets with their labels, every table stake beside its outline
+item, any length that cannot hold the required items (step 5.1), and the client's branded template
+or naming rule (name it, or say none). The person approves or changes the outline. If any heading
+changes after H4, show the diff (old and new heading) before H5.
 
 ## Step 7: Write the Doc
 
@@ -257,7 +271,7 @@ note the choice at H4.
 1. Fill every section in template order, in the brief's language only (headings, labels and FAQ heading included).
 2. Write the FAQs (step 5 set): questions as H3, 1 to 3 guideline bullets, the first always the self-contained 40 to 50 word answer instruction. Guidelines, never drafted answers.
 3. Write on-page SEO with the title workflow (three candidates: benefit, specificity, curiosity; keep the winner; say why the others lost in full mode). Check the limits and banned patterns in `references/brief-rules.md` section 9.
-4. Write CTA strategy, links (real GSC URLs as full absolute URLs; otherwise `[INTERNAL LINK: anchor -> topic]`), E-E-A-T (only what the client can deliver), writer notes, technical notes, and sources and scope.
+4. Write CTA strategy, links (real GSC URLs, or indexed sitemap URLs labelled as such, as full absolute URLs; otherwise `[INTERNAL LINK: anchor -> topic]`), E-E-A-T (only what the client can deliver), writer notes, technical notes, and sources and scope.
 5. Add the Accuracy and brand guardrails section when the client's brain or brand docs have rules.
    - **Sources, not placeholders:** for every claim a guideline requires (a figure, a study, a date, a rule), use the AI Overview's cited sources from the export as evidence when they support it (read them first), otherwise run one free web search within the run, and put the source URL in the brief and in the Fact and source bank (Sources and scope). Use `[CITE: ...]` only when nothing reliable is found; count them for H6.
 6. Apply the variant and YMYL tables below.
@@ -271,8 +285,8 @@ note the choice at H4.
 
 | Topic type | Add to the brief |
 |---|---|
-| Health or medical | A review-by-expert note (named role, not a person you invent); a red-flags or "when to get help" element in the outline; a studies and sources list (publisher, date, link) for the writer to verify; claims only from the client's own materials |
-| Finance, crypto, tax | A not-advice disclaimer note; no figures (fees, returns, rates) unless the client supplied them; jurisdiction caveats; reviewer in technical notes |
+| Health or medical | A review-by-expert note (named role, not a person you invent); a red-flags or "when to get help" element in the outline; a studies and sources list (publisher, date, link) for the writer to verify; claims only from the client's own materials; a `**TODO (human):** legal or compliance review of service promotion and CTA wording` line in Accuracy and brand guardrails |
+| Finance, crypto, tax | A not-advice disclaimer note; no figures (fees, returns, rates) unless the client supplied them; jurisdiction caveats; reviewer in technical notes; a `**TODO (human):** legal or compliance review of product promotion and CTA wording` line in Accuracy and brand guardrails |
 | Legal | Jurisdiction and date-of-law note; primary sources (statute, regulator) as external links; a `**TODO (human):** legal review` on sensitive lines |
 
 Raise any brand or legal wording risk inside the brief with a safe generic fallback; never hold a
@@ -344,3 +358,8 @@ topic, one brief per topic, never one brief covering several topics.
 | TODOs hidden in HTML comments | Visible `**TODO (human):**` lines; check_brief.py errors on `<!--` |
 | GSC numbers across the 2025-05-13 to 2026-04-27 logging error | Last 3 full months; caveat or a later window; read `dataNotes` |
 | New page keeps the existing page's head term | Cannibalisation override: re-choose the primary at H3 |
+| Override primary is a synonym or translation of the old head term | The new primary names the sub-intent; override only terms the client page ranks for |
+| Crawl cap exhausted by one brief | WebFetch first; at most 3 crawled domains; show remaining crawl writes at H1 |
+| Model-chosen keywords presented as observed | Seeds may query the export; keyword table only from user, GSC, tracked, PAA or related searches |
+| Length target too short for the table stakes | Say so at H4 with a proposed total; never drop a stake silently |
+| Snippet target on an unpulled query | Only pulled queries; AI Overview answer block label when no featured snippet |

@@ -16,7 +16,8 @@ reports no errors. Run it on each variant you deliver. What it checks mechanical
 redo it by hand): section order and headings, the keyword, competitor and on-page tables, character
 limits, slug word count, outline labels and non-zero word counts, outline sum + FAQ allowance =
 total (1% tolerance), 1 to 3 distinct snippet queries, snippet targets labelled a bet when SERP
-features were not observed, the 40/50 first FAQ guideline, forbidden leftovers (`{{`, `}}`,
+features were not observed or an AI Overview answer block when no featured snippet was observed,
+snippet queries that are not in the keyword table (warning), the 40/50 first FAQ guideline, forbidden leftovers (`{{`, `}}`,
 `<topic>`, `<client>`, `<keyword>`, `[PLACEHOLDER`, `TBD`, `Lorem`), any HTML comment `<!--`
 (an error: comments vanish in the Google Doc, so a TODO must be a visible `**TODO (human):**`
 line), em-dashes, and English banned title, meta and phrase patterns. If the script is unavailable, do
@@ -29,11 +30,11 @@ these checks by hand from section 4 and say so in Sources and scope.
 | C1 | No leftover text from another brief or the template (wrong topic words, sample rows, another client's FAQ) | Read the whole brief for words that do not belong to this topic and client |
 | C2 | No primary keyword with zero or unmeasured volume without saying so | Keyword table note on the primary |
 | C3 | The top-3 list has 3 real pages, each read in this run | Compare with the page-read record |
-| C4 | Headings in the brief's language only (no English FAQ heading in a Hebrew brief) | Every `##` and FAQ heading |
+| C4 | Headings in the brief's language only (no English FAQ heading in a Hebrew brief); the template's fixed label `## On Page SEO` is allowed in a Hebrew brief | Every `##` and FAQ heading |
 | C5 | Figures identical wherever they repeat (total words, FAQ allowance, volumes, title, H1, slug) | Brief at a glance vs body |
 | C6 | Every volume and rank is from a tool call in this run, with source and geo | Source line under the keyword table; Sources and scope |
 | C7 | Every competitor URL is real and was read (a crawl-only read counts only with its digest labelled partial) | Page-read record and crawl ids |
-| C8 | No invented internal URL | Every internal URL appears in the GSC data; else the placeholder |
+| C8 | No invented internal URL | Every internal URL appears in GSC data, or in SurgeOS `get_sitemap_urls` with indexed status (say which in the links table); else the placeholder |
 | C9 | Keywords appear exactly as supplied or exported | Diff the table against the list |
 | C10 | The intent verdict matches the observed SERP | The SERP record and the verdict table in SKILL.md step 3 |
 | C11 | No GSC impressions, CTR or position quoted from a window that overlaps the GSC impressions logging error (2025-05-13 to 2026-04-27) without the caveat; SurgeOS `dataNotes` / `compareNote` respected | Every GSC figure's window in the brief and in Sources and scope |
@@ -51,6 +52,10 @@ and never round up.
 **Against inflated self-scores:** table stakes is 5 only if every table stake has its own outline
 item (not only a passing mention in another section's guideline). Before scoring, list each table
 stake beside the outline item that carries it; any stake named only in passing caps the score at 4.
+**Table stakes is at most 3** if any stake from the gap analysis or from the competitors' shared
+headings has no outline item. **Keyword integration is at most 3** if the primary changed at H3 and
+the new primary fails the override reading check (section 5), or if a snippet target or heading
+targets a query not in the keyword table.
 
 | Criterion | The question | A 3 looks like | A 5 looks like |
 |---|---|---|---|
@@ -74,7 +79,7 @@ strengths. They go in your working notes, not the brief.
 - [ ] On-page table with all six rows and a Chars column; limits: meta title <= 60, meta description <= 155, OG title <= 60, OG description <= 200, slug 3 to 5 hyphenated words.
 - [ ] Every outline item has a non-empty Angle, Guidelines, Keywords and a non-zero Word count.
 - [ ] Outline sum + FAQ allowance = total word count.
-- [ ] 1 to 3 snippet targets with distinct queries, or none if the SERP shows no opportunity.
+- [ ] 1 to 3 snippet targets with distinct, pulled queries (in the keyword table), or none if the SERP shows no opportunity; at most 2, labelled, when no featured snippet was observed.
 - [ ] FAQs: questions as H3, 1 to 3 guideline bullets, first one the 40 to 50 word answer instruction; no drafted answers.
 - [ ] Internal links are full absolute URLs from GSC, or the placeholder.
 - [ ] E-E-A-T lists only what the client can deliver.
@@ -90,8 +95,12 @@ strengths. They go in your working notes, not the brief.
 - **Headings are claims, not labels;** at most one "What is X?"; no 5 parallel "How to" H2s; shapes vary.
 - **Guidelines advance the angle** and name concrete things (a table's columns, an example, a number with `[CITE]`), not "explain clearly".
 - **Claims:** every product, medical, legal or financial claim is supported by the client's materials or a source URL read in this run (listed in the Fact and source bank), or marked `[CITE: ...]` / `**TODO (human):** ...`. More than a handful of `[CITE]` markers means the research was skipped: search before shipping.
-- **Snippet bets:** when SERP features were not observed (Ahrefs or web-search fallback), each snippet target says it is an answer-first bet (at most 2); when the SERP export succeeded, features are observed and no bet label is used.
-- **Cannibalisation override:** when a new page was chosen over an existing client page, the primary keyword is the distinct sub-intent, not the existing page's head term.
+- **Snippet bets:** when SERP features were not observed (Ahrefs or web-search fallback), each snippet target says it is an answer-first bet (at most 2); when the export shows no featured snippet but an AI Overview, each says "AI Overview answer block; no featured snippet observed" (at most 2); a featured snippet observed needs no label. Every target query was pulled.
+- **Cannibalisation override:** when a new page was chosen over an existing client page, the primary keyword is the distinct sub-intent, not the existing page's head term. Override primary is not a synonym, abbreviation expansion, translation or transliteration of the existing head term, and the override touched only terms the client page ranks or gets impressions for.
+- **Keyword sourcing without a volume tool:** every keyword row comes from a user string, client GSC, SurgeOS tracked keywords, or the export's PAA or related searches; no model-chosen seed in the table unless observed.
+- **Competitor claims:** every weakness ("it lacks X") matches the page text read; Covered by lists only pages read in this run.
+- **Length vs required items:** a user total below about 120 words an item was raised at H4; no table stake dropped silently.
+- **Medical and finance:** a legal or compliance TODO on promotion and CTA wording is present.
 - **Meta hook matches the intent** of the query.
 - **Brand rules:** banned terms absent, preferred terms used, guardrails honoured.
 - **Standing recommendation changed?** Then the brief says so (house rule 5).

@@ -11,7 +11,7 @@ because they are the method. Section numbers are referenced from `SKILL.md`.
 - **Data integrity.** Base all analysis only on the data pulled in this run, the keywords and the user's context. Do not fabricate statistics, studies or claims. When referencing competitor behaviour, cite the specific URL. Flag uncertain recommendations as suggestions, not facts.
 - **Brand alignment.** Every recommendation fits the brand's voice, positioning, audience and content rules. Never recommend what the brand's don't-list or banned terms exclude. Favour preferred terminology. Flag known competitors when they appear.
 - **Reasoning is a deliverable.** Every recommendation in the full variant carries a `Reasoning:` line that cites the data behind it (a URL, a keyword with volume and rank, a heading pattern). The concise variant deletes those lines and nothing else.
-- **Language.** Every heading, label, value and reasoning line is in the brief's language. In a Hebrew brief, only the fixed labels in the template stay English (on-page element names, outline level prefixes, snippet formats).
+- **Language.** Every heading, label, value and reasoning line is in the brief's language. In a Hebrew brief, only the fixed labels in the template stay English (the `## On Page SEO` section heading, on-page element names, outline level prefixes, snippet formats).
 - **The brief's own prose obeys the voice rails and banned-phrase list in section 12.** A writer copies the brief's wording, so a guideline that says "delve into" teaches the article to say it.
 
 ## 1. Search intent
@@ -86,7 +86,7 @@ the winners dominate and the lower performers miss. Do not rely on the weighted 
 
 - **What it is:** "a single, concise sentence summarizing the page's content and angle."
 - **Strengths:** specific things to learn from ("a comparison table of the three account types", "opens with a 45-word definition"), and which high-value keyword clusters and positions it owns.
-- **Weaknesses:** specific gaps, written as concrete, reusable content gaps ("no worked example with real numbers", "ignores the local tax rule"), and the high-volume terms where it ranks weakly or not at all. Writers use these as a differentiation directive: close these gaps explicitly, without complaining about competitors in the article.
+- **Weaknesses:** specific gaps, written as concrete, reusable content gaps ("no worked example with real numbers", "ignores the local tax rule"), and the high-volume terms where it ranks weakly or not at all. Verify every "it lacks X" or "it does not mention X" against the page text read in this run before writing it (a QA check found a page credited with omitting a step it listed); a page read only partially gets no absence claims. Writers use these as a differentiation directive: close these gaps explicitly, without complaining about competitors in the article.
 
 In the brief: the differentiation summary (with reasoning), the competitor table (URL, weighted
 score, word count, what it is, strengths, weaknesses; at least 3 rows), the top 3 read in full, and
@@ -103,7 +103,7 @@ one line naming what was excluded or flagged (the client's own URLs, forums, Wik
 Constraints:
 
 - "Use the exact keywords provided. Do not add, change, or remove any keywords from the list." Exported lists are trimmed only for topic fit, and the trim is stated. "Exact" means the strings stay unchanged; it does not mean the user's term must stay primary.
-- **Cannibalisation override.** When a client page already covers the topic and the person chooses a new page with a distinct angle (SKILL.md step 3), re-choose the primary keyword for the distinct sub-intent, so the new page does not target the existing page's head term. Keep every user string exactly; retype the old head term as Secondary or "Existing page (do not target)" (its note names the existing URL and says to link to it, not compete with it). Show the change (old primary, new primary, why) at H3.
+- **Cannibalisation override.** When a client page already covers the topic and the person chooses a new page with a distinct angle (SKILL.md step 3), re-choose the primary keyword for the distinct sub-intent, so the new page does not target the existing page's head term. Keep every user string exactly; retype the old head term as Secondary or "Existing page (do not target)" (its note names the existing URL and says to link to it, not compete with it). Show the change (old primary, new primary, why) at H3. Apply it only to the terms the existing client page actually ranks or gets impressions for (export position or GSC, last 3 full months); other user strings keep their type. The new primary names the distinct sub-intent ("X vs Y", "how to do X with Y"), never a synonym, abbreviation expansion, translation or transliteration of the existing head term. If no user string expresses the sub-intent, use an observed query (PAA, related search, client GSC query) as primary and say so at H3.
 - **The informational head term stays primary.** An informational page chasing a bigger transactional head term loses to retail and cannibalises the commercial page. Commercial terms become "Commercial (route, do not target)" rows whose note says which page they route to (an internal link), and they do not shape the outline.
 - **Brand and navigational terms** (a brand name, a product name, a site name) are typed "Brand (excluded)": brand demand is not topic demand. They are excluded from scoring and targeting.
 - **Zero or unmeasured volume on the primary keyword** must be said in the note ("0 in <country>, <month>; chosen because ..."), never left silent.
@@ -191,6 +191,7 @@ the table stake X", "Exploits the opportunity to discuss Y in more depth than co
 - **FAQ allowance:** reserve it explicitly, questions x 80 words by default (60 to 100 a question). Outline sum + FAQ allowance = total (the check tolerates 1%).
 - **Every item has a non-zero word count.** H2 sections get more than their H3s. Give more to complex guidelines and to snippet-target sections; give demand-weighted space to subtopics with their own volume.
 - The writer's range per section is the target x 0.85 to x 1.15; state it once in Writer notes. Padding to a number is worse than a sharper, shorter section.
+- **A user total too small for the required items:** divide the outline budget by the table stakes plus the opportunities planned as sections. Below about 120 words an item, say so at H4 with two options: raise the total (propose a number), or name which stake or opportunity moves to an FAQ or a link. Never drop a table stake silently.
 
 ### 7.6 Featured snippet targeting
 
@@ -200,7 +201,9 @@ the table stake X", "Exploits the opportunity to discuss Y in more depth than co
 - Each target has a **distinct query**: never point two sections at the same query.
 - Choose the sections most likely to win: those that directly answer a specific question.
 - Format = what Google shows for that query: **paragraph** for definitions (a direct 40 to 60 word answer in the first 1 to 2 sentences), **list** for steps or items (5 to 8 clear items), **table** for comparisons (a real table with headers).
-- Only where there is a genuine opportunity. "A single strong target beats three weak ones." For informational queries at least one target is usually warranted. With no featured snippet and no clear answer query in the SERP, an AI Overview or answer-first target is still reasonable for the main question; say which.
+- Only where there is a genuine opportunity. "A single strong target beats three weak ones." For informational queries at least one target is usually warranted.
+- **Only pulled queries:** every target query is one pulled in the export (in the keyword table). Never a target on a query that was not pulled.
+- **No featured snippet observed, AI Overview observed:** at most 2 targets, each labelled `Snippet target: <format> | <query> (AI Overview answer block; no featured snippet observed)`. In a Hebrew brief: `(בלוק תשובה ל-AI Overview; לא נצפה featured snippet)`. Neither a featured snippet nor an AI Overview observed on a located SERP: no targets.
 - **SERP features not observed** (web-search fallback, no located SERP): label each target a bet, at most 2: `Snippet target: <format> | <query> (answer-first bet; SERP features not observed)`. In a Hebrew brief: `(הימור answer-first; רכיבי SERP לא נצפו)`.
 - No opportunity anywhere: no snippet targets.
 
@@ -224,7 +227,7 @@ bolt on as generic add-ons."
 ### 7.8 Enrichment (after the skeleton is approved internally)
 
 - **Keywords:** the exact keyword strings (from the keyword table) this item helps target.
-- **Covered by:** URLs of read competitors that have a section on this item (checked against their headings and text).
+- **Covered by:** URLs of read competitors that have a section on this item (checked against their headings and text). Only pages read in this run; an unread ranking page goes in Search intent and SERP, not in Covered by.
 - **Internal links:** where it strengthens the article, append 1 to 2 guidelines proposing a contextual internal link: a real client URL from the GSC data, or `[INTERNAL LINK: anchor -> topic]`. Only links that genuinely help the reader; do not force one into every section.
 - **Never overwrite strategy:** preserve every section angle exactly and every existing guideline. Append only; never delete, reword or replace.
 
@@ -303,7 +306,7 @@ passes the specificity test, (c) any banned pattern considered and rejected.
 
 - **Primary CTA:** the one action the page exists to drive, matched to an informational reader (a related guide, a tool, a soft product mention the client's materials support). **Secondary CTA:** the lighter alternative. **Placement:** where each appears (after section N, end of page, inline).
 - Do not sell an outcome the page cannot deliver; a soft CTA with an availability or eligibility caveat beats a hard one that overclaims.
-- **Internal links:** a table of anchor, full absolute URL, placement and why; real URLs from GSC only. Commercial "route, do not target" keywords become anchors to the commercial page.
+- **Internal links:** a table of anchor, full absolute URL, placement and why; real URLs from GSC, or from SurgeOS `get_sitemap_urls` with indexed status for hosts outside the default GSC view, labelled "sitemap, indexed". Commercial "route, do not target" keywords become anchors to the commercial page.
 - **External links:** authoritative, non-competitor sources (regulators, standards bodies, peer-reviewed studies, official documentation), with what each supports. Never a competitor.
 
 ## 11. E-E-A-T signals
@@ -367,8 +370,8 @@ A brief with a dozen `[CITE]` markers has moved the research to the writer.
 
 ## 13. YMYL extras (health, finance, legal)
 
-- **Health:** a review-by-expert note (role, not an invented name); a red-flags or "when to get help" element in the outline (for example a "when to see a doctor" list); a studies and sources list (publisher, date, link) for the writer to verify; a repeated per-condition structure where the topic has several conditions (what it is, symptoms, first steps); claims only from the client's own materials; a fact-check line in technical notes.
-- **Finance, crypto, tax:** a not-financial-advice or not-tax-advice note; no fees, returns or rates unless the client supplied them; jurisdiction caveats; the local angle (the market's tax or regulator rules) is often the strategic opportunity.
+- **Health:** a review-by-expert note (role, not an invented name); a red-flags or "when to get help" element in the outline (for example a "when to see a doctor" list); a studies and sources list (publisher, date, link) for the writer to verify; a repeated per-condition structure where the topic has several conditions (what it is, symptoms, first steps); claims only from the client's own materials; a fact-check line in technical notes; a `**TODO (human):** legal or compliance review of service promotion and CTA wording` line in Accuracy and brand guardrails (medical-service promotion is regulated; no unsupported superlatives).
+- **Finance, crypto, tax:** a not-financial-advice or not-tax-advice note; no fees, returns or rates unless the client supplied them; jurisdiction caveats; a `**TODO (human):** legal or compliance review of product promotion and CTA wording` line in Accuracy and brand guardrails; the local angle (the market's tax or regulator rules) is often the strategic opportunity.
 - **Legal:** jurisdiction and the date of the law; primary sources (statute, regulator) as external links, read in this run; institution point of view where the client is an institution with positions; `**TODO (human):** legal review` on sensitive lines.
 - Raise a brand-name or legal wording risk inside the brief with a generic fallback (a device class instead of a third-party brand, for example). Never hold the brief waiting on legal.
 

@@ -32,7 +32,12 @@ Checks (ERROR fails the brief, WARNING is advice)
     7  Article structure: totals, per-item bullets, word count sum, snippet targets;
        when the Search intent section says SERP features were not observed
        ("not observed" / "לא נצפו"), every snippet line must say it is a bet
-       ("bet" / "הימור") and there should be at most 2 (warnings)
+       ("bet" / "הימור") and there should be at most 2 (warnings); when it says
+       no featured snippet was observed ("no featured snippet" / "לא נצפה featured
+       snippet"), every snippet line must say it is an AI Overview answer block
+       ("AI Overview answer block" / "בלוק תשובה ל-AI Overview"), at most 2
+       (warnings); every snippet query should be a keyword in the keyword table,
+       i.e. a query that was pulled (warning)
     8  FAQs: Guidelines bullet, the 40 to 50 word answer rule, no drafted answers
     9  Competitor table: at least 3 rows, absolute http(s) URLs
     10 language consistency of section headings
@@ -128,6 +133,9 @@ INTERNAL_LINK_RE = re.compile(r"\[INTERNAL LINK:")
 HTML_COMMENT_RE = re.compile(r"<!--")
 NOT_OBSERVED_RE = re.compile(r"not observed|לא נצפו", re.I)
 BET_RE = re.compile(r"\bbets?\b|הימור", re.I)
+NO_FS_RE = re.compile(r"no featured snippet|לא נצפה featured snippet|אין featured snippet", re.I)
+AIO_BLOCK_RE = re.compile(r"AI Overview answer block|בלוק תשובה ל-?AI Overview", re.I)
+TRAILING_PAREN_RE = re.compile(r"\s*\([^()]*\)\s*$")
 FILL_TOKEN_RE = re.compile(r"\{\{.*?\}\}")
 CODE_SPAN_RE = re.compile(r"`[^`]*`")
 
@@ -438,6 +446,7 @@ def main(argv=None):
 
     # ---- 5. keyword table
     primary_kw = None
+    kw_set = set()  # every keyword string in the keyword table (casefolded, spaces collapsed)
     r = sec_range("keywords")
     if r:
         tables = find_tables(lines, r[0], r[1])
@@ -448,6 +457,8 @@ def main(argv=None):
         if ktable:
             for ln, cells in ktable["rows"]:
                 typ = strip_fmt(cells[0]).lower() if cells else ""
+                if len(cells) > 1 and strip_fmt(cells[1]):
+                    kw_set.add(" ".join(strip_fmt(cells[1]).split()).casefold())
                 if typ.startswith("primary") or typ.startswith("ראשית"):
                     kw = strip_fmt(cells[1]) if len(cells) > 1 else ""
                     vol = strip_fmt(cells[2]) if len(cells) > 2 else ""
@@ -596,7 +607,7 @@ def main(argv=None):
         for ln, txt in snippets:
             fmt, _sep, query = txt.partition("|")
             fmt = strip_fmt(fmt).lower()
-            query = strip_fmt(query)
+            query = TRAILING_PAREN_RE.sub("", strip_fmt(query)).strip()
             if fmt not in ("paragraph", "list", "table"):
                 rep.error(ln, "snippet target format '%s' must be paragraph, list or table" % fmt)
             if not query:
@@ -607,6 +618,9 @@ def main(argv=None):
                     rep.error(ln, "snippet target query '%s' is duplicated (also line %d)" % (query, seen_q[qk]))
                 else:
                     seen_q[qk] = ln
+                if kw_set and not FILL_TOKEN_RE.search(query) and " ".join(query.split()).casefold() not in kw_set:
+                    rep.warn(ln, "snippet target query '%s' is not in the keyword table: target only queries pulled in "
+                             "this run (add it as a pulled keyword or pick a pulled query)" % query)
         if not snippets:
             rep.warn(hl, "no snippet target in the outline (informational briefs usually warrant one)")
         ir = sec_range("intent")
@@ -619,6 +633,13 @@ def main(argv=None):
                              "(add '(answer-first bet; SERP features not observed)') at lines: %s" % fmt_lines(unlabelled))
                 if len(snippets) > 2:
                     rep.warn(snippets[2][0], "SERP features were not observed: at most 2 snippet bets (found %d)" % len(snippets))
+            elif NO_FS_RE.search(intent_text):
+                unlabelled = [ln for ln, txt in snippets if not AIO_BLOCK_RE.search(txt)]
+                if unlabelled:
+                    rep.warn(unlabelled[0], "no featured snippet was observed, but snippet target(s) are not labelled "
+                             "'(AI Overview answer block; no featured snippet observed)' at lines: %s" % fmt_lines(unlabelled))
+                if len(snippets) > 2:
+                    rep.warn(snippets[2][0], "no featured snippet observed: at most 2 AI Overview answer-block targets (found %d)" % len(snippets))
 
         if args.variant == "full" and items and missing_reasoning:
             rep.warn(missing_reasoning[0], "full variant: outline item(s) without a Reasoning bullet at lines: %s" % fmt_lines(missing_reasoning))

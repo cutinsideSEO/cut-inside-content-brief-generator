@@ -2,7 +2,8 @@
 name: new-page-content-brief
 description: >-
   Produces an SEO content brief (not the article) for one NEW informational article (guide, "what
-  is", "how to") as a Google Doc a writer can execute without further research: questions first,
+  is", "how to") as two linked Google Docs from one research pass: a gold-length writer brief a
+  writer can execute without further research, and the full research brief behind it: questions first,
   live SERP research (SurgeOS SERP export and crawler, DataForSEO, Ahrefs via ahrefs-navigator),
   competitor scoring, intent verdict, editorial angle, gaps, a nested outline with section angles,
   word budgets and snippet targets, FAQs, on-page SEO, E-E-A-T, a self-check, and human checkpoints.
@@ -21,6 +22,7 @@ description: >-
 > 2026-10-20). QA pending (Phase 5).
 > 2026-10-26: SurgeOS SERP export and any-URL crawler added as the primary research route (round-1 QA ran without them).
 > 2026-10-26: QA round 2 fixes (crawler cap, override primary, keyword sourcing without a volume tool, length vs required items, export price, AI Overview answer blocks, one pre-H1 message, transliteration merging, medical and finance compliance TODO, verified competitor weaknesses, Covered by read pages only, indexed sitemap URLs, Hebrew On Page SEO label, branded template at H4).
+> 2026-10-28: owner verdict: outputs split into a gold-length writer brief (human) and the full research brief (internal and machine writing); concise variant removed.
 
 # New page content brief (informational, v0.1)
 
@@ -28,20 +30,29 @@ A brief is the plan a writer follows without opening a SERP. The failure mode is
 SERP: covering what everyone covers, phrased how everyone phrases it. Everything below exists to
 prevent that, and to make every number in the brief traceable to a tool call made in this run.
 
-**What this skill produces:** one brief per topic, in the client's language, as a Google Doc built
-from `assets/brief-template.md` (or `assets/brief-template-he.md`). **Brief only:** never draft
-article copy (several clients' contracts are brief-only; drafting is `blog-article-draft`). The
-brief describes the TARGET page only; anything about a current page goes in a companion note.
-No Open Items section: decisions are settled with the person at H3 and H4. Aim for 15 pages or fewer.
+**What this skill produces:** per topic, in the client's language, two linked Google Docs from one
+research pass:
+
+- **Writer brief** (the main deliverable, what goes to a client or freelancer; gold-brief length,
+  readable in five minutes): `assets/writer-brief-template.md` (Hebrew `-he`). Distilled from the
+  research brief at step 7b.
+- **Research brief** (internal: the agency record, the strategist's review copy, and the input for
+  machine writing with `blog-article-draft`; never sent to the client unless the person asks):
+  `assets/brief-template.md` (Hebrew `-he`), every section with its reasoning and evidence.
+
+**Brief only:** never draft article copy (several clients' contracts are brief-only; drafting is
+`blog-article-draft`). Both briefs describe the TARGET page only; anything about a current page goes
+in a companion note. No Open Items section: decisions are settled with the person at H3 and H4. The
+research brief stays at 15 pages or fewer; the writer brief keeps to the step 7b length budget.
 
 **Who does what:** Claude does the research and writing with its tools (SurgeOS SERP export and
 crawler first; DataForSEO MCP and Ahrefs as fallbacks); Ahrefs work happens in a browser through
 the `ahrefs-navigator` skill (never the Ahrefs MCP or API); the person decides at the six
 checkpoints below.
 
-**What the brief contains** (house format; the templates hold the exact labels):
+**What the research brief contains** (house format; the templates hold the exact labels):
 
-1. Title line (`<Topic> - Content Brief | <Client>`, Hebrew `<topic> - בריף יצירת תוכן | <client>`, unless the client's brain sets a document naming rule: step 7), header block (date, market and language, prepared by role, variant) and relevant links.
+1. Title line (the writer title plus ` | research`; writer title `<Topic> - Content Brief | <Client>`, Hebrew `<topic> - בריף יצירת תוכן | <client>`, unless the client's brain sets a document naming rule: step 7), header block (date, market and language, prepared by role, "Research brief" with a link to the writer brief) and relevant links.
 2. Brief at a glance: intent and format, editorial angle, word count, primary keyword, title and H1.
 3. Accuracy and brand guardrails (only when the client has rules).
 4. Strategy and goals: page goal, target audience, editorial angle.
@@ -53,8 +64,17 @@ checkpoints below.
 10. Article structure: total and FAQ allowance; nested outline with angle, guidelines, keywords, word count, covered by, snippet target, resources.
 11. FAQs, Conclusion and CTA, internal and external links, E-E-A-T signals, writer notes, technical notes, sources and scope.
 
-Reasoning lines appear in the full variant only. The brief's own prose follows the same voice rails
-and banned-phrase list it gives the writer: a writer copies the brief's wording.
+**What the writer brief contains:** header (title, date, market, link to the research brief);
+Strategy summary (about 150 words: intent and format, what wins the SERP, our angle, the 3 gaps we
+exploit, guardrails); keyword table (Type, Keyword, Monthly searches, Placement) with one source
+line; on-page table (Element, Recommendation, Chars); the full outline, each item with heading,
+one-line angle, 2 to 4 imperative guidelines, word count, and a snippet target or resource only
+where present; FAQs (one-line guideline each); internal links (anchor, URL); writer notes (tone, top
+do's and don'ts, E-E-A-T and YMYL items, every TODO); CTA. No competitor table, gap evidence,
+reasoning, SERP detail or source bank: those stay in the research brief, linked.
+
+Reasoning lines appear in the research brief only. Both briefs' prose follows the voice rails and
+banned-phrase list the brief gives the writer: a writer copies the brief's wording.
 
 ## House rules (verbatim, apply to everything you write)
 
@@ -71,13 +91,15 @@ and banned-phrase list it gives the writer: a writer copies the brief's wording.
 | Path | Read or run when |
 |---|---|
 | `references/research-playbook.md` | before step 2 (research): tools, parameters, scoring, digests, market codes, cost |
-| `references/brief-rules.md` | before step 4 (strategy) and again before step 6 (outline) |
+| `references/brief-rules.md` | before step 4 (strategy), again before step 6 (outline), and section 17 before step 7b (writer brief) |
 | `references/examples.md` | before step 7 (writing the Doc): format examples only, never content to copy. QA cases must be held out of examples.md: never test the skill on a topic whose gold is excerpted there |
-| `assets/brief-template.md` | at step 7, for an English brief |
-| `assets/brief-template-he.md` | at step 7, for a Hebrew brief |
+| `assets/brief-template.md` | at step 7, the research brief (English) |
+| `assets/brief-template-he.md` | at step 7, the research brief (Hebrew) |
+| `assets/writer-brief-template.md` | at step 7b, the writer brief (English) |
+| `assets/writer-brief-template-he.md` | at step 7b, the writer brief (Hebrew) |
 | `scripts/score_competitors.py` | at step 2, after the SERP pulls |
 | `references/qa-rubric.md` | before step 8 (self-check) |
-| `scripts/check_brief.py` | at step 8, on the finished Markdown |
+| `scripts/check_brief.py` | at step 8, on both briefs (`--type research`, `--type writer --pair`) |
 | `evals/qa-log.md` | never at run time; maintenance only (QA rounds) |
 
 ## Step 0: Ask first (one message)
@@ -89,7 +111,7 @@ assume a market from the domain.
 2. What is the topic or main keyword? Do you have a keyword list with volumes, or should I build one from Ahrefs (browser export through ahrefs-navigator, global and local volume)?
 3. Is there a target length, or should the competitors' depth decide?
 4. Are there pages you want weighted heavily (references, competitors you rate), or a page whose structure the brief should follow?
-5. Who will write it: an internal writer, the client, or a freelancer? (Client-facing and freelancer briefs get the concise variant with reasoning trimmed.)
+5. Who will write it: an internal writer, the client, a freelancer, or a machine (`blog-article-draft`)? (Every run makes both a writer brief and a research brief; the answer sets the writer brief's tone and assumed knowledge, and whether the research brief is shared with the writer.)
 6. Where should the Doc go (the client's content folder, or a link you give me)?
 
 "Check and send new briefs": if briefs from an earlier run exist, read them and start at step 8 for
@@ -258,11 +280,11 @@ item, any length that cannot hold the required items (step 5.1), and the client'
 or naming rule (name it, or say none). The person approves or changes the outline. If any heading
 changes after H4, show the diff (old and new heading) before H5.
 
-## Step 7: Write the Doc
+## Step 7: Write the research brief
 
 Before this step, read `references/examples.md` for the format (never copy its content). Copy the
 blank template, `assets/brief-template.md` (English) or `assets/brief-template-he.md` (Hebrew),
-into the working folder as `brief.md`, and fill it. Always start from the blank template, never
+into the working folder as `research-brief.md`, and fill it. Always start from the blank template, never
 from a previous brief: copy-paste leftovers are the most common miss in past briefs. If the
 client's brain names a branded template or a naming rule for documents, keep the skill's section
 order and labels but apply the client's header, branding and file naming (title line included);
@@ -270,18 +292,13 @@ note the choice at H4.
 
 1. Fill every section in template order, in the brief's language only (headings, labels and FAQ heading included).
 2. Write the FAQs (step 5 set): questions as H3, 1 to 3 guideline bullets, the first always the self-contained 40 to 50 word answer instruction. Guidelines, never drafted answers.
-3. Write on-page SEO with the title workflow (three candidates: benefit, specificity, curiosity; keep the winner; say why the others lost in full mode). Check the limits and banned patterns in `references/brief-rules.md` section 9.
+3. Write on-page SEO with the title workflow (three candidates: benefit, specificity, curiosity; keep the winner; say in the Reasoning column why the others lost). Check the limits and banned patterns in `references/brief-rules.md` section 9.
 4. Write CTA strategy, links (real GSC URLs, or indexed sitemap URLs labelled as such, as full absolute URLs; otherwise `[INTERNAL LINK: anchor -> topic]`), E-E-A-T (only what the client can deliver), writer notes, technical notes, and sources and scope.
 5. Add the Accuracy and brand guardrails section when the client's brain or brand docs have rules.
    - **Sources, not placeholders:** for every claim a guideline requires (a figure, a study, a date, a rule), use the AI Overview's cited sources from the export as evidence when they support it (read them first), otherwise run one free web search within the run, and put the source URL in the brief and in the Fact and source bank (Sources and scope). Use `[CITE: ...]` only when nothing reliable is found; count them for H6.
-6. Apply the variant and YMYL tables below.
+6. Apply the YMYL table below.
 7. Make every figure identical wherever it repeats (word counts, volumes, title, H1).
-
-| Who writes | Variant | What changes |
-|---|---|---|
-| Internal writer | full | Every recommendation keeps its Reasoning line |
-| Client or freelancer | concise | Drop every `**Reasoning:**` line, the Reasoning column of the on-page table and the strategy rationale paragraphs; Covered by is optional |
-| Both asked for | both, from one run | Build full first, derive concise by deletion only; never let the two disagree |
+8. Run `python scripts/check_brief.py research-brief.md --type research` (step 8.1) before step 7b: the writer brief is distilled from a clean research brief.
 
 | Topic type | Add to the brief |
 |---|---|
@@ -293,22 +310,39 @@ Raise any brand or legal wording risk inside the brief with a safe generic fallb
 brief waiting on legal. Unsupported product or medical claims become `[CITE: ...]` or a
 visible `**TODO (human):** ...` line. Never use HTML comments: they vanish in the Google Doc.
 
+## Step 7b: Distil the writer brief
+
+Before this step, read `references/brief-rules.md` section 17. Copy the blank
+`assets/writer-brief-template.md` (Hebrew `assets/writer-brief-template-he.md`) as
+`writer-brief.md` and fill it FROM `research-brief.md`, by deletion and compression only.
+
+- **No new content.** No claim, number, source, heading or keyword that is not in the research brief. Compress wording; never change what it says.
+- **Identical figures and strings.** Keyword strings and volumes, total word count and FAQ allowance, every on-page value, every outline heading with its prefix and word count, every FAQ question, and every snippet target line (label included) are copied character for character.
+- **Nothing lost.** Every table stake and strategic opportunity stays visible in the outline, as an item or a guideline; every `**TODO (human):**` line survives (those from dropped sections go to Writer notes); `[CITE]` and `[INTERNAL LINK]` markers stay with the text that carries them.
+- **What moves out:** competitor table, gap evidence, Reasoning and Covered by lines, keyword bullets, SERP detail, Fact and source bank, Sources and scope, technical notes. The header links to the research brief instead.
+- **Who writes (step 0, question 5):** sets the writer brief's tone and assumed knowledge (a freelancer new to the client gets the brand rules spelled out; an internal writer gets less). An internal strategist may also get the research brief; a machine writer (`blog-article-draft`) takes the research brief as its input.
+- **Length:** the budget in section 17 (soft target 2,000 words or 85 per outline item plus FAQ question, whichever is higher; hard ceiling 1.5 times that). Over it: compress guidelines and notes, never drop an item.
+
+Checklist before step 8: summary at most about 150 words; each angle one line; 2 to 4 imperative
+guidelines per item; at most 5 do's and 5 don'ts; one-line FAQ guidelines that keep the 40 to 50
+word answer rule; internal links as anchor and full URL.
+
 ## Step 8: Self-check
 
 Before this step, read `references/qa-rubric.md`.
 
-1. Run `python scripts/check_brief.py brief.md` (add `--lang he` for a Hebrew brief, `--variant concise` for the concise one). It exits with code 1 on errors. Fix every error and review every warning, then run it again until it is clean. Its "Markers" line gives the TODO (human) and [CITE] counts for step 9 and H6.
-2. Read for what the script cannot see: Hebrew equivalents of banned title, meta and heading patterns; off-topic words from another brief; claims without a source; an angle that fails the swap test.
-3. Score the five rubric criteria 1 to 5 with one line of evidence each. Ship bar: every criterion at 4 or 5. Below 4 on any criterion: fix the brief and score again; never ship below the bar.
+1. Run `python scripts/check_brief.py research-brief.md --type research`, then `python scripts/check_brief.py writer-brief.md --type writer --pair research-brief.md` (add `--lang he` for Hebrew). The pair run errors when a keyword, volume, total, on-page value, outline heading, word count or FAQ question differs between the two, and warns when a table stake or opportunity lost its match or a TODO was dropped. Exit code 1 means errors. Fix every error and review every warning, then run both again until clean. The "Markers" and "Words" lines give the TODO, [CITE] and word counts for step 9 and H6.
+2. Read for what the script cannot see: Hebrew equivalents of banned title, meta and heading patterns; off-topic words from another brief; claims without a source; an angle that fails the swap test; in the writer brief, a compressed line that changed a claim, and whether a writer can act on it in five minutes.
+3. Score the five rubric criteria 1 to 5 on the research brief, and the writer-brief checks in `references/qa-rubric.md` section 3a, with one line of evidence each. Ship bar: every criterion at 4 or 5. Below 4 on any criterion: fix the brief and score again; never ship below the bar.
 4. Confirm every correctness criterion in the rubric holds. One failure blocks delivery.
 
 ## Step 9: Deliver
 
-1. **Checkpoint H5:** before anything client-visible (sharing the Doc, placing it in a folder the client can open, updating a content table the client sees), show the finished brief and its self-check. Always state the H5 decision in one line before `create_file`: "folder X is not client-visible, creating it there", or ask whether it is. Wait for approval.
-   Before `create_file`, convert any remaining `<!-- ... -->` comment to a visible `**TODO (human):** X` line (comments do not survive the Doc conversion), re-run `check_brief.py`, and count the TODOs in brief.md.
-2. Create the Doc with Google Drive `create_file`: `title` = the brief's title line, `textContent` = the Markdown, `contentMimeType` = `text/markdown`, `parentId` = the folder the user named, conversion ON (do not set `disableConversionToGoogleType`) so it becomes a Google Doc. Create the concise variant the same way with " (concise)" at the end of the title when both are needed.
-3. Verify by reading it back with `read_file_content`: headings present, tables rendered, no `{{`, no em-dash, and the number of "TODO (human)" lines in the Doc equals the count in brief.md. If the Markdown conversion fails or tables break, create it again from the same content converted to HTML with `contentMimeType` = `text/html`. If Drive is unavailable, hand the user the Markdown file.
-4. Never share the Doc, change its permissions or touch a client-visible system before H5.
+1. **Checkpoint H5** (it applies to the writer brief, the client-visible one): before anything client-visible (sharing a Doc, placing it in a folder the client can open, updating a content table the client sees), show the finished writer brief, both self-checks and both word counts. Always state the H5 decision in one line before `create_file`: "folder X is not client-visible, creating both there", or ask whether it is. The research brief is internal: if the named folder is client-visible, ask where it goes. Wait for approval.
+   Before `create_file`, convert any remaining `<!-- ... -->` comment to a visible `**TODO (human):** X` line in both files, re-run both checks, and count the TODOs in each file.
+2. Create both Docs with Google Drive `create_file` in the named folder: `textContent` = the Markdown, `contentMimeType` = `text/markdown`, `parentId` = the folder, conversion ON (do not set `disableConversionToGoogleType`). First the research brief (`title` = writer title + " | research"), then the writer brief (`title` = the writer title line) with its "Research brief" header line set to the research Doc's link. The research brief's "Writer brief" line names the writer Doc by title and folder; replace it with the link when the connector can update the Doc.
+3. Verify each by reading it back with `read_file_content`: headings present, tables rendered, no `{{`, no em-dash, the writer brief's link to the research brief opens, and each Doc's "TODO (human)" count equals its Markdown file's. If the Markdown conversion fails or tables break, create it again from the same content converted to HTML with `contentMimeType` = `text/html`. If Drive is unavailable, hand the user both Markdown files.
+4. Never share a Doc, change its permissions or touch a client-visible system before H5. Never share the research brief with the client unless the person asks.
 
 ## Step 10: Final message
 
@@ -316,9 +350,10 @@ Before this step, read `references/qa-rubric.md`.
 
 ```
 <Title line>
-Doc: <link>   (variant: full | concise | both)
-Self-check: intent <n>/5, table stakes <n>/5, opportunities <n>/5, keywords <n>/5, advantage <n>/5
-check_brief.py: clean (0 errors, <w> warnings reviewed)
+Writer brief: <link>   (<w1> words; budget soft <s>, hard <h>)
+Research brief: <link> (<w2> words; internal, input for blog-article-draft)
+Self-check: intent <n>/5, table stakes <n>/5, opportunities <n>/5, keywords <n>/5, advantage <n>/5; writer brief checks pass
+check_brief.py: research clean, writer + pair clean (0 errors, <w> warnings reviewed)
 Open markers: <t> TODO (human), <c> [CITE]; <n> claims sourced in the Fact and source bank
 Cost: SERP export <jobId> $<cost> (<q> queries, depth 20; or reused, $0); <k> crawls (<ids>); DataForSEO fallback $<summed cost> (<q2> SERPs, <p> page reads, or none); Ahrefs <n> browser exports, 0 API units
 Not measured: <for example: keyword difficulty, backlinks of ranking pages, the client's GA4 Key Events>
@@ -363,3 +398,6 @@ topic, one brief per topic, never one brief covering several topics.
 | Model-chosen keywords presented as observed | Seeds may query the export; keyword table only from user, GSC, tracked, PAA or related searches |
 | Length target too short for the table stakes | Say so at H4 with a proposed total; never drop a stake silently |
 | Snippet target on an unpulled query | Only pulled queries; AI Overview answer block label when no featured snippet |
+| Writer brief loses a table stake or opportunity in compression | Every stake and opportunity stays an item or a guideline; `--pair` warns on a lost match |
+| Numbers or strings drift between the two briefs | Copy keywords, volumes, totals, on-page values, headings, word counts and FAQs verbatim; `--pair` errors on any difference |
+| Writer brief as long as the research brief | Distil to the section 17 budget; reasoning and evidence stay in the research brief, linked |

@@ -1,12 +1,13 @@
-# {{נושא}} - בריף יצירת תוכן | {{לקוח}}
+# {{נושא}} - בריף יצירת תוכן | {{לקוח}} | research
 
-{{! TEMPLATE NOTES (English, for the strategist), delete this block. Hebrew brief: every heading, label and value is Hebrew except the fixed English labels kept on purpose: the `## On Page SEO` section heading, the on-page element names (Meta title, Meta description, URL slug, H1, OG title, OG description), the outline prefixes (Hero, H2, H3, H4, Conclusion), the snippet formats (paragraph, list, table) and the placeholder conventions. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete; scripts/check_brief.py --lang he fails the brief while any double brace remains. Copy this blank file for every brief, never an old brief. FULL vs CONCISE: concise deletes every **נימוק:** line, the נימוק column of the on-page table and the rationale paragraphs (מכוסה אצל is optional), nothing else. Read Hebrew headings and titles for Hebrew equivalents of banned patterns (המדריך המלא, כל מה שצריך לדעת, יתרונות וחסרונות, למתחילים). No em-dashes. URLs and numbers inside Hebrew text: keep them on their own or at the end of a phrase so they read correctly right to left. MARKERS: a person's decision or check is a visible line `**TODO (human):** what to decide` (the text may be Hebrew), never an HTML comment (comments vanish in the Google Doc, and check_brief.py fails on any comment opener); `[CITE: ...]` only when a search in the run found no source; `[INTERNAL LINK: anchor -> topic]` when no real URL exists. If the client's brain names a branded template or naming rule, keep this section order and these labels but apply the client's header, branding and file naming. }}
+{{! TEMPLATE NOTES (English, for the strategist), delete this block. Hebrew brief: every heading, label and value is Hebrew except the fixed English labels kept on purpose: the `## On Page SEO` section heading, the on-page element names (Meta title, Meta description, URL slug, H1, OG title, OG description), the outline prefixes (Hero, H2, H3, H4, Conclusion), the snippet formats (paragraph, list, table) and the placeholder conventions. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete; scripts/check_brief.py --lang he fails the brief while any double brace remains. Copy this blank file for every brief, never an old brief. RESEARCH BRIEF: this is the internal record (strategist review, agency record, and the input for machine writing with blog-article-draft); it keeps every **נימוק:** line, the נימוק column of the on-page table and the rationale paragraphs. Its title is the writer brief's title plus " | research". The writer brief (assets/writer-brief-template-he.md) is distilled from this file, by deletion and compression only, after this file passes check_brief.py --type research --lang he. Read Hebrew headings and titles for Hebrew equivalents of banned patterns (המדריך המלא, כל מה שצריך לדעת, יתרונות וחסרונות, למתחילים). No em-dashes. URLs and numbers inside Hebrew text: keep them on their own or at the end of a phrase so they read correctly right to left. MARKERS: a person's decision or check is a visible line `**TODO (human):** what to decide` (the text may be Hebrew), never an HTML comment (comments vanish in the Google Doc, and check_brief.py fails on any comment opener); `[CITE: ...]` only when a search in the run found no source; `[INTERNAL LINK: anchor -> topic]` when no real URL exists. If the client's brain names a branded template or naming rule, keep this section order and these labels but apply the client's header, branding and file naming. }}
 
 - **תאריך:** {{YYYY-MM-DD}}
 - **שוק:** {{מדינת ה-SERP}}, {{שפת ה-SERP}}
 - **שפת הבריף:** {{עברית}}
 - **הוכן על ידי:** {{תפקיד, לדוגמה אסטרטג/ית תוכן SEO, Cut Inside}}
-- **גרסה:** {{מלאה | מקוצרת}}
+- **מסמך:** בריף מחקר (פנימי: המחקר המלא, הראיות והנימוקים; לא נשלח ללקוח אלא אם התבקש)
+- **בריף לכותב:** {{קישור למסמך הבריף לכותב, או שמו והתיקייה}}
 
 **קישורים רלוונטיים**
 
@@ -132,8 +133,6 @@
 | H1 | {{H1, יכול להיות שונה מהכותרת}} | {{52}} | {{למה הוא משרת את הקורא בעמוד}} |
 | OG title | {{גרסה שמעוררת סקרנות}} | {{50}} | {{הקרס}} |
 | OG description | {{טענה או מספר ספציפיים}} | {{170}} | {{למה זה שווה לחיצה}} |
-
-{{! Concise variant: delete the נימוק column (header, separator and every cell). }}
 
 ## מבנה המאמר
 

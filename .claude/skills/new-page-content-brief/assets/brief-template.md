@@ -1,12 +1,13 @@
-# {{Topic}} - Content Brief | {{Client}}
+# {{Topic}} - Content Brief | {{Client}} | research
 
-{{! TEMPLATE NOTES, delete this block. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete. scripts/check_brief.py fails the brief while any double brace remains. Copy this blank file for every brief; never start from an old brief. Labels in bold, table headers and outline prefixes are machine-checked: keep them exactly. FULL vs CONCISE: the full variant keeps every **Reasoning:** line, the Reasoning column of the on-page table and the rationale paragraphs; the concise variant deletes exactly those (Covered by is optional in concise) and nothing else. Write in the brief's language; no em-dashes. MARKERS: a person's decision or check is a visible line `**TODO (human):** what to decide`, never an HTML comment (comments vanish in the Google Doc, and check_brief.py fails on any comment opener); `[CITE: ...]` only when a search in the run found no source; `[INTERNAL LINK: anchor -> topic]` when no real URL exists. If the client's brain names a branded template or naming rule, keep this section order and these labels but apply the client's header, branding and file naming. }}
+{{! TEMPLATE NOTES, delete this block. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete. scripts/check_brief.py fails the brief while any double brace remains. Copy this blank file for every brief; never start from an old brief. Labels in bold, table headers and outline prefixes are machine-checked: keep them exactly. RESEARCH BRIEF: this is the internal record (strategist review, agency record, and the input for machine writing with blog-article-draft); it keeps every **Reasoning:** line, the Reasoning column of the on-page table and the rationale paragraphs. Its title is the writer brief's title plus " | research". The writer brief (assets/writer-brief-template.md) is distilled from this file, by deletion and compression only, after this file passes check_brief.py --type research. Write in the brief's language; no em-dashes. MARKERS: a person's decision or check is a visible line `**TODO (human):** what to decide`, never an HTML comment (comments vanish in the Google Doc, and check_brief.py fails on any comment opener); `[CITE: ...]` only when a search in the run found no source; `[INTERNAL LINK: anchor -> topic]` when no real URL exists. If the client's brain names a branded template or naming rule, keep this section order and these labels but apply the client's header, branding and file naming. }}
 
 - **Date:** {{YYYY-MM-DD}}
 - **Market:** {{SERP country}}, {{SERP language}}
 - **Brief language:** {{language}}
 - **Prepared by:** {{role, for example SEO content strategist, Cut Inside}}
-- **Variant:** {{full | concise}}
+- **Document:** Research brief (internal: full research, evidence and reasoning; not sent to the client unless the person asks)
+- **Writer brief:** {{link to the writer brief Doc, or its title and folder}}
 
 **Relevant links**
 
@@ -132,8 +133,6 @@ Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts
 | H1 | {{H1, may differ from the title}} | {{58}} | {{why it serves the on-page reader}} |
 | OG title | {{curiosity-led variant}} | {{55}} | {{the hook}} |
 | OG description | {{specific claim or number}} | {{180}} | {{why it earns the click}} |
-
-{{! Concise variant: delete the Reasoning column (header, separator and every cell). }}
 
 ## Article structure
 

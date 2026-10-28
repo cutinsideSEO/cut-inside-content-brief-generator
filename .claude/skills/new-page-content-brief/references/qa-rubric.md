@@ -1,18 +1,22 @@
 # QA rubric (read before step 8, the self-check)
 
-The self-check a brief must pass before H5. It has four layers, in this order: the script, the
-correctness criteria, the five-criterion rubric, and the reading checks the script cannot do. The
+The self-check both briefs must pass before H5. It has four layers, in this order: the script, the
+correctness criteria, the five-criterion rubric (on the research brief) with the writer-brief checks
+(section 3a), and the reading checks the script cannot do. The
 same criteria, with Pass / Partial / Fail and one line of evidence, are what the Phase 5 QA uses, so
 a brief that passes here should pass there.
 
 ## 1. Run the script first
 
 ```
-python scripts/check_brief.py brief.md [--lang he] [--variant concise]
+python scripts/check_brief.py research-brief.md --type research [--lang he]
+python scripts/check_brief.py writer-brief.md --type writer --pair research-brief.md [--lang he]
 ```
 
-Exit code 1 means errors. Fix every error and review every warning, then run it again until it
-reports no errors. Run it on each variant you deliver. What it checks mechanically (so you do not
+Exit code 1 means errors. Fix every error and review every warning, then run both again until they
+report no errors. (`--variant` is a deprecated alias: concise reads as `--type writer`.) The writer
+run adds the length budget, the writer section set and, with `--pair`, the identity checks between
+the two briefs (section 3a). What it checks mechanically (so you do not
 redo it by hand): section order and headings, the keyword, competitor and on-page tables, character
 limits, slug word count, outline labels and non-zero word counts, outline sum + FAQ allowance =
 total (1% tolerance), 1 to 3 distinct snippet queries, snippet targets labelled a bet when SERP
@@ -68,10 +72,27 @@ targets a query not in the keyword table.
 Also note, as the validator does: the improvements you made (section, issue, fix) and the brief's
 strengths. They go in your working notes, not the brief.
 
+## 3a. Writer-brief checks (ship bar: all pass)
+
+The writer brief is the client-visible deliverable, so it gets its own checks on top of the
+research brief's rubric. Score each pass or fail with one line of evidence.
+
+| # | Check | How |
+|---|---|---|
+| W1 | **Length budget** | `check_brief.py --type writer` shows no length warning or error: at or under the soft target (the higher of 2,000 and 85 x items), never above the hard ceiling (1.5 x soft). Brief-rules section 17.1 |
+| W2 | **Nothing lost against the research brief** | `--pair` is clean: keywords, volumes, totals, on-page values, headings, word counts, FAQs and snippet lines identical; every TODO (human) kept; every table stake and strategic opportunity still visible as an item or guideline (list each beside its writer item, as for the table-stakes score) |
+| W3 | **Readable in five minutes** | A writer reading only this Doc knows the angle, the outline with budgets, the keywords and where they go, the on-page values, the FAQs, the do's and don'ts and the CTA, without opening the research brief. Summary at most about 150 words; one-line angles; 2 to 4 imperative guidelines; one-line FAQ guidelines |
+| W4 | **No research clutter** | No competitor table, gap evidence, Reasoning or Covered by lines, scores, ranks, SERP detail or source bank; competitor names and URLs appear only where a guideline needs a source |
+| W5 | **No new claims** | Every compressed line says what the research line said: no new number, source, claim or keyword, no rounding, no softened or sharpened angle |
+
+**Blind A/B in QA rounds:** compare the WRITER brief with the gold brief (the gold briefs are
+writer-facing documents; most had a longer research layer behind them). The research brief is
+judged separately against the correctness criteria and the rubric.
+
 ## 4. Format checklist
 
 - [ ] Title line in the house form: `<Topic> - Content Brief | <Client>` or `<topic> - בריף יצירת תוכן | <client>`.
-- [ ] Header block: date, market and language, prepared by (role), variant; relevant links.
+- [ ] Research brief header: date, market and language, prepared by (role), "Research brief" line with the writer brief named or linked; relevant links. Title = writer title + " | research".
 - [ ] Every section present in template order (guardrails only when the client has rules).
 - [ ] Every keyword supplied is in the keyword table, typed, with a placement note; a source-and-date line under the table.
 - [ ] Competitor table with at least 3 rows; differentiation summary grounded in rankings.
@@ -85,7 +106,7 @@ strengths. They go in your working notes, not the brief.
 - [ ] E-E-A-T lists only what the client can deliver.
 - [ ] Sources and scope: SERP date, market, tools, the SERP export `jobId` and crawl ids, client files read, GSC window, cost, exports, what was not measured, and the Fact and source bank table.
 - [ ] Search intent and SERP: SERP features marked observed when the export succeeded, and an AI Overview line per query (present or absent, gist, cited sources).
-- [ ] Concise variant: no Reasoning lines, no Reasoning column; nothing else differs from full.
+- [ ] Writer brief: the section 3a checks pass and `--pair` is clean.
 - [ ] No Open Items section; nothing about the current page (that goes in a companion note); 15 pages or fewer.
 
 ## 5. Reading checks the script cannot do
@@ -145,7 +166,8 @@ strengths. They go in your working notes, not the brief.
 | Hebrew pattern or AI-tell found by reading | Rewrite the line; re-run the script |
 | Claim without support | Search for a source first; else `[CITE: ...]` or `**TODO (human):** ...`, or cut it |
 | HTML comment in the brief | Convert it to a visible `**TODO (human):** ...` line; re-run the script |
-| Mismatch between full and concise | Rebuild concise from full by deletion only |
+| Mismatch between the research and writer briefs (`--pair` error) | Copy the value from the research brief into the writer brief; if the research brief was wrong, fix it there first and re-distil |
+| Writer brief over its length budget | Compress guidelines, notes and the summary (brief-rules section 17.3); never drop an item, FAQ or stake |
 
 ## 9. Agency content-brief criteria (Phase 5 scorecard, for reference)
 

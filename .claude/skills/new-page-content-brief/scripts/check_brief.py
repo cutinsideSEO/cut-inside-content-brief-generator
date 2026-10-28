@@ -4,19 +4,33 @@
 Standard library only, Python 3.9+, works on Windows and Linux. Run it before
 the brief is converted to a Google Doc.
 
+Every run produces two linked briefs: the RESEARCH brief (internal, the full
+research with reasoning; assets/brief-template*.md) and the WRITER brief (the
+human-facing, gold-length brief distilled from it; assets/writer-brief-template*.md).
+
 Usage
-    python check_brief.py brief.md
-    python check_brief.py brief.md --lang he --variant concise
-    python check_brief.py brief.md --json
+    python check_brief.py brief.md                         # research brief
+    python check_brief.py writer.md --type writer          # writer brief
+    python check_brief.py writer.md --type writer --pair brief.md
+    python check_brief.py brief.md --lang he --json
 
 Options
+    --type research|writer  Which brief this is (default research). research
+                          expects a Reasoning bullet on every outline item;
+                          writer applies the writer-brief section set, the length
+                          budget and warns on Reasoning / Covered by lines.
+    --variant full|concise  DEPRECATED alias kept for old commands: full maps to
+                          --type research, concise to --type writer (a notice
+                          is printed on stderr). The concise variant no longer
+                          exists; the writer brief replaced it.
+    --pair OTHER.md       The counterpart brief of the same run (the research
+                          brief when --type writer, the writer brief when
+                          --type research). Adds the pair checks below.
     --lang en|he          Brief language. Auto-detected when omitted (Hebrew
                           characters in the H1 title means he). Both the English
                           and the Hebrew labels of the format spec are accepted
                           in either mode; the language only drives the
                           language-consistency check.
-    --variant full|concise  full (default) expects a Reasoning bullet on every
-                          outline item; concise warns when Reasoning bullets exist.
     --json                Print the result as JSON instead of text.
 
 Checks (ERROR fails the brief, WARNING is advice)
@@ -25,7 +39,11 @@ Checks (ERROR fails the brief, WARNING is advice)
        (allowed: [INTERNAL LINK: ...], [CITE: ...], **TODO (human):** ...)
        and any HTML comment '<!--' (error: comments do not survive the Google
        Doc conversion, so a TODO must be a visible **TODO (human):** line)
-    3  the 15 required sections (Accuracy and brand guardrails is optional) and order
+    3  required sections and order: research = the 15 research sections
+       (Accuracy and brand guardrails is optional); writer = Strategy summary,
+       Keyword strategy, On-page SEO, Article structure, FAQs, Internal links,
+       Writer notes, Conclusion and CTA (a research-only section in a writer
+       brief is a warning)
     4  On-page table: required rows, character limits, slug rules, Chars column
     5  Keyword table: Primary keyword present, in title / H1 / OG title / slug, volume
     6  banned title, meta description and AI-cliche phrases
@@ -41,11 +59,30 @@ Checks (ERROR fails the brief, WARNING is advice)
     8  FAQs: Guidelines bullet, the 40 to 50 word answer rule, no drafted answers
     9  Competitor table: at least 3 rows, absolute http(s) URLs
     10 language consistency of section headings
-    11 internal links must be absolute URLs
+    11 internal links must be absolute URLs (writer: every Internal links URL
+       cell is an absolute URL or an [INTERNAL LINK: ...] placeholder, error)
+    12 writer only: length budget (words = whitespace tokens containing a
+       letter or digit; items = outline items + FAQ questions; soft target =
+       max(2,000, 85 x items), WARNING above it; hard ceiling = 1.5 x soft
+       target, ERROR above it; budget from the gold briefs, see
+       references/brief-rules.md section 17); Strategy summary over about 150
+       words, an Angle over 40 words, more than 4 Guidelines bullets, more
+       than 5 Do or Don't bullets, Reasoning or Covered by lines, a Reasoning
+       column, a missing research-brief link line (warnings)
+    13 --pair: ERROR when a keyword string or its volume, the Total word count
+       or FAQ allowance, an on-page value (meta title, meta description, slug,
+       H1, OG title, OG description), an outline heading or its Word count, or
+       an FAQ question differs between the two briefs; WARNING when the title
+       lines do not follow "<writer title> | research", a snippet target line
+       differs, the writer brief has fewer TODO (human) lines, or a research
+       table stake or strategic opportunity has under 50% token overlap with
+       the writer outline (worded as "lost in distillation" when the research
+       outline matched it better, otherwise "confirm by reading")
 
 Output: ERRORS, then WARNINGS, a marker count line (TODO (human), [CITE],
 [INTERNAL LINK], outside inline code; compare the TODO count with the Doc at
-read-back and report the CITE count at H6), then a one-line summary.
+read-back and report the CITE count at H6), the word count (and the writer
+budget), then a one-line summary.
 Exit code: 1 if any error, 0 otherwise, 2 if the file cannot be read.
 """
 
@@ -84,13 +121,38 @@ def norm_key(text):
     return re.sub(r"[\W_]+", "", text.lower())
 
 
-SECTION_BY_KEY = {}
-for _i, (_sid, _req, _en, _he) in enumerate(SECTIONS):
-    SECTION_BY_KEY[norm_key(_en)] = _sid
-    SECTION_BY_KEY[norm_key(_he)] = _sid
-SECTION_INDEX = {s[0]: i for i, s in enumerate(SECTIONS)}
-SECTION_EN = {s[0]: s[2] for s in SECTIONS}
-SECTION_HE = {s[0]: s[3] for s in SECTIONS}
+# the writer brief (distilled from the research brief)
+WRITER_SECTIONS = [
+    ("summary", True, "Strategy summary", "סיכום אסטרטגי"),
+    ("keywords", True, "Keyword strategy", "אסטרטגיית מילות מפתח"),
+    ("onpage", True, "On-page SEO", "On Page SEO"),
+    ("structure", True, "Article structure", "מבנה המאמר"),
+    ("faq", True, "Frequently Asked Questions", "שאלות ותשובות"),
+    ("ilinks", True, "Internal links", "קישורים פנימיים"),
+    ("writer", True, "Writer notes", "הנחיות לכותב"),
+    ("conclusion", True, "Conclusion and CTA", "סיכום וקריאה לפעולה"),
+]
+WRITER_IDS = {s[0] for s in WRITER_SECTIONS}
+RESEARCH_ONLY = [s for s in SECTIONS if s[0] not in WRITER_IDS]
+
+
+def section_maps(sections):
+    by_key = {}
+    for _sid, _req, _en, _he in sections:
+        by_key[norm_key(_en)] = _sid
+        by_key[norm_key(_he)] = _sid
+    return (by_key, {s[0]: i for i, s in enumerate(sections)},
+            {s[0]: s[2] for s in sections}, {s[0]: s[3] for s in sections})
+
+
+# writer budget, measured on the gold briefs (references/brief-rules.md section 17)
+WRITER_SOFT_MIN = 2000
+WRITER_WORDS_PER_ITEM = 85
+WRITER_HARD_FACTOR = 1.5
+SUMMARY_MAX_WORDS = 165   # "at most about 150"
+ANGLE_MAX_WORDS = 40
+DO_DONT_MAX = 5
+STAKE_MATCH_MIN = 0.5
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
 ITEM_RE = re.compile(r"^#{3,5} (Hero|H2|H3|H4|Conclusion):\s*(.*?)\s*$")
@@ -138,6 +200,20 @@ AIO_BLOCK_RE = re.compile(r"AI Overview answer block|בלוק תשובה ל-?AI 
 TRAILING_PAREN_RE = re.compile(r"\s*\([^()]*\)\s*$")
 FILL_TOKEN_RE = re.compile(r"\{\{.*?\}\}")
 CODE_SPAN_RE = re.compile(r"`[^`]*`")
+WORD_TOKEN_RE = re.compile(r"\S+")
+RESEARCH_LINK_RE = re.compile(r"^[-*+]\s+\*\*\s*(?:Research brief|בריף מחקר)\s*:?\s*\*\*", re.I)
+DO_LABELS = ("do", "מה לעשות")
+DONT_LABELS = ("don't", "dont", "ממה להימנע")
+STAKES_HEAD_RE = re.compile(r"table stakes|נושאי חובה", re.I)
+OPPS_HEAD_RE = re.compile(r"strategic opportunities|הזדמנויות אסטרטגיות", re.I)
+STAKE_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+\*\*(.+?)\*\*")
+STOPWORDS = {
+    "the", "and", "for", "with", "that", "this", "from", "into", "are", "its", "it's", "how",
+    "what", "why", "when", "which", "who", "not", "but", "you", "your", "our", "their", "they",
+    "them", "than", "then", "each", "both", "only", "also", "more", "most", "any", "all", "one",
+    "two", "per", "via", "about", "over", "under", "between", "including", "include", "use",
+    "של", "את", "על", "עם", "או", "גם", "כל", "לא", "זה", "זו", "מה", "איך", "למה", "בין",
+}
 
 TITLE_BANNED = [
     ("ultimate guide", r"ultimate guide"),
@@ -278,27 +354,65 @@ def first_bullet(bullets, label):
     return None
 
 
-def main(argv=None):
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
-    if hasattr(sys.stderr, "reconfigure"):
-        sys.stderr.reconfigure(encoding="utf-8")
-    ap = argparse.ArgumentParser(description="Mechanical checks on a content brief in Markdown.")
-    ap.add_argument("brief", help="path to the brief (.md)")
-    ap.add_argument("--lang", choices=["en", "he"], help="brief language (auto-detected when omitted)")
-    ap.add_argument("--variant", choices=["full", "concise"], default="full",
-                    help="full (default) expects Reasoning bullets; concise does not")
-    ap.add_argument("--json", action="store_true", help="print the result as JSON")
-    args = ap.parse_args(argv)
+def count_words(text):
+    """Whitespace tokens that contain a letter or digit (table pipes and bullets do not count)."""
+    return sum(1 for tok in WORD_TOKEN_RE.findall(text) if re.search(r"\w", tok))
 
+
+def stem_forms(tok):
+    forms = {tok}
+    if tok.isascii():
+        base = tok
+        for suf in ("ings", "ing", "ies", "ed", "es", "s"):
+            if tok.endswith(suf) and len(tok) - len(suf) >= 3:
+                base = tok[: -len(suf)]
+                break
+        forms.add(base)
+        if base.endswith("e") and len(base) >= 4:
+            forms.add(base[:-1])
+    elif len(tok) > 3 and tok[0] in "והבכלמש":
+        forms.add(tok[1:])
+        if len(tok) > 4 and tok[1] in "הבכלמש":
+            forms.add(tok[2:])
+    return forms
+
+
+def topic_tokens(text):
+    toks = []
+    for tok in re.findall(r"\w+", text.lower()):
+        if len(tok) < 3 or tok in STOPWORDS:
+            continue
+        toks.append(tok)
+    return toks
+
+
+def overlap_ratio(topic, pool_forms):
+    toks = topic_tokens(topic)
+    if not toks:
+        return None
+    hit = sum(1 for tok in toks if stem_forms(tok) & pool_forms)
+    return hit / float(len(toks))
+
+
+def analyse(path, kind, lang_opt):
+    """Check one brief. Returns (report, info) or (None, error message) when unreadable."""
     try:
-        with open(args.brief, "r", encoding="utf-8-sig") as fh:
+        with open(path, "r", encoding="utf-8-sig") as fh:
             text = fh.read()
     except (OSError, UnicodeDecodeError) as exc:
-        print("error: cannot read %s: %s" % (args.brief, exc), file=sys.stderr)
-        return 2
+        return None, "cannot read %s: %s" % (path, exc)
     lines = text.splitlines()
     rep = Report()
+    writer_mode = kind == "writer"
+    mode_sections = WRITER_SECTIONS if writer_mode else SECTIONS
+    section_by_key, section_index, section_en, section_he = section_maps(mode_sections)
+    if writer_mode:  # recognise research-only headings so they can be flagged
+        for _sid, _req, _en, _he in RESEARCH_ONLY:
+            section_by_key.setdefault(norm_key(_en), _sid)
+            section_by_key.setdefault(norm_key(_he), _sid)
+    info = {"path": path, "kind": kind, "keywords": [], "onpage": {}, "total": None,
+            "faq_allow": None, "items": [], "faq_qs": [], "title": None, "stakes": [],
+            "opps": [], "words": count_words(text)}
 
     # ---- structure scan: headings (outside code fences) and sections
     in_fence = [False] * len(lines)
@@ -318,9 +432,11 @@ def main(argv=None):
             headings.append((i, len(m.group(1)), m.group(2)))
 
     title = next((h for h in headings if h[1] == 1), None)
-    lang = args.lang
+    info["title"] = title[2] if title else None
+    lang = lang_opt
     if lang is None:
         lang = "he" if (title and HEBREW_RE.search(title[2])) else "en"
+    info["lang"] = lang
     if title is None:
         rep.warn(1, "no '# ' title line found (expected '# <Topic> - Content Brief | <Client>')")
 
@@ -329,7 +445,7 @@ def main(argv=None):
     for n, (idx, level, htext) in enumerate(headings):
         if level != 2:
             continue
-        sid = SECTION_BY_KEY.get(norm_key(htext))
+        sid = section_by_key.get(norm_key(htext))
         end = len(lines)
         for (j, lv2, _t) in headings[n + 1:]:
             if lv2 <= 2:
@@ -374,9 +490,10 @@ def main(argv=None):
         "cite": sum(len(CITE_RE.findall(ln)) for ln in plain),
         "internal_link": sum(len(INTERNAL_LINK_RE.findall(ln)) for ln in plain),
     }
+    info["markers"] = markers
 
     # ---- 3. required sections and order
-    for sid, required, en, he in SECTIONS:
+    for sid, required, en, he in mode_sections:
         if required and sid not in sections:
             rep.error(None, "required section missing: '## %s' (HE: '## %s')" % (en, he))
     max_seen = -1
@@ -385,7 +502,11 @@ def main(argv=None):
         if sections[sid][0] != idx:
             rep.warn(idx + 1, "duplicate section heading '## %s'" % htext)
             continue
-        pos = SECTION_INDEX[sid]
+        if sid not in section_index:
+            rep.warn(idx + 1, "writer brief: '## %s' belongs in the research brief (keep it there, linked, "
+                     "not in the writer brief)" % htext)
+            continue
+        pos = section_index[sid]
         if pos < max_seen:
             rep.warn(idx + 1, "section '## %s' is out of order (it should come before '%s')" % (htext, max_name))
         else:
@@ -393,11 +514,13 @@ def main(argv=None):
             max_name = htext
 
     # ---- 4. on-page table
-    onpage = {}
+    onpage = info["onpage"]
     r = sec_range("onpage")
     if r:
         for t in find_tables(lines, r[0], r[1]):
             hdr = [strip_fmt(c).lower() for c in t["header"][1]]
+            if writer_mode and any(c in ("reasoning", "נימוק") for c in hdr):
+                rep.warn(t["header"][0], "writer brief: the on-page table has a Reasoning column (keep it in the research brief)")
             rec_col = next((k for k, c in enumerate(hdr) if "recommendation" in c or "המלצה" in c), 1)
             chars_col = next((k for k, c in enumerate(hdr) if c in ("chars", "תווים")), None)
             for ln, cells in t["rows"]:
@@ -459,6 +582,8 @@ def main(argv=None):
                 typ = strip_fmt(cells[0]).lower() if cells else ""
                 if len(cells) > 1 and strip_fmt(cells[1]):
                     kw_set.add(" ".join(strip_fmt(cells[1]).split()).casefold())
+                    info["keywords"].append({"line": ln, "keyword": " ".join(strip_fmt(cells[1]).split()),
+                                             "volume": strip_fmt(cells[2]) if len(cells) > 2 else ""})
                 if typ.startswith("primary") or typ.startswith("ראשית"):
                     kw = strip_fmt(cells[1]) if len(cells) > 1 else ""
                     vol = strip_fmt(cells[2]) if len(cells) > 2 else ""
@@ -512,6 +637,7 @@ def main(argv=None):
         rep.warn(nums[0], 'banned phrase "%s" on lines: %s' % (phrase, fmt_lines(nums)))
 
     # ---- 7. article structure
+    items = []
     r = sec_range("structure")
     if r:
         lo, hi = r
@@ -525,6 +651,7 @@ def main(argv=None):
                 m = FAQ_ALLOW_RE.search(lines[i])
                 if m:
                     faq_allow = int(m.group(1).replace(",", ""))
+        info["total"], info["faq_allow"] = total, faq_allow
         hl = sections["structure"][0] + 1
         if total is None:
             rep.error(hl, "Article structure is missing '**Total word count:**' (HE: '**סה\"כ מילים:**')")
@@ -532,7 +659,6 @@ def main(argv=None):
             rep.error(hl, "Article structure is missing '**FAQ allowance:**' (HE: '**הקצאה לשאלות ותשובות:**')")
 
         item_idx = [i for i in range(lo, hi) if ITEM_RE.match(lines[i])]
-        items = []
         for n, i in enumerate(item_idx):
             m = ITEM_RE.match(lines[i])
             end = hi
@@ -549,6 +675,7 @@ def main(argv=None):
         snippets = []
         missing_reasoning = []
         has_reasoning = []
+        has_covered = []
         current_h2 = None
         what_is = []
         for it in items:
@@ -566,19 +693,30 @@ def main(argv=None):
             ab = first_bullet(b, "angle")
             if ab is None or not ab["text"].strip():
                 rep.error(it["line"], "%s has no Angle bullet or it is empty" % label)
+            elif writer_mode and len(ab["text"].split()) > ANGLE_MAX_WORDS:
+                rep.warn(ab["line"], "writer brief: %s has a %d-word Angle (one line, at most about %d words)"
+                         % (label, len(ab["text"].split()), ANGLE_MAX_WORDS))
             gb = first_bullet(b, "guidelines")
             if gb is None or not gb["nested"]:
                 rep.error(it["line"], "%s has no Guidelines bullet with nested bullets" % label)
-            if first_bullet(b, "keywords") is None:
+            elif writer_mode and len(gb["nested"]) > 4:
+                rep.warn(gb["line"], "writer brief: %s has %d guideline bullets (2 to 4: merge or compress)" % (label, len(gb["nested"])))
+            if not writer_mode and first_bullet(b, "keywords") is None:
                 rep.warn(it["line"], "%s has no Keywords bullet" % label)
             rb = first_bullet(b, "reasoning")
             if rb is None:
                 missing_reasoning.append(it["line"])
             else:
                 has_reasoning.append(it["line"])
+            if first_bullet(b, "covered") is not None:
+                has_covered.append(it["line"])
+            it["snippet"] = None
+            it["text"] = " ".join([it["title"]] + [x["text"] for x in b] + [g for x in b for g in x["nested"]])
             for sb in b:
                 if sb["label"] == "snippet":
                     snippets.append((sb["line"], sb["text"]))
+                    if it["snippet"] is None:
+                        it["snippet"] = " ".join(sb["text"].split())
             if it["kind"] == "H2":
                 current_h2 = it
                 if WHAT_IS_RE.match(it["title"].strip()):
@@ -623,7 +761,7 @@ def main(argv=None):
                              "this run (add it as a pulled keyword or pick a pulled query)" % query)
         if not snippets:
             rep.warn(hl, "no snippet target in the outline (informational briefs usually warrant one)")
-        ir = sec_range("intent")
+        ir = sec_range("intent") or (sec_range("summary") if writer_mode else None)
         if ir and snippets:
             intent_text = "\n".join(FILL_TOKEN_RE.sub(" ", lines[i]) for i in range(ir[0], ir[1]))
             if NOT_OBSERVED_RE.search(intent_text):
@@ -641,16 +779,20 @@ def main(argv=None):
                 if len(snippets) > 2:
                     rep.warn(snippets[2][0], "no featured snippet observed: at most 2 AI Overview answer-block targets (found %d)" % len(snippets))
 
-        if args.variant == "full" and items and missing_reasoning:
-            rep.warn(missing_reasoning[0], "full variant: outline item(s) without a Reasoning bullet at lines: %s" % fmt_lines(missing_reasoning))
-        if args.variant == "concise" and has_reasoning:
-            rep.warn(has_reasoning[0], "concise variant: Reasoning bullets present at lines: %s" % fmt_lines(has_reasoning))
+        if not writer_mode and items and missing_reasoning:
+            rep.warn(missing_reasoning[0], "research brief: outline item(s) without a Reasoning bullet at lines: %s" % fmt_lines(missing_reasoning))
+        if writer_mode and has_reasoning:
+            rep.warn(has_reasoning[0], "writer brief: Reasoning bullets present at lines: %s (keep them in the research brief)" % fmt_lines(has_reasoning))
+        if writer_mode and has_covered:
+            rep.warn(has_covered[0], "writer brief: Covered by bullets present at lines: %s (keep them in the research brief)" % fmt_lines(has_covered))
+    info["items"] = items
 
     # ---- 8. FAQs
     r = sec_range("faq")
     if r:
         lo, hi = r
         qs = [i for i in range(lo, hi) if re.match(r"^###\s+\S", lines[i]) and not in_fence[i]]
+        info["faq_qs"] = [HEADING_RE.match(lines[i]).group(2) for i in qs]
         if len(qs) < 3:
             rep.warn(sections["faq"][0] + 1, "only %d FAQ question(s) found (expected at least 3)" % len(qs))
         for i in qs:
@@ -671,9 +813,9 @@ def main(argv=None):
                 if len(g.split()) > 60:
                     rep.warn(gb["line"], "FAQ '%s': a guideline bullet has %d words and looks like a drafted answer" % (q, len(g.split())))
 
-    # ---- 9. competitor table
+    # ---- 9. competitor table (research brief; flagged above if it appears in a writer brief)
     r = sec_range("competitive")
-    if r:
+    if r and not writer_mode:
         tables = find_tables(lines, r[0], r[1])
         ctable = None
         for t in tables:
@@ -696,12 +838,30 @@ def main(argv=None):
                 if not re.match(r"^https?://\S+", token, re.I):
                     rep.error(ln, "competitor URL is not an absolute http(s) URL: '%s'" % (strip_fmt(raw) or "(empty)"))
 
+    # table stakes and opportunities (research brief), for --pair
+    r = sec_range("gap")
+    if r:
+        bucket = None
+        for i in range(r[0], r[1]):
+            hm = HEADING_RE.match(lines[i])
+            if hm and not in_fence[i]:
+                bucket = "stakes" if STAKES_HEAD_RE.search(hm.group(2)) else (
+                    "opps" if OPPS_HEAD_RE.search(hm.group(2)) else None)
+                continue
+            sm = STAKE_ITEM_RE.match(lines[i])
+            if bucket and sm:
+                topic = sm.group(1).strip().rstrip(":").strip()
+                if norm_key(topic) not in ("reasoning", "נימוק"):
+                    info[bucket].append((i + 1, topic))
+
     # ---- 10. language consistency
     if lang == "he":
         for sid, idx, htext in order:
+            if sid not in section_en:
+                continue
             k = norm_key(htext)
-            if k == norm_key(SECTION_EN[sid]) and k != norm_key(SECTION_HE[sid]):
-                rep.warn(idx + 1, "English section heading '## %s' in a Hebrew brief (use '## %s')" % (htext, SECTION_HE[sid]))
+            if k == norm_key(section_en[sid]) and k != norm_key(section_he[sid]):
+                rep.warn(idx + 1, "English section heading '## %s' in a Hebrew brief (use '## %s')" % (htext, section_he[sid]))
     else:
         for idx, level, htext in headings:
             if level >= 2 and HEBREW_RE.search(htext):
@@ -714,14 +874,200 @@ def main(argv=None):
             rel.append(i + 1)
     if rel:
         rep.warn(rel[0], "markdown link(s) with a relative target (starts with '/'); use full absolute URLs. Lines: %s" % fmt_lines(rel))
+    r = sec_range("ilinks")
+    if writer_mode and r:
+        for t in find_tables(lines, r[0], r[1]):
+            hdr = [strip_fmt(c).lower() for c in t["header"][1]]
+            ucol = next((k for k, c in enumerate(hdr) if c in ("url", "כתובת")), 1)
+            for ln, cells in t["rows"]:
+                raw = strip_fmt(cells[ucol]) if len(cells) > ucol else ""
+                lm = re.search(r"\]\(\s*<?([^)\s>]+)", raw)
+                cand = lm.group(1) if lm else raw.strip("<>")
+                if not (re.match(r"^https?://\S+", cand, re.I) or INTERNAL_LINK_RE.search(cand)):
+                    rep.error(ln, "internal link URL is not an absolute http(s) URL or an [INTERNAL LINK: ...] placeholder: '%s'"
+                              % (raw or "(empty)"))
 
-    # ---- output
+    # ---- 12. writer brief: length budget and compression
+    if writer_mode:
+        n_items = len(items) + len(info["faq_qs"])
+        soft = max(WRITER_SOFT_MIN, WRITER_WORDS_PER_ITEM * n_items)
+        hard = int(round(soft * WRITER_HARD_FACTOR))
+        info["budget"] = {"items": n_items, "soft": soft, "hard": hard}
+        if info["words"] > hard:
+            rep.error(None, "writer brief is %d words, above the hard ceiling of %d (soft target %d for %d outline items "
+                      "and FAQ questions): compress guidelines and notes, never drop an item"
+                      % (info["words"], hard, soft, n_items))
+        elif info["words"] > soft:
+            rep.warn(None, "writer brief is %d words, above the soft target of %d (%d outline items and FAQ questions; "
+                     "hard ceiling %d)" % (info["words"], soft, n_items, hard))
+        r = sec_range("summary")
+        if r:
+            sw = count_words("\n".join(FILL_TOKEN_RE.sub(" ", lines[i]) for i in range(r[0], r[1])))
+            if sw > SUMMARY_MAX_WORDS:
+                rep.warn(sections["summary"][0] + 1, "Strategy summary is %d words (at most about 150)" % sw)
+        stray = [b["line"] for b in parse_bullets(lines, 0, len(lines)) if b["label"] == "reasoning"]
+        stray = [ln for ln in stray if ln not in has_reasoning_lines(items)]
+        if stray:
+            rep.warn(stray[0], "writer brief: Reasoning lines outside the outline at lines: %s" % fmt_lines(stray))
+        r = sec_range("writer")
+        if r:
+            for b in parse_bullets(lines, r[0], r[1]):
+                lab = b["raw_label"]
+                if (lab in DO_LABELS or lab in DONT_LABELS) and len(b["nested"]) > DO_DONT_MAX:
+                    rep.warn(b["line"], "writer brief: %d '%s' bullets (at most %d)" % (len(b["nested"]), lab, DO_DONT_MAX))
+        if not any(RESEARCH_LINK_RE.match(ln) for ln in lines[:40]):
+            rep.warn(1, "writer brief: no '**Research brief:**' link line in the header (HE: '**בריף מחקר:**')")
+
+    return rep, info
+
+
+def has_reasoning_lines(items):
+    return {b["line"] for it in items for b in it["bullets"] if b["label"] == "reasoning"}
+
+
+def norm_text(text):
+    return " ".join((text or "").split())
+
+
+def pair_checks(writer, research, rep):
+    """Compare the writer brief with the research brief it was distilled from."""
+    wt, rt = norm_text(writer["title"]), norm_text(research["title"])
+    if wt and rt and rt != wt + " | research":
+        rep.warn(None, "pair: research title '%s' is not the writer title plus ' | research' ('%s | research')" % (rt, wt))
+    # keywords and volumes
+    wk = {k["keyword"]: k for k in writer["keywords"]}
+    rk = {k["keyword"]: k for k in research["keywords"]}
+    for kw in rk:
+        if kw not in wk:
+            rep.error(None, "pair: keyword '%s' is in the research brief but not in the writer brief (strings must match exactly)" % kw)
+        elif norm_text(wk[kw]["volume"]) != norm_text(rk[kw]["volume"]):
+            rep.error(wk[kw]["line"], "pair: volume for '%s' differs (writer %s, research %s)"
+                      % (kw, wk[kw]["volume"], rk[kw]["volume"]))
+    for kw in wk:
+        if kw not in rk:
+            rep.error(wk[kw]["line"], "pair: keyword '%s' is in the writer brief but not in the research brief" % kw)
+    # totals
+    for key, nice in (("total", "Total word count"), ("faq_allow", "FAQ allowance")):
+        if writer[key] != research[key]:
+            rep.error(None, "pair: %s differs (writer %s, research %s)" % (nice, writer[key], research[key]))
+    # on-page values
+    for label in ("meta title", "meta description", "url slug", "h1", "og title", "og description"):
+        r_ent, w_ent = research["onpage"].get(label), writer["onpage"].get(label)
+        if r_ent is None:
+            continue
+        if w_ent is None:
+            rep.error(None, "pair: %s is in the research brief but missing from the writer brief" % NICE[label])
+        elif norm_text(w_ent["value"]) != norm_text(r_ent["value"]):
+            rep.error(w_ent["line"], "pair: %s differs (writer '%s', research '%s')" % (NICE[label], w_ent["value"], r_ent["value"]))
+    # outline headings, word counts, snippet lines
+    def key(it):
+        return (it["kind"], norm_text(it["title"]))
+    w_items = {key(it): it for it in writer["items"]}
+    r_items = {key(it): it for it in research["items"]}
+    for k, it in r_items.items():
+        w = w_items.get(k)
+        if w is None:
+            rep.error(None, "pair: outline item '%s: %s' is in the research brief but not in the writer brief" % k)
+            continue
+        if w.get("wc") != it.get("wc"):
+            rep.error(w["line"], "pair: Word count of '%s: %s' differs (writer %s, research %s)" % (k + (w.get("wc"), it.get("wc"))))
+        if (w.get("snippet") or "") != (it.get("snippet") or ""):
+            rep.warn(w["line"], "pair: snippet target of '%s: %s' differs from the research brief (copy it verbatim)" % k)
+    for k, w in w_items.items():
+        if k not in r_items:
+            rep.error(w["line"], "pair: outline item '%s: %s' is in the writer brief but not in the research brief" % k)
+    if [key(i) for i in writer["items"] if key(i) in r_items] != [key(i) for i in research["items"] if key(i) in w_items]:
+        rep.warn(None, "pair: outline items are in a different order than in the research brief")
+    # FAQ questions
+    wq = [norm_text(q) for q in writer["faq_qs"]]
+    rq = [norm_text(q) for q in research["faq_qs"]]
+    for q in rq:
+        if q not in wq:
+            rep.error(None, "pair: FAQ question '%s' is in the research brief but not in the writer brief" % q)
+    for q in wq:
+        if q not in rq:
+            rep.error(None, "pair: FAQ question '%s' is in the writer brief but not in the research brief" % q)
+    # human markers: a TODO is moved, never dropped
+    if writer["markers"]["todo_human"] < research["markers"]["todo_human"]:
+        rep.warn(None, "pair: the writer brief has %d TODO (human) line(s), the research brief %d: keep every TODO "
+                 "(those from dropped sections go to Writer notes)" % (writer["markers"]["todo_human"],
+                                                                       research["markers"]["todo_human"]))
+    # every table stake and opportunity still visible in the writer outline
+    def pool_of(brief):
+        pool = set()
+        for it in brief["items"]:
+            for tok in topic_tokens(it.get("text", "")):
+                pool |= stem_forms(tok)
+        return pool
+    w_pool, r_pool = pool_of(writer), pool_of(research)
+    for bucket, nice in (("stakes", "table stake"), ("opps", "strategic opportunity")):
+        for ln, topic in research[bucket]:
+            w_ratio = overlap_ratio(topic, w_pool)
+            if w_ratio is None or w_ratio >= STAKE_MATCH_MIN:
+                continue
+            r_ratio = overlap_ratio(topic, r_pool)
+            if r_ratio > w_ratio:
+                rep.warn(None, "pair: research %s '%s' (research line %d) lost its match in distillation (%d%% token "
+                         "overlap in the writer outline, %d%% in the research outline): keep it visible as an item or a "
+                         "guideline" % (nice, topic, ln, w_ratio * 100, r_ratio * 100))
+            else:
+                rep.warn(None, "pair: research %s '%s' (research line %d) has under %d%% token overlap in both outlines "
+                         "(%d%%): confirm by reading that an item or guideline carries it"
+                         % (nice, topic, ln, STAKE_MATCH_MIN * 100, w_ratio * 100))
+
+
+def main(argv=None):
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+    ap = argparse.ArgumentParser(description="Mechanical checks on a content brief in Markdown.")
+    ap.add_argument("brief", help="path to the brief (.md)")
+    ap.add_argument("--type", dest="kind", choices=["research", "writer"],
+                    help="research (default): the full internal brief; writer: the distilled human-facing brief")
+    ap.add_argument("--variant", choices=["full", "concise"],
+                    help="DEPRECATED: full = --type research, concise = --type writer")
+    ap.add_argument("--pair", help="the counterpart brief of the same run, for the pair checks")
+    ap.add_argument("--lang", choices=["en", "he"], help="brief language (auto-detected when omitted)")
+    ap.add_argument("--json", action="store_true", help="print the result as JSON")
+    args = ap.parse_args(argv)
+
+    kind = args.kind
+    if args.variant:
+        mapped = "writer" if args.variant == "concise" else "research"
+        print("notice: --variant is deprecated (the concise variant was replaced by the writer brief); "
+              "--variant %s is read as --type %s%s" % (args.variant, mapped,
+                                                       "" if kind is None else ", but --type %s wins" % kind),
+              file=sys.stderr)
+        if kind is None:
+            kind = mapped
+    kind = kind or "research"
+
+    rep, info = analyse(args.brief, kind, args.lang)
+    if rep is None:
+        print("error: %s" % info, file=sys.stderr)
+        return 2
+    other = None
+    if args.pair:
+        other_kind = "research" if kind == "writer" else "writer"
+        _orep, other = analyse(args.pair, other_kind, args.lang)
+        if _orep is None:
+            print("error: %s" % other, file=sys.stderr)
+            return 2
+        if kind == "writer":
+            pair_checks(info, other, rep)
+        else:
+            pair_checks(other, info, rep)
+
     errors = rep.of("ERROR")
     warnings = rep.of("WARNING")
     ok = not errors
+    markers = info["markers"]
     if args.json:
         payload = {
-            "file": args.brief, "language": lang, "variant": args.variant, "ok": ok, "markers": markers,
+            "file": args.brief, "language": info["lang"], "type": kind, "ok": ok, "markers": markers,
+            "words": info["words"], "budget": info.get("budget"),
+            "pair": args.pair, "pair_words": other["words"] if other else None,
             "errors": [{"line": ln, "message": m} for ln, m in errors],
             "warnings": [{"line": ln, "message": m} for ln, m in warnings],
         }
@@ -738,8 +1084,17 @@ def main(argv=None):
         show("WARNINGS", warnings)
         print("Markers: %d TODO (human), %d [CITE], %d [INTERNAL LINK]"
               % (markers["todo_human"], markers["cite"], markers["internal_link"]))
-        print("%s: %d error(s), %d warning(s) [lang=%s, variant=%s]"
-              % ("FAIL" if errors else "PASS", len(errors), len(warnings), lang, args.variant))
+        words_line = "Words: %d" % info["words"]
+        if info.get("budget"):
+            b = info["budget"]
+            words_line += " (writer budget: soft target %d, hard ceiling %d, for %d outline items and FAQ questions)" \
+                          % (b["soft"], b["hard"], b["items"])
+        if other:
+            words_line += "; paired %s brief: %d words" % ("research" if kind == "writer" else "writer", other["words"])
+        print(words_line)
+        print("%s: %d error(s), %d warning(s) [lang=%s, type=%s%s]"
+              % ("FAIL" if errors else "PASS", len(errors), len(warnings), info["lang"], kind,
+                 ", paired" if other else ""))
     return 0 if ok else 1
 
 

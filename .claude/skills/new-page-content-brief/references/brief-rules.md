@@ -1,4 +1,4 @@
-# Brief rules (read before step 4, and again before step 6)
+# Brief rules (read before step 4, again before step 6, and section 17 before step 7b)
 
 The rules for every section of the brief, in the order the method builds them. Most of the wording
 comes from the agency's Content Brief Generator prompts; quoted rules are kept close to verbatim
@@ -10,7 +10,7 @@ because they are the method. Section numbers are referenced from `SKILL.md`.
 - **Priority pages weigh more.** Pages the user named as references or rated competitors get significantly more weight: prioritise their structure, topics and style, and say in the reasoning when one of them shaped a decision.
 - **Data integrity.** Base all analysis only on the data pulled in this run, the keywords and the user's context. Do not fabricate statistics, studies or claims. When referencing competitor behaviour, cite the specific URL. Flag uncertain recommendations as suggestions, not facts.
 - **Brand alignment.** Every recommendation fits the brand's voice, positioning, audience and content rules. Never recommend what the brand's don't-list or banned terms exclude. Favour preferred terminology. Flag known competitors when they appear.
-- **Reasoning is a deliverable.** Every recommendation in the full variant carries a `Reasoning:` line that cites the data behind it (a URL, a keyword with volume and rank, a heading pattern). The concise variant deletes those lines and nothing else.
+- **Reasoning is a deliverable.** Every recommendation in the research brief carries a `Reasoning:` line that cites the data behind it (a URL, a keyword with volume and rank, a heading pattern). The writer brief leaves reasoning out and links to the research brief (section 17).
 - **Language.** Every heading, label, value and reasoning line is in the brief's language. In a Hebrew brief, only the fixed labels in the template stay English (the `## On Page SEO` section heading, on-page element names, outline level prefixes, snippet formats).
 - **The brief's own prose obeys the voice rails and banned-phrase list in section 12.** A writer copies the brief's wording, so a guideline that says "delve into" teaches the article to say it.
 
@@ -98,7 +98,7 @@ one line naming what was excluded or flagged (the client's own URLs, forums, Wik
 2. **Primary:** one or more keywords that best represent the core intent. Pick the single strongest one for the on-page elements.
 3. **Every other keyword is categorised:** Secondary, Question, Commercial (route, do not target), Brand (excluded), or Existing page (do not target). Nothing is dropped.
 4. **A note on every keyword:** its strategic value and where it goes ("H1 and opening paragraph", "H2 of section 3", "FAQ 2", "anchor text to the commercial page").
-5. **Rationale** (full variant): why these primaries, how the secondaries support them.
+5. **Rationale** (research brief): why these primaries, how the secondaries support them.
 
 Constraints:
 
@@ -123,7 +123,7 @@ Write:
 
 1. **Table stakes:** topics consistently covered by the top-ranking and priority competitors; the non-negotiable topics. Each: the topic plus evidence (which competitors' headings, which keywords).
 2. **Strategic opportunities:** topics, angles or formats competitors cover poorly, superficially or not at all. Each: the opportunity plus its heading or keyword evidence and why it differentiates. Typical sources: honest failure cases, a conditional answer where others give a slogan, a local angle (law, tax, currency, institutions of the market), a worked example with real numbers, a practical "how to use this" payoff, a format nobody offers (table, calculator, decision rule), freshness.
-3. **Summary** (full variant): how the gaps shape the outline.
+3. **Summary** (research brief): how the gaps shape the outline.
 
 Every table stake must appear in the outline; every opportunity must be exploited, and at least two
 visibly in depth.
@@ -182,7 +182,7 @@ CTA to our product page')."
 | "Mention the benefits." | "Name the one condition under which the method loses money, with a worked example; no competitor in the top 3 shows a losing case." |
 | "Add some statistics." | "Cite the regulator's current threshold from https://www.regulator.example/thresholds (read in this run, dated); do not use a figure without a source." |
 
-**Reasoning** (full variant): why the item is included, linked back to the gap analysis ("Covers
+**Reasoning** (research brief): why the item is included, linked back to the gap analysis ("Covers
 the table stake X", "Exploits the opportunity to discuss Y in more depth than competitors").
 
 ### 7.5 Word-count allocation
@@ -248,7 +248,7 @@ needed: omit the line. Note when design work is outside the client's scope with 
 5. Questions are H3s under the FAQ heading: "Frequently Asked Questions" in English, "שאלות ותשובות" in Hebrew. Never the English heading in a Hebrew brief.
 6. No question duplicates an outline heading's job; an FAQ adds an answer the body does not give in that form.
 7. Brand questions only when the client's materials support the answer.
-8. Reasoning (full variant): how the set was chosen, naming the question keywords included.
+8. Reasoning (research brief): how the set was chosen, naming the question keywords included.
 
 ## 9. On-page SEO
 
@@ -299,7 +299,7 @@ were weaker.
 | OG description | <= 200 characters; room for a specific claim or number |
 
 The table has a Chars column: count characters of the final text and write the number. Reasoning
-per element (full variant): (a) which primary keyword and where it sits, (b) why the phrasing
+per element (research brief): (a) which primary keyword and where it sits, (b) why the phrasing
 passes the specificity test, (c) any banned pattern considered and rejected.
 
 ## 10. Conclusion, CTA and links
@@ -407,3 +407,109 @@ citations, GA4 Key Events).
 with columns `Claim | Source URL | Date | Used in section`. Every row has a URL found and read in
 this run; a claim with no source found stays a `[CITE: ...]` in its guideline and is listed here
 with "not found" as its source.
+
+## 17. Writer brief distillation (step 7b)
+
+The owner's verdict (2026-10-28, round-2 blind A/B): the skill's briefs are very good but far too
+long for a human; keep that version for research and machine writing, and give the writer a short
+brief with exactly what they need, as the gold briefs do. So every run ends with two Docs: the
+research brief (sections 1 to 16, unchanged) and the writer brief, distilled from it. The research
+brief is always built and checked first; the writer brief adds nothing to it.
+
+### 17.1 Length budget (measured on the gold briefs)
+
+| Set | Briefs | Median | Range |
+|---|---|---|---|
+| Gold briefs (brief part only, draft tabs excluded; counted from the Drive read-back, so about +/-10%) | 8 (4 EN, 4 HE) | about 1,900 words | about 1,000 to 2,400; one app export with a reasoning line under every item is about 3,900 |
+| The skill's round-1 briefs (whitespace tokens) | 4 (2 EN, 2 HE) | about 5,700 words | 3,850 to 7,000 |
+
+- **Items** = outline items (Hero, H2, H3, H4, Conclusion) + FAQ questions.
+- **Soft target** = the higher of 2,000 words and 85 words x items (near the gold median; most gold briefs run about 65 to 105 words an item). Above it: a warning; compress.
+- **Hard ceiling** = 1.5 x the soft target (3,000 at the base, between the gold maximum without reasoning lines and the one with them). Above it: an error.
+- **Words** = whitespace tokens that contain a letter or digit, over the whole Doc (tables included). `scripts/check_brief.py --type writer` measures and enforces it.
+- A shorter writer brief is fine; never drop an outline item, FAQ or table stake to reach the number.
+- Rough split for a 14-item brief at 2,000 words: header and summary 200; keyword and on-page tables 250; outline about 80 an item; FAQs 30 to 40 each; links, notes and CTA 250.
+
+### 17.2 What the writer brief keeps, section by section
+
+| Research brief section | Writer brief |
+|---|---|
+| Header, relevant links | Title (without " \| research"), date, market, a "Research brief" line with the research Doc's link. Relevant links: only the target URL if the writer needs it, inside the summary or CTA |
+| Brief at a glance, Search intent and SERP, Strategy and goals, Content gap analysis, Accuracy and brand guardrails | One **Strategy summary** of at most about 150 words: intent and format; what wins the SERP (no URLs, scores or ranks); our angle in 1 to 2 sentences; the 3 strongest gaps we exploit; the key guardrails |
+| Keyword strategy | Same rows, same strings and volumes; columns Type, Keyword, Monthly searches, Placement (the placement half of the note); one source line. Global volume and the rationale stay in the research brief |
+| Competitive analysis | Nothing (linked) |
+| On-page SEO | Same six values and Chars; no Reasoning column |
+| Article structure | Same total and FAQ allowance; every item, same prefix, heading and word count; a one-line angle; 2 to 4 imperative guidelines; Snippet target (verbatim, label included) and Resources only where present. No Keywords, Covered by or Reasoning lines |
+| Frequently Asked Questions | Same questions as H3; one guideline line each, still opening with the 40 to 50 word answer rule; no Reasoning |
+| Conclusion and CTA | Same CTAs and placement (moved to the end of the writer brief) |
+| Internal and external links | Internal links as Anchor and URL; external sources stay inline in the guidelines that use them |
+| E-E-A-T signals, Writer notes, Technical notes | Writer notes: tone (one or two lines), at most 5 do's and 5 don'ts, one short E-E-A-T and YMYL list (author or reviewer, first-hand material, disclaimers, red flags), the conventions line. Every TODO (human) from a dropped section moves here |
+| Sources and scope, Fact and source bank | Nothing (linked); the source URLs a guideline needs stay inline in that guideline |
+
+### 17.3 How to compress
+
+1. **Delete first, then shorten.** Remove evidence, competitor names and URLs, scores, ranks and "because" clauses; keep the instruction and its specifics.
+2. **The angle keeps its claim.** One line: the position, without its justification. Never soften or sharpen it.
+3. **Guidelines stay imperative and concrete.** Merge two bullets that serve one action; keep every number, named source, table column list, `[CITE: ...]`, link and `**TODO (human):**` in the bullet that carries it.
+4. **Copy, never retype,** every keyword, volume, total, on-page value, heading, word count, FAQ question and snippet line (`--pair` errors on any difference).
+5. **Every table stake and strategic opportunity stays visible,** as an outline item or inside a guideline, in words a reader can match to the research brief (`--pair` warns when one lost its match).
+6. **No new claims,** no new sources, no rounding. If a line cannot be shortened without changing what it says, keep it.
+
+### 17.4 Example (research form, then writer form)
+
+Research brief:
+
+```
+### H2: A heat pump pays back only inside its rated range
+- **Angle:** A heat pump's savings depend on the share of winter hours it runs inside its rated
+  range; below that range the backup heater carries the load and the payback period stretches
+  past the equipment's life, which none of the top 3 pages quantifies.
+- **Guidelines:**
+  - Open with the answer: payback depends on hours inside the rated range, not on the average
+    winter temperature. Competitor 2 uses the average temperature, which hides cold snaps.
+  - Add a table with columns Climate, Hours below rated range, Backup share, Payback years,
+    using the regulator's degree-day data (https://www.regulator.example/degree-days, read in
+    this run); no competitor shows payback by climate.
+  - Explain the backup heater in two sentences, because readers in the forum results confuse it
+    with a fault.
+  - Link "how to size a heat pump" to https://www.client.example/blog/heat-pump-sizing/.
+- **Keywords:** heat pump payback, heat pump cold climate
+- **Word count:** 300
+- **Covered by:** https://www.example.com/heat-pump-guide, https://www.example.org/savings
+- **Snippet target:** table | heat pump payback (AI Overview answer block; no featured snippet observed)
+- **Reasoning:** exploits opportunity 2 (payback by climate, absent in the top 3) and covers the
+  table stake "running costs".
+```
+
+Writer brief:
+
+```
+### H2: A heat pump pays back only inside its rated range
+- **Angle:** Savings depend on the hours a heat pump runs inside its rated range; below it, the
+  backup heater carries the load and payback stretches past the equipment's life.
+- **Guidelines:**
+  - Open with the answer: payback depends on hours inside the rated range, not the average winter
+    temperature.
+  - Add a table (Climate, Hours below rated range, Backup share, Payback years) from
+    https://www.regulator.example/degree-days.
+  - Explain the backup heater in two sentences; link "how to size a heat pump" to
+    https://www.client.example/blog/heat-pump-sizing/.
+- **Word count:** 300
+- **Snippet target:** table | heat pump payback (AI Overview answer block; no featured snippet observed)
+```
+
+FAQ, research form "Open with a self-contained 40 to 50 word answer that directly answers the
+question, then expand on the backup heater and on why the average temperature misleads." plus a
+reasoning line; writer form "Open with a self-contained 40 to 50 word answer, then cover the backup
+heater and why the average temperature misleads."
+
+(Illustrations of shape only; the topic, URLs and numbers are invented and must never be reused.)
+
+### 17.5 Only in the research brief
+
+Competitor table, differentiation summary and top 3; gap evidence; every Reasoning line and column;
+Covered by; keyword bullets per item; global volume and keyword rationale; SERP features and AI
+Overview detail; page goal and audience reasoning; swap test; technical notes; Sources and scope and
+the Fact and source bank. The research brief is the input for machine writing
+(`blog-article-draft`) and the record a strategist reviews; it is shared with a client only when
+the person asks.

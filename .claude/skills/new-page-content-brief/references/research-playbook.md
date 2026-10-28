@@ -117,6 +117,7 @@ if the export or GSC shows them, labelled with that source. Every volume "not me
 2. Pick the highest-volume member of each cluster as its representative query.
 3. Pull SERPs for representatives in volume order, at most 15. Low-volume long tails stay in the keyword table without their own SERP.
 4. Always include the primary keyword and the top question keyword.
+5. Use seed queries only when the user strings plus GSC give fewer than 8 representative queries; otherwise fill no slots with seeds.
 
 ## 5. SERP pulls (step 2.3)
 

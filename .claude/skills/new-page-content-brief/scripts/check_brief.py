@@ -38,14 +38,20 @@ Checks (ERROR fails the brief, WARNING is advice)
     2  forbidden leftovers: {{ }} <topic> <client> <keyword> [PLACEHOLDER TBD Lorem
        (allowed: [INTERNAL LINK: ...], [CITE: ...], **TODO (human):** ...)
        and any HTML comment '<!--' (error: comments do not survive the Google
-       Doc conversion, so a TODO must be a visible **TODO (human):** line)
+       Doc conversion, so a TODO must be a visible **TODO (human):** line);
+       any other angle-bracket token such as <network> or <br> outside inline
+       code and fill tokens (error: the Google Doc conversion drops it; write
+       placeholders in [square brackets]; autolinks <https://...> are allowed)
     3  required sections and order: research = the 15 research sections
        (Accuracy and brand guardrails is optional); writer = Strategy summary,
        Keyword strategy, On-page SEO, Article structure, FAQs, Internal links,
        Writer notes, Conclusion and CTA (a research-only section in a writer
        brief is a warning)
     4  On-page table: required rows, character limits, slug rules, Chars column
-    5  Keyword table: Primary keyword present, in title / H1 / OG title / slug, volume
+    5  Keyword table: Primary keyword present, in title / H1 / OG title / slug, volume;
+       in a Hebrew brief, a Primary with no Hebrew letter (warning: the primary
+       must be in the market's search language; a foreign-language PAA may only
+       be a Question row)
     6  banned title, meta description and AI-cliche phrases
     7  Article structure: totals, per-item bullets, word count sum, snippet targets;
        when the Search intent section says SERP features were not observed
@@ -72,7 +78,10 @@ Checks (ERROR fails the brief, WARNING is advice)
     13 --pair: ERROR when a keyword string or its volume, the Total word count
        or FAQ allowance, an on-page value (meta title, meta description, slug,
        H1, OG title, OG description), an outline heading or its Word count, or
-       an FAQ question differs between the two briefs; WARNING when the title
+       an FAQ question differs between the two briefs (an "Existing page (do
+       not target)" or "Brand (excluded)" row of the research brief may instead
+       appear in the writer brief's one-line '**Do not target:**' summary under
+       the keyword table, HE '**לא לטרגט:**', string copied exactly); WARNING when the title
        lines do not follow "<writer title> | research", a snippet target line
        differs, the writer brief has fewer TODO (human) lines, or a research
        table stake or strategic opportunity has under 50% token overlap with
@@ -193,6 +202,10 @@ TODO_RE = re.compile(r"\*\*TODO \(human\):\*\*")
 CITE_RE = re.compile(r"\[CITE:")
 INTERNAL_LINK_RE = re.compile(r"\[INTERNAL LINK:")
 HTML_COMMENT_RE = re.compile(r"<!--")
+ANGLE_RE = re.compile(r"<([A-Za-z][^<>\n]{0,80})>")
+AUTOLINK_RE = re.compile(r"^(?:https?|mailto|ftp):", re.I)
+DNT_RE = re.compile(r"^\s*(?:[-*+]\s+)?\*\*\s*(?:Do not target|לא לטרגט)\s*:?\s*\*\*\s*:?\s*(.*)$", re.I)
+COLLAPSIBLE_TYPES = ("existing page", "brand", "עמוד קיים", "מותג")
 NOT_OBSERVED_RE = re.compile(r"not observed|לא נצפו", re.I)
 BET_RE = re.compile(r"\bbets?\b|הימור", re.I)
 NO_FS_RE = re.compile(r"no featured snippet|לא נצפה featured snippet|אין featured snippet", re.I)
@@ -483,6 +496,26 @@ def analyse(path, kind, lang_opt):
     if comment_lines:
         rep.error(comment_lines[0], "HTML comment '<!--' on lines: %s (comments vanish in the Google Doc; "
                   "write a visible '**TODO (human):** ...' line instead)" % fmt_lines(comment_lines))
+    angle = {}
+    named = {"<topic>", "<client>", "<keyword>"}  # already reported as forbidden leftovers
+    for i, ln in enumerate(lines):
+        if in_fence[i]:
+            continue
+        scrub = FILL_TOKEN_RE.sub(" ", CODE_SPAN_RE.sub(" ", ln))
+        for m in ANGLE_RE.finditer(scrub):
+            tok = m.group(0)
+            if AUTOLINK_RE.match(m.group(1)) or tok.lower() in named:
+                continue
+            angle.setdefault(i + 1, []).append(tok)
+    if angle:
+        toks = []
+        for nums in angle.values():
+            for tok in nums:
+                if tok not in toks:
+                    toks.append(tok)
+        rep.error(min(angle), "angle-bracket text %s on lines: %s (the Google Doc conversion drops it: write placeholders "
+                  "in [square brackets] and no HTML tags)" % (", ".join(toks[:5]) + (" ..." if len(toks) > 5 else ""),
+                                                           fmt_lines(angle.keys())))
     # markers in use (inline code spans, such as the Conventions line, are not counted)
     plain = [CODE_SPAN_RE.sub(" ", ln) for ln in lines]
     markers = {
@@ -583,15 +616,24 @@ def analyse(path, kind, lang_opt):
                 if len(cells) > 1 and strip_fmt(cells[1]):
                     kw_set.add(" ".join(strip_fmt(cells[1]).split()).casefold())
                     info["keywords"].append({"line": ln, "keyword": " ".join(strip_fmt(cells[1]).split()),
-                                             "volume": strip_fmt(cells[2]) if len(cells) > 2 else ""})
+                                             "volume": strip_fmt(cells[2]) if len(cells) > 2 else "", "type": typ})
                 if typ.startswith("primary") or typ.startswith("ראשית"):
                     kw = strip_fmt(cells[1]) if len(cells) > 1 else ""
                     vol = strip_fmt(cells[2]) if len(cells) > 2 else ""
                     primaries.append((ln, kw, vol))
+        dnt = [DNT_RE.match(lines[i]).group(1) for i in range(r[0], r[1])
+               if not in_fence[i] and DNT_RE.match(lines[i])]
+        info["dnt"] = " ".join(" ".join(strip_fmt(t).split()) for t in dnt)
         if not primaries:
             rep.error(sections["keywords"][0] + 1, "Keyword table has no Primary row")
         else:
             primary_kw = primaries[0][1]
+            if lang == "he":
+                for ln, kw, _vol in primaries:
+                    if kw and not HEBREW_RE.search(kw):
+                        rep.warn(ln, "Primary keyword '%s' has no Hebrew letter in a Hebrew brief: the primary must be in "
+                                 "the market's search language as people there type it (a foreign-language PAA may only "
+                                 "be a Question row; SKILL.md step 3)" % kw)
             for ln, kw, vol in primaries:
                 digits = vol.replace(",", "").strip()
                 if not digits or digits.lower() in ("n/a", "na", "-") or (digits.isdigit() and int(digits) == 0):
@@ -929,6 +971,17 @@ def norm_text(text):
     return " ".join((text or "").split())
 
 
+def dnt_has(dnt, kw):
+    """Is keyword kw listed, exactly, in the writer brief's 'Do not target' line?"""
+    if not dnt:
+        return False
+    if any(q[0] + kw + q[1] in dnt for q in ('""', "\u201c\u201d", "''", "\u201d\u201d")):
+        return True
+    if '"' in dnt or "\u201c" in dnt:  # a quoted list: only a quoted string counts
+        return False
+    return re.search(r"(?<!\w)%s(?!\w)" % re.escape(kw), dnt) is not None
+
+
 def pair_checks(writer, research, rep):
     """Compare the writer brief with the research brief it was distilled from."""
     wt, rt = norm_text(writer["title"]), norm_text(research["title"])
@@ -937,9 +990,14 @@ def pair_checks(writer, research, rep):
     # keywords and volumes
     wk = {k["keyword"]: k for k in writer["keywords"]}
     rk = {k["keyword"]: k for k in research["keywords"]}
+    dnt = writer.get("dnt", "")
     for kw in rk:
         if kw not in wk:
-            rep.error(None, "pair: keyword '%s' is in the research brief but not in the writer brief (strings must match exactly)" % kw)
+            collapsible = rk[kw].get("type", "").startswith(COLLAPSIBLE_TYPES)
+            if collapsible and dnt_has(dnt, kw):
+                continue
+            rep.error(None, "pair: keyword '%s' is in the research brief but not in the writer brief%s (strings must match exactly)"
+                      % (kw, " (neither in the keyword table nor in its '**Do not target:**' line)" if collapsible else ""))
         elif norm_text(wk[kw]["volume"]) != norm_text(rk[kw]["volume"]):
             rep.error(wk[kw]["line"], "pair: volume for '%s' differs (writer %s, research %s)"
                       % (kw, wk[kw]["volume"], rk[kw]["volume"]))

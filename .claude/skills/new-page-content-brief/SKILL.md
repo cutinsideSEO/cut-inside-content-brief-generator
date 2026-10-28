@@ -23,6 +23,7 @@ description: >-
 > 2026-10-26: SurgeOS SERP export and any-URL crawler added as the primary research route (round-1 QA ran without them).
 > 2026-10-26: QA round 2 fixes (crawler cap, override primary, keyword sourcing without a volume tool, length vs required items, export price, AI Overview answer blocks, one pre-H1 message, transliteration merging, medical and finance compliance TODO, verified competitor weaknesses, Covered by read pages only, indexed sitemap URLs, Hebrew On Page SEO label, branded template at H4).
 > 2026-10-28: owner verdict: outputs split into a gold-length writer brief (human) and the full research brief (internal and machine writing); concise variant removed.
+> 2026-10-28: QA round 3 fixes (RTL HTML delivery, market-language primary, angle-bracket guard, Hebrew compliance line, collapsed do-not-target rows).
 
 # New page content brief (informational, v0.1)
 
@@ -100,6 +101,7 @@ banned-phrase list the brief gives the writer: a writer copies the brief's wordi
 | `scripts/score_competitors.py` | at step 2, after the SERP pulls |
 | `references/qa-rubric.md` | before step 8 (self-check) |
 | `scripts/check_brief.py` | at step 8, on both briefs (`--type research`, `--type writer --pair`) |
+| `scripts/md_to_html.py` | at step 9: Markdown to HTML for the Doc upload (always for Hebrew, `--lang he`), and `--verify` on the Doc's HTML export |
 | `evals/qa-log.md` | never at run time; maintenance only (QA rounds) |
 
 ## Step 0: Ask first (one message)
@@ -221,7 +223,9 @@ Classify from the SERP you observed, not from the keyword. This is the stop rule
 
 - Apply it only to the terms the existing client page actually ranks or gets impressions for (export position, or GSC `gsc_query_page` query x page, last 3 full months). Other user strings keep their type.
 - The new primary names the distinct sub-intent ("X vs Y", "how to do X with Y", a narrower question), never a synonym, abbreviation expansion, translation or transliteration of the existing page's head term.
-- If no user string expresses the sub-intent, use an observed query (PAA, related search, client GSC query) as primary and say so at H3.
+- The new primary is in the market's search language as people there type it (Hebrew script, or a mixed Latin and Hebrew form seen in the user list or client GSC, such as "dca" plus a Hebrew word). A PAA or related search in another language may enter the table as a Question row at most, never as the primary.
+- If no user string expresses the sub-intent, use an observed market-language query (PAA, related search, client GSC query) as primary and say so at H3. If no market-language observed string fits, say so at H3 and offer to pull up to 3 market-language phrasings of the sub-intent with `run_serp_export`; keep the one whose located SERP returns market-language pages on that sub-intent, typed Primary and labelled "seed, SERP observed, volume not measured" (or proceed without a measured primary and say so).
+- If the new primary was not a query in the export, pull its SERP before H3 approval (a one-query export; H2 only if it exceeds the approved spend) and re-check the verdict, the top 3 and the snippet plan against it.
 
 Never proceed silently on a mismatch.
 
@@ -235,7 +239,7 @@ the editorial angle and, later, the outline skeleton: those decide whether the a
 3. **Competitor breakdown:** for every scored competitor, one-sentence description, strengths, weaknesses (written as concrete, reusable gaps; check every "it lacks X" claim against the page text you read before writing it); then the differentiation summary, grounded in the rankings (name keyword clusters, volumes and ranks), not in the score alone.
 4. **Content gap:** table stakes (in most competitors' headings, or keyword clusters most rank for) and strategic opportunities (in 1 or 2 competitors or absent; high-volume clusters weakly covered), each with heading or keyword evidence, weighed by volume.
 5. **Editorial angle:** a 1 to 2 sentence thesis that takes a position, is specific, passes the swap test, fits informational intent (an explanatory thesis) and cites at least one competitor gap or strength. Re-check it against the gap analysis; if the gaps point to a sharper angle, revise now.
-6. **Keyword strategy:** every keyword exact, typed Primary / Secondary / Question / Commercial (route, do not target) / Brand (excluded) / Existing page (do not target), each with a placement note. The informational head term stays primary even when a transactional term is bigger. "Exact" means the strings are unchanged, not that the user's term must stay primary (see the cannibalisation override in step 3).
+6. **Keyword strategy:** every keyword exact, typed Primary / Secondary / Question / Commercial (route, do not target) / Brand (excluded) / Existing page (do not target), each with a placement note. The informational head term stays primary even when a transactional term is bigger. "Exact" means the strings are unchanged, not that the user's term must stay primary (see the cannibalisation override in step 3). The primary is always in the market's search language (step 3); `check_brief.py` warns on a Hebrew brief whose primary has no Hebrew letter.
 
 **Checkpoint H3:** show the intent verdict with its evidence, the keyword table, the competitor set
 (scored table plus what was flagged or excluded), the page goal, the audience and the editorial
@@ -277,8 +281,10 @@ Build the outline in these passes, in this order:
 **Checkpoint H4:** show the outline with section angles, the word budget (per item and the sum),
 the FAQ allowance, the snippet targets with their labels, every table stake beside its outline
 item, any length that cannot hold the required items (step 5.1), and the client's branded template
-or naming rule (name it, or say none). The person approves or changes the outline. If any heading
-changes after H4, show the diff (old and new heading) before H5.
+or naming rule (name it, or say none). After a cannibalisation override, also list the existing
+client page's H2s beside the new outline and mark each overlap: an overlapping section becomes a
+link to that page or a clearly different facet. The person approves or changes the outline. If any
+heading changes after H4, show the diff (old and new heading) before H5.
 
 ## Step 7: Write the research brief
 
@@ -290,23 +296,25 @@ client's brain names a branded template or a naming rule for documents, keep the
 order and labels but apply the client's header, branding and file naming (title line included);
 note the choice at H4.
 
-1. Fill every section in template order, in the brief's language only (headings, labels and FAQ heading included).
+1. Fill every section in template order, in the brief's language only (headings, labels and FAQ heading included). Placeholders inside guidelines use [square brackets], never angle brackets: the Doc conversion drops angle-bracket text, and `check_brief.py` errors on it.
 2. Write the FAQs (step 5 set): questions as H3, 1 to 3 guideline bullets, the first always the self-contained 40 to 50 word answer instruction. Guidelines, never drafted answers.
 3. Write on-page SEO with the title workflow (three candidates: benefit, specificity, curiosity; keep the winner; say in the Reasoning column why the others lost). Check the limits and banned patterns in `references/brief-rules.md` section 9.
 4. Write CTA strategy, links (real GSC URLs, or indexed sitemap URLs labelled as such, as full absolute URLs; otherwise `[INTERNAL LINK: anchor -> topic]`), E-E-A-T (only what the client can deliver), writer notes, technical notes, and sources and scope.
 5. Add the Accuracy and brand guardrails section when the client's brain or brand docs have rules.
    - **Sources, not placeholders:** for every claim a guideline requires (a figure, a study, a date, a rule), use the AI Overview's cited sources from the export as evidence when they support it (read them first), otherwise run one free web search within the run, and put the source URL in the brief and in the Fact and source bank (Sources and scope). Use `[CITE: ...]` only when nothing reliable is found; count them for H6.
+   - Before H5, run one web search per remaining `[CITE]` and read the best result; keep the `[CITE]` only with that search noted in the Fact and source bank. A source verified only through a search result (the page itself refused) is labelled "checked by search, page not read".
 6. Apply the YMYL table below.
 7. Make every figure identical wherever it repeats (word counts, volumes, title, H1).
 8. Run `python scripts/check_brief.py research-brief.md --type research` (step 8.1) before step 7b: the writer brief is distilled from a clean research brief.
 
 | Topic type | Add to the brief |
 |---|---|
-| Health or medical | A review-by-expert note (named role, not a person you invent); a red-flags or "when to get help" element in the outline; a studies and sources list (publisher, date, link) for the writer to verify; claims only from the client's own materials; a `**TODO (human):** legal or compliance review of service promotion and CTA wording` line in Accuracy and brand guardrails |
-| Finance, crypto, tax | A not-advice disclaimer note; no figures (fees, returns, rates) unless the client supplied them; jurisdiction caveats; reviewer in technical notes; a `**TODO (human):** legal or compliance review of product promotion and CTA wording` line in Accuracy and brand guardrails |
+| Health or medical | A review-by-expert note (named role, not a person you invent); a red-flags or "when to get help" element in the outline; a studies and sources list (publisher, date, link) for the writer to verify; claims only from the client's own materials; a `**TODO (human):** legal or compliance review of service promotion and CTA wording` line in Accuracy and brand guardrails (Hebrew: `**TODO (human):** בדיקה משפטית או רגולטורית של קידום השירות ושל נוסח ה-CTA`) |
+| Finance, crypto, tax | A not-advice disclaimer note; no figures (fees, returns, rates) unless the client supplied them; jurisdiction caveats; reviewer in technical notes; a `**TODO (human):** legal or compliance review of product promotion and CTA wording` line in Accuracy and brand guardrails (Hebrew: `**TODO (human):** בדיקה משפטית או רגולטורית של קידום המוצר ושל נוסח ה-CTA`) |
 | Legal | Jurisdiction and date-of-law note; primary sources (statute, regulator) as external links; a `**TODO (human):** legal review` on sensitive lines |
 
-Raise any brand or legal wording risk inside the brief with a safe generic fallback; never hold a
+Use the compliance line in the brief's language. Raise any brand or legal wording risk inside the
+brief with a safe generic fallback; never hold a
 brief waiting on legal. Unsupported product or medical claims become `[CITE: ...]` or a
 visible `**TODO (human):** ...` line. Never use HTML comments: they vanish in the Google Doc.
 
@@ -320,6 +328,7 @@ Before this step, read `references/brief-rules.md` section 17. Copy the blank
 - **Identical figures and strings.** Keyword strings and volumes, total word count and FAQ allowance, every on-page value, every outline heading with its prefix and word count, every FAQ question, and every snippet target line (label included) are copied character for character.
 - **Nothing lost.** Every table stake and strategic opportunity stays visible in the outline, as an item or a guideline; every `**TODO (human):**` line survives (those from dropped sections go to Writer notes); `[CITE]` and `[INTERNAL LINK]` markers stay with the text that carries them.
 - **What moves out:** competitor table, gap evidence, Reasoning and Covered by lines, keyword bullets, SERP detail, Fact and source bank, Sources and scope, technical notes. The header links to the research brief instead.
+- **Collapsed keyword rows:** "Existing page (do not target)" and "Brand (excluded)" rows become one line under the writer's keyword table, `**Do not target:** "string", "string"; link "anchor" to URL` (Hebrew `**לא לטרגט:**`), every string copied exactly and quoted; the research brief keeps them as rows. `--pair` accepts a string found in that line.
 - **Who writes (step 0, question 5):** sets the writer brief's tone and assumed knowledge (a freelancer new to the client gets the brand rules spelled out; an internal writer gets less). An internal strategist may also get the research brief; a machine writer (`blog-article-draft`) takes the research brief as its input.
 - **Length:** the budget in section 17 (soft target 2,000 words or 85 per outline item plus FAQ question, whichever is higher; hard ceiling 1.5 times that). Over it: compress guidelines and notes, never drop an item.
 
@@ -340,8 +349,11 @@ Before this step, read `references/qa-rubric.md`.
 
 1. **Checkpoint H5** (it applies to the writer brief, the client-visible one): before anything client-visible (sharing a Doc, placing it in a folder the client can open, updating a content table the client sees), show the finished writer brief, both self-checks and both word counts. Always state the H5 decision in one line before `create_file`: "folder X is not client-visible, creating both there", or ask whether it is. The research brief is internal: if the named folder is client-visible, ask where it goes. Wait for approval.
    Before `create_file`, convert any remaining `<!-- ... -->` comment to a visible `**TODO (human):** X` line in both files, re-run both checks, and count the TODOs in each file.
-2. Create both Docs with Google Drive `create_file` in the named folder: `textContent` = the Markdown, `contentMimeType` = `text/markdown`, `parentId` = the folder, conversion ON (do not set `disableConversionToGoogleType`). First the research brief (`title` = writer title + " | research"), then the writer brief (`title` = the writer title line) with its "Research brief" header line set to the research Doc's link. The research brief's "Writer brief" line names the writer Doc by title and folder; replace it with the link when the connector can update the Doc.
-3. Verify each by reading it back with `read_file_content`: headings present, tables rendered, no `{{`, no em-dash, the writer brief's link to the research brief opens, and each Doc's "TODO (human)" count equals its Markdown file's. If the Markdown conversion fails or tables break, create it again from the same content converted to HTML with `contentMimeType` = `text/html`. If Drive is unavailable, hand the user both Markdown files.
+2. Create both Docs with Google Drive `create_file` in the named folder, `parentId` = the folder, conversion ON (do not set `disableConversionToGoogleType`). First the research brief (`title` = writer title + " | research"), then the writer brief (`title` = the writer title line) with its "Research brief" header line set to the research Doc's link. The research brief's "Writer brief" line names the writer Doc by title and folder; replace it with the link when the connector can update the Doc.
+   - **Hebrew (RTL) briefs always upload as HTML, never Markdown** (Markdown import loses right-to-left): `python scripts/md_to_html.py writer-brief.md writer-brief.html --lang he`, then `textContent` = the HTML, `contentMimeType` = `text/html`. Same for the research brief.
+   - **English** may upload the Markdown (`contentMimeType` = `text/markdown`) or the converter's HTML.
+   - **A client brand document rule** in the brain (font, direction, logo) goes through the converter: `--font "<font>"`, `--rtl`, `--logo <PNG or JPG https URL>` (SVG does not import: then a visible TODO line). Name the rule at H4.
+3. Verify each Doc on read-back: export it with Drive `download_file_content` (`exportMimeType` = `text/html`), save it, and run `python scripts/md_to_html.py writer-brief.md --verify export.html --lang he` (or `--lang en`). It compares the Doc's word count with the Markdown's (must be within 3%: a larger gap means the conversion dropped text, often angle brackets) and, for Hebrew, confirms `dir="rtl"` or right alignment. Also check with `read_file_content`: headings present, tables rendered, no `{{`, no em-dash, the writer brief's link to the research brief opens, and each Doc's "TODO (human)" count equals its Markdown file's. A broken Doc: fix the source, then replace its content with `update_file` (or ask before trashing it); never leave a renamed broken copy in the folder. If Drive is unavailable, hand the user both Markdown files (and the HTML for Hebrew).
 4. Never share a Doc, change its permissions or touch a client-visible system before H5. Never share the research brief with the client unless the person asks.
 
 ## Step 10: Final message
@@ -401,3 +413,7 @@ topic, one brief per topic, never one brief covering several topics.
 | Writer brief loses a table stake or opportunity in compression | Every stake and opportunity stays an item or a guideline; `--pair` warns on a lost match |
 | Numbers or strings drift between the two briefs | Copy keywords, volumes, totals, on-page values, headings, word counts and FAQs verbatim; `--pair` errors on any difference |
 | Writer brief as long as the research brief | Distil to the section 17 budget; reasoning and evidence stay in the research brief, linked |
+| Hebrew Doc renders left to right | RTL briefs upload as HTML from `md_to_html.py --lang he`; `--verify` the HTML export |
+| Angle-bracket text vanishes in the Doc | [square brackets] for placeholders; `check_brief.py` errors on `<word>`; compare word counts at read-back |
+| Override primary in another language, or never pulled | Primary in the market's search language; pull its SERP before H3 approval |
+| Writer keyword table full of do-not-target rows | One `**Do not target:**` line under the writer table; rows stay in the research brief |

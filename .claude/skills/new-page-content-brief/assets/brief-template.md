@@ -1,6 +1,6 @@
 # {{Topic}} - Content Brief | {{Client}} | research
 
-{{! TEMPLATE NOTES, delete this block. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete. scripts/check_brief.py fails the brief while any double brace remains. Copy this blank file for every brief; never start from an old brief. Labels in bold, table headers and outline prefixes are machine-checked: keep them exactly. RESEARCH BRIEF: this is the internal record (strategist review, agency record, and the input for machine writing with blog-article-draft); it keeps every **Reasoning:** line, the Reasoning column of the on-page table and the rationale paragraphs. Its title is the writer brief's title plus " | research". The writer brief (assets/writer-brief-template.md) is distilled from this file, by deletion and compression only, after this file passes check_brief.py --type research. Write in the brief's language; no em-dashes. MARKERS: a person's decision or check is a visible line `**TODO (human):** what to decide`, never an HTML comment (comments vanish in the Google Doc, and check_brief.py fails on any comment opener); `[CITE: ...]` only when a search in the run found no source; `[INTERNAL LINK: anchor -> topic]` when no real URL exists. If the client's brain names a branded template or naming rule, keep this section order and these labels but apply the client's header, branding and file naming. }}
+{{! TEMPLATE NOTES, delete this block. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete. scripts/check_brief.py fails the brief while any double brace remains. Copy this blank file for every brief; never start from an old brief. Labels in bold, table headers and outline prefixes are machine-checked: keep them exactly. RESEARCH BRIEF: this is the internal record (strategist review, agency record, and the input for machine writing with blog-article-draft); it keeps every **Reasoning:** line, the Reasoning column of the on-page table and the rationale paragraphs. Its title is the writer brief's title plus " | research". The writer brief (assets/writer-brief-template.md) is distilled from this file, by deletion and compression only, after this file passes check_brief.py --type research. Write in the brief's language; no em-dashes. Placeholders inside guidelines use [square brackets], never angle brackets (the Doc conversion drops angle-bracket text; check_brief.py errors on it). MARKERS: a person's decision or check is a visible line `**TODO (human):** what to decide`, never an HTML comment (comments vanish in the Google Doc, and check_brief.py fails on any comment opener); `[CITE: ...]` only when a search in the run found no source; `[INTERNAL LINK: anchor -> topic]` when no real URL exists. If the client's brain names a branded template or naming rule, keep this section order and these labels but apply the client's header, branding and file naming. }}
 
 - **Date:** {{YYYY-MM-DD}}
 - **Market:** {{SERP country}}, {{SERP language}}
@@ -26,7 +26,7 @@
 
 ## Accuracy and brand guardrails
 
-{{! Only when the client's AI Brain, decisions-log or brand docs have rules; otherwise delete this whole section. Short bullets. }}
+{{! Only when the client's AI Brain, decisions-log or brand docs have rules; otherwise delete this whole section. Short bullets. Health or medical topic: add the line **TODO (human):** legal or compliance review of service promotion and CTA wording. Finance, crypto or tax topic: **TODO (human):** legal or compliance review of product promotion and CTA wording. }}
 
 - **Naming:** {{required names and naming bans}}
 - **Claims we cannot make:** {{claim, and the safe alternative}}
@@ -64,7 +64,7 @@
 - **SERP features observed:** {{per query: featured snippet, People Also Ask, video, image pack, AI Overview, ads; or "none present" (located SERP); or "not observed (Ahrefs or web-search fallback, not a located SERP)"}}
 - **AI Overview:** {{per query: present or absent; one-line gist of what it says; cited sources as full URLs; or "not observed (fallback route)"}}
 - **What ranks:** {{one or two lines: content types and domain types in the top 10; forums, Wikipedia or video noted as an intent signal}}
-- **Source:** {{SurgeOS SERP export <jobId>, country, language, device, depth 20, pulled YYYY-MM-DD; N queries (or the fallback used, with its label)}}
+- **Source:** {{SurgeOS SERP export [jobId], country, language, device, depth 20, pulled YYYY-MM-DD; N queries (or the fallback used, with its label)}}
 - **Reasoning:** {{why this verdict}}
 
 ## Keyword strategy
@@ -203,7 +203,7 @@ Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts
 - **Word count:** {{200}}
 - **Reasoning:** {{...}}
 
-{{! Check: every Word count above plus the FAQ allowance equals the Total word count. At most 3 Snippet target lines, each with a different query. Every query must be one pulled in the export (in the keyword table). If SERP features were not observed (Ahrefs or web-search fallback), at most 2, each written as: paragraph | <query> (answer-first bet; SERP features not observed). If the export shows no featured snippet but an AI Overview, at most 2, each written as: paragraph | <query> (AI Overview answer block; no featured snippet observed). }}
+{{! Check: every Word count above plus the FAQ allowance equals the Total word count. At most 3 Snippet target lines, each with a different query. Every query must be one pulled in the export (in the keyword table). If SERP features were not observed (Ahrefs or web-search fallback), at most 2, each written as: paragraph | [query] (answer-first bet; SERP features not observed). If the export shows no featured snippet but an AI Overview, at most 2, each written as: paragraph | [query] (AI Overview answer block; no featured snippet observed). }}
 
 ## Frequently Asked Questions
 
@@ -271,9 +271,9 @@ Weighted score = sum over pulled queries of volume x max(1, 21 - rank) (`scripts
 
 ## Sources and scope
 
-- **SERP:** {{SurgeOS SERP export <jobId> (new or reused), country, language, device, depth 20, YYYY-MM-DD, N queries; or the fallback used, with its label}}
+- **SERP:** {{SurgeOS SERP export [jobId] (new or reused), country, language, device, depth 20, YYYY-MM-DD, N queries; or the fallback used, with its label}}
 - **Keywords:** {{source, country and global, YYYY-MM-DD}}
-- **Pages read:** {{N pages: SurgeOS crawl ids <id>, <id> (word count, title, meta, H1) plus WebFetch for headings and body; crawl-only partial digests: N; failed reads dropped: N}}
+- **Pages read:** {{N pages: SurgeOS crawl ids [id], [id] (word count, title, meta, H1) plus WebFetch for headings and body; crawl-only partial digests: N; failed reads dropped: N}}
 - **Client data:** {{SurgeOS GSC property, window YYYY-MM-DD to YYYY-MM-DD (last 3 full months; add "spans the GSC impressions logging error 2025-05-13 to 2026-04-27" if it overlaps)}}
 - **Client files read:** {{AI Brain files, product briefs, past briefs on the topic; for a file too large to read whole, the terms grepped}}
 - **Cost:** SERP export ${{0.00}} ({{jobId}}, from the tool; $0 if reused); {{N}} crawls; DataForSEO fallback ${{0.00}} (summed cost fields, or none); Ahrefs {{N}} browser exports, 0 API units

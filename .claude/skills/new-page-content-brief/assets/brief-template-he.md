@@ -1,6 +1,6 @@
 # {{נושא}} - בריף יצירת תוכן | {{לקוח}} | research
 
-{{! TEMPLATE NOTES (English, for the strategist), delete this block. Hebrew brief: every heading, label and value is Hebrew except the fixed English labels kept on purpose: the `## On Page SEO` section heading, the on-page element names (Meta title, Meta description, URL slug, H1, OG title, OG description), the outline prefixes (Hero, H2, H3, H4, Conclusion), the snippet formats (paragraph, list, table) and the placeholder conventions. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete; scripts/check_brief.py --lang he fails the brief while any double brace remains. Copy this blank file for every brief, never an old brief. RESEARCH BRIEF: this is the internal record (strategist review, agency record, and the input for machine writing with blog-article-draft); it keeps every **נימוק:** line, the נימוק column of the on-page table and the rationale paragraphs. Its title is the writer brief's title plus " | research". The writer brief (assets/writer-brief-template-he.md) is distilled from this file, by deletion and compression only, after this file passes check_brief.py --type research --lang he. Read Hebrew headings and titles for Hebrew equivalents of banned patterns (המדריך המלא, כל מה שצריך לדעת, יתרונות וחסרונות, למתחילים). No em-dashes. URLs and numbers inside Hebrew text: keep them on their own or at the end of a phrase so they read correctly right to left. MARKERS: a person's decision or check is a visible line `**TODO (human):** what to decide` (the text may be Hebrew), never an HTML comment (comments vanish in the Google Doc, and check_brief.py fails on any comment opener); `[CITE: ...]` only when a search in the run found no source; `[INTERNAL LINK: anchor -> topic]` when no real URL exists. If the client's brain names a branded template or naming rule, keep this section order and these labels but apply the client's header, branding and file naming. }}
+{{! TEMPLATE NOTES (English, for the strategist), delete this block. Hebrew brief: every heading, label and value is Hebrew except the fixed English labels kept on purpose: the `## On Page SEO` section heading, the on-page element names (Meta title, Meta description, URL slug, H1, OG title, OG description), the outline prefixes (Hero, H2, H3, H4, Conclusion), the snippet formats (paragraph, list, table) and the placeholder conventions. Every double-brace token is a value to fill, and every double-brace token that starts with an exclamation mark is guidance to delete; scripts/check_brief.py --lang he fails the brief while any double brace remains. Copy this blank file for every brief, never an old brief. RESEARCH BRIEF: this is the internal record (strategist review, agency record, and the input for machine writing with blog-article-draft); it keeps every **נימוק:** line, the נימוק column of the on-page table and the rationale paragraphs. Its title is the writer brief's title plus " | research". The writer brief (assets/writer-brief-template-he.md) is distilled from this file, by deletion and compression only, after this file passes check_brief.py --type research --lang he. Read Hebrew headings and titles for Hebrew equivalents of banned patterns (המדריך המלא, כל מה שצריך לדעת, יתרונות וחסרונות, למתחילים). No em-dashes. Placeholders inside guidelines use [square brackets], never angle brackets (the Doc conversion drops them). Upload as HTML from scripts/md_to_html.py --lang he, never Markdown (SKILL.md step 9). URLs and numbers inside Hebrew text: keep them on their own or at the end of a phrase so they read correctly right to left. MARKERS: a person's decision or check is a visible line `**TODO (human):** what to decide` (the text may be Hebrew), never an HTML comment (comments vanish in the Google Doc, and check_brief.py fails on any comment opener); `[CITE: ...]` only when a search in the run found no source; `[INTERNAL LINK: anchor -> topic]` when no real URL exists. If the client's brain names a branded template or naming rule, keep this section order and these labels but apply the client's header, branding and file naming. }}
 
 - **תאריך:** {{YYYY-MM-DD}}
 - **שוק:** {{מדינת ה-SERP}}, {{שפת ה-SERP}}
@@ -26,7 +26,7 @@
 
 ## דגשי דיוק ומותג
 
-{{! Only when the client's AI Brain, decisions-log or brand docs have rules; otherwise delete this whole section. }}
+{{! Only when the client's AI Brain, decisions-log or brand docs have rules; otherwise delete this whole section. Health or medical topic: add the Hebrew line **TODO (human):** בדיקה משפטית או רגולטורית של קידום השירות ושל נוסח ה-CTA. Finance, crypto or tax topic: **TODO (human):** בדיקה משפטית או רגולטורית של קידום המוצר ושל נוסח ה-CTA. }}
 
 - **שמות ומיתוג:** {{שמות מחייבים ואיסורי שימוש}}
 - **טענות שאסור לטעון:** {{הטענה, והחלופה הבטוחה}}
@@ -64,7 +64,7 @@
 - **רכיבי SERP שנצפו:** {{לכל שאילתה: featured snippet, People Also Ask, וידאו, חבילת תמונות, AI Overview, מודעות; או "אין רכיבים" (SERP ממוקם); או "לא נצפו (Ahrefs או חיפוש רשת חלופי, לא SERP ממוקם)"}}
 - **AI Overview:** {{לכל שאילתה: מופיע או לא; תמצית של שורה אחת; המקורות שהוא מצטט, ככתובות מלאות; או "לא נצפה (מסלול חלופי)"}}
 - **מה מדורג:** {{שורה או שתיים: סוגי תוכן ואתרים בעשרייה הראשונה; פורומים, ויקיפדיה או וידאו כסימן לכוונה}}
-- **מקור:** {{SurgeOS SERP export <jobId>, מדינה, שפה, מכשיר, עומק 20, נמשך YYYY-MM-DD; N שאילתות (או המסלול החלופי, עם התווית שלו)}}
+- **מקור:** {{SurgeOS SERP export [jobId], מדינה, שפה, מכשיר, עומק 20, נמשך YYYY-MM-DD; N שאילתות (או המסלול החלופי, עם התווית שלו)}}
 - **נימוק:** {{למה זו ההכרעה}}
 
 ## אסטרטגיית מילות מפתח
@@ -203,7 +203,7 @@
 - **מספר מילים:** {{200}}
 - **נימוק:** {{...}}
 
-{{! Check: every מספר מילים above plus the הקצאה לשאלות ותשובות equals סה"כ מילים. At most 3 יעד סניפט lines, each with a different query. Every query must be one pulled in the export (in the keyword table). If SERP features were not observed (Ahrefs or web-search fallback), at most 2, each written as: paragraph | <query> (הימור answer-first; רכיבי SERP לא נצפו). If the export shows no featured snippet but an AI Overview, at most 2, each written as: paragraph | <query> (בלוק תשובה ל-AI Overview; לא נצפה featured snippet). }}
+{{! Check: every מספר מילים above plus the הקצאה לשאלות ותשובות equals סה"כ מילים. At most 3 יעד סניפט lines, each with a different query. Every query must be one pulled in the export (in the keyword table). If SERP features were not observed (Ahrefs or web-search fallback), at most 2, each written as: paragraph | [query] (הימור answer-first; רכיבי SERP לא נצפו). If the export shows no featured snippet but an AI Overview, at most 2, each written as: paragraph | [query] (בלוק תשובה ל-AI Overview; לא נצפה featured snippet). }}
 
 ## שאלות ותשובות
 
@@ -271,9 +271,9 @@
 
 ## מקורות והיקף
 
-- **SERP:** {{SurgeOS SERP export <jobId> (חדש או בשימוש חוזר), מדינה, שפה, מכשיר, עומק 20, YYYY-MM-DD, N שאילתות; או המסלול החלופי, עם התווית שלו}}
+- **SERP:** {{SurgeOS SERP export [jobId] (חדש או בשימוש חוזר), מדינה, שפה, מכשיר, עומק 20, YYYY-MM-DD, N שאילתות; או המסלול החלופי, עם התווית שלו}}
 - **מילות מפתח:** {{מקור, נפח מדינה וגלובלי, YYYY-MM-DD}}
-- **עמודים שנקראו:** {{N עמודים: מזהי סריקת SurgeOS <id>, <id> (ספירת מילים, title, meta, H1) ועוד WebFetch לכותרות ולגוף; תקצירים חלקיים מסריקה בלבד: N; קריאות שנכשלו והוסרו: N}}
+- **עמודים שנקראו:** {{N עמודים: מזהי סריקת SurgeOS [id], [id] (ספירת מילים, title, meta, H1) ועוד WebFetch לכותרות ולגוף; תקצירים חלקיים מסריקה בלבד: N; קריאות שנכשלו והוסרו: N}}
 - **נתוני הלקוח:** {{נכס GSC ב-SurgeOS, חלון YYYY-MM-DD עד YYYY-MM-DD (שלושת החודשים המלאים האחרונים; אם החלון חופף, להוסיף "חופף לתקלת רישום החשיפות ב-GSC בין 2025-05-13 ל-2026-04-27")}}
 - **קבצי לקוח שנקראו:** {{קבצי AI Brain, תדריכי מוצר, בריפים קודמים בנושא; לקובץ גדול מדי לקריאה מלאה, המונחים שחופשו בו}}
 - **עלות:** SERP export ${{0.00}} ({{jobId}}, מהכלי; $0 בשימוש חוזר); {{N}} סריקות; DataForSEO חלופי ${{0.00}} (סכום שדות cost, או אין); Ahrefs {{N}} ייצואים בדפדפן, 0 יחידות API

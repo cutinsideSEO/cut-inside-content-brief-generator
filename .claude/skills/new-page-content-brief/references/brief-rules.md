@@ -103,7 +103,8 @@ one line naming what was excluded or flagged (the client's own URLs, forums, Wik
 Constraints:
 
 - "Use the exact keywords provided. Do not add, change, or remove any keywords from the list." Exported lists are trimmed only for topic fit, and the trim is stated. "Exact" means the strings stay unchanged; it does not mean the user's term must stay primary.
-- **Cannibalisation override.** When a client page already covers the topic and the person chooses a new page with a distinct angle (SKILL.md step 3), re-choose the primary keyword for the distinct sub-intent, so the new page does not target the existing page's head term. Keep every user string exactly; retype the old head term as Secondary or "Existing page (do not target)" (its note names the existing URL and says to link to it, not compete with it). Show the change (old primary, new primary, why) at H3. Apply it only to the terms the existing client page actually ranks or gets impressions for (export position or GSC, last 3 full months); other user strings keep their type. The new primary names the distinct sub-intent ("X vs Y", "how to do X with Y"), never a synonym, abbreviation expansion, translation or transliteration of the existing head term. If no user string expresses the sub-intent, use an observed query (PAA, related search, client GSC query) as primary and say so at H3.
+- **Cannibalisation override.** When a client page already covers the topic and the person chooses a new page with a distinct angle (SKILL.md step 3), re-choose the primary keyword for the distinct sub-intent, so the new page does not target the existing page's head term. Keep every user string exactly; retype the old head term as Secondary or "Existing page (do not target)" (its note names the existing URL and says to link to it, not compete with it). Show the change (old primary, new primary, why) at H3. Apply it only to the terms the existing client page actually ranks or gets impressions for (export position or GSC, last 3 full months); other user strings keep their type. The new primary names the distinct sub-intent ("X vs Y", "how to do X with Y"), never a synonym, abbreviation expansion, translation or transliteration of the existing head term. If no user string expresses the sub-intent, use an observed query (PAA, related search, client GSC query) as primary and say so at H3. If the new primary was not a query in the export, its SERP is pulled before H3 approval (SKILL.md step 3).
+- **The primary is in the market's search language,** as people in that market type it: Hebrew script for an Israeli Hebrew brief, or a mixed Latin and Hebrew form actually seen in the user list or the client's GSC. A PAA question or related search in another language (an English PAA on a transliterated query, for example) may enter the table as a Question row at most, never as the primary: it cannot appear verbatim in a Hebrew title, H1 or OG title, and nobody can track its rank. If no market-language observed string expresses the sub-intent, offer at H3 to pull up to 3 market-language phrasings and keep the one whose located SERP returns market-language pages on that sub-intent ("seed, SERP observed, volume not measured"). `scripts/check_brief.py` warns when a Hebrew brief's primary has no Hebrew letter.
 - **The informational head term stays primary.** An informational page chasing a bigger transactional head term loses to retail and cannibalises the commercial page. Commercial terms become "Commercial (route, do not target)" rows whose note says which page they route to (an internal link), and they do not shape the outline.
 - **Brand and navigational terms** (a brand name, a product name, a site name) are typed "Brand (excluded)": brand demand is not topic demand. They are excluded from scoring and targeting.
 - **Zero or unmeasured volume on the primary keyword** must be said in the note ("0 in <country>, <month>; chosen because ..."), never left silent.
@@ -181,6 +182,14 @@ CTA to our product page')."
 | "Explain the topic clearly." | "Open with the 45-word answer, then a table comparing the two methods (columns: time per week, months to usable result, cost, best for)." |
 | "Mention the benefits." | "Name the one condition under which the method loses money, with a worked example; no competitor in the top 3 shows a losing case." |
 | "Add some statistics." | "Cite the regulator's current threshold from https://www.regulator.example/thresholds (read in this run, dated); do not use a figure without a source." |
+
+**Placeholders** inside a guideline (a sample line the writer completes) use [square brackets]:
+"payable in [asset] on [network] to [address]". Never angle brackets: the Google Doc conversion
+silently drops angle-bracket text, and `scripts/check_brief.py` errors on it.
+
+**How-to and software topics:** name every OS or software version with its support status checked
+in this run (for example "Windows 10 support ended 2025-10-14"), so a guide does not teach steps
+for a version the reader should not be running without saying so.
 
 **Reasoning** (research brief): why the item is included, linked back to the gap analysis ("Covers
 the table stake X", "Exploits the opportunity to discuss Y in more depth than competitors").
@@ -356,7 +365,8 @@ followed by its own answer ("What is X? X is...") outside a designated definitio
 **Visual guidelines:** hero image (authentic over stock), infographics, video, charts, a
 downloadable asset if useful, alt text for every image.
 
-**Conventions:** `[INTERNAL LINK: anchor -> topic]` where a link is needed but no real URL exists;
+**Conventions:** placeholders in [square brackets], never angle brackets (the Doc conversion drops
+them); `[INTERNAL LINK: anchor -> topic]` where a link is needed but no real URL exists;
 a visible `**TODO (human):** ...` line (bold label, on its own line or at the end of a bullet) for
 a decision or verification a person must make. Never an HTML comment (`<!-- -->`): comments vanish
 when the Markdown becomes a Google Doc, and the reviewer never sees them. No invented statistics,
@@ -370,8 +380,9 @@ A brief with a dozen `[CITE]` markers has moved the research to the writer.
 
 ## 13. YMYL extras (health, finance, legal)
 
-- **Health:** a review-by-expert note (role, not an invented name); a red-flags or "when to get help" element in the outline (for example a "when to see a doctor" list); a studies and sources list (publisher, date, link) for the writer to verify; a repeated per-condition structure where the topic has several conditions (what it is, symptoms, first steps); claims only from the client's own materials; a fact-check line in technical notes; a `**TODO (human):** legal or compliance review of service promotion and CTA wording` line in Accuracy and brand guardrails (medical-service promotion is regulated; no unsupported superlatives).
-- **Finance, crypto, tax:** a not-financial-advice or not-tax-advice note; no fees, returns or rates unless the client supplied them; jurisdiction caveats; a `**TODO (human):** legal or compliance review of product promotion and CTA wording` line in Accuracy and brand guardrails; the local angle (the market's tax or regulator rules) is often the strategic opportunity.
+- **Health:** a review-by-expert note (role, not an invented name); a red-flags or "when to get help" element in the outline (for example a "when to see a doctor" list); a studies and sources list (publisher, date, link) for the writer to verify; a repeated per-condition structure where the topic has several conditions (what it is, symptoms, first steps); claims only from the client's own materials; a fact-check line in technical notes; a `**TODO (human):** legal or compliance review of service promotion and CTA wording` line in Accuracy and brand guardrails (medical-service promotion is regulated; no unsupported superlatives). Hebrew brief: `**TODO (human):** בדיקה משפטית או רגולטורית של קידום השירות ושל נוסח ה-CTA`.
+- **Finance, crypto, tax:** a not-financial-advice or not-tax-advice note; no fees, returns or rates unless the client supplied them; jurisdiction caveats; a `**TODO (human):** legal or compliance review of product promotion and CTA wording` line in Accuracy and brand guardrails (Hebrew brief: `**TODO (human):** בדיקה משפטית או רגולטורית של קידום המוצר ושל נוסח ה-CTA`); the local angle (the market's tax or regulator rules) is often the strategic opportunity.
+- **Language of the compliance line:** use the line in the brief's language (the bold `TODO (human):` label stays English so the marker count works; the text after it is Hebrew in a Hebrew brief).
 - **Legal:** jurisdiction and the date of the law; primary sources (statute, regulator) as external links, read in this run; institution point of view where the client is an institution with positions; `**TODO (human):** legal review` on sensitive lines.
 - Raise a brand-name or legal wording risk inside the brief with a generic fallback (a device class instead of a third-party brand, for example). Never hold the brief waiting on legal.
 
@@ -406,7 +417,9 @@ citations, GA4 Key Events).
 **Fact and source bank:** a table of every factual claim the guidelines ask the writer to use,
 with columns `Claim | Source URL | Date | Used in section`. Every row has a URL found and read in
 this run; a claim with no source found stays a `[CITE: ...]` in its guideline and is listed here
-with "not found" as its source.
+with "not found" as its source. Before H5, each remaining `[CITE]` gets one web search with the
+best result read; a source confirmed only through search results (the page refused the read) is
+labelled "checked by search, page not read".
 
 ## 17. Writer brief distillation (step 7b)
 
@@ -436,7 +449,7 @@ brief is always built and checked first; the writer brief adds nothing to it.
 |---|---|
 | Header, relevant links | Title (without " \| research"), date, market, a "Research brief" line with the research Doc's link. Relevant links: only the target URL if the writer needs it, inside the summary or CTA |
 | Brief at a glance, Search intent and SERP, Strategy and goals, Content gap analysis, Accuracy and brand guardrails | One **Strategy summary** of at most about 150 words: intent and format; what wins the SERP (no URLs, scores or ranks); our angle in 1 to 2 sentences; the 3 strongest gaps we exploit; the key guardrails |
-| Keyword strategy | Same rows, same strings and volumes; columns Type, Keyword, Monthly searches, Placement (the placement half of the note); one source line. Global volume and the rationale stay in the research brief |
+| Keyword strategy | Primary, Secondary, Question and Commercial rows as in the research brief: same strings and volumes; columns Type, Keyword, Monthly searches, Placement (the placement half of the note). "Existing page (do not target)" and "Brand (excluded)" rows collapse into one line under the table: `**Do not target:** "string", "string"; link "anchor" to URL` (Hebrew `**לא לטרגט:**`), every string copied exactly and quoted (`--pair` accepts it there). Then one source line. Global volume, the rationale and the full do-not-target rows stay in the research brief |
 | Competitive analysis | Nothing (linked) |
 | On-page SEO | Same six values and Chars; no Reasoning column |
 | Article structure | Same total and FAQ allowance; every item, same prefix, heading and word count; a one-line angle; 2 to 4 imperative guidelines; Snippet target (verbatim, label included) and Resources only where present. No Keywords, Covered by or Reasoning lines |

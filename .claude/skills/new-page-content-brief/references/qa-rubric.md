@@ -59,7 +59,8 @@ stake beside the outline item that carries it; any stake named only in passing c
 **Table stakes is at most 3** if any stake from the gap analysis or from the competitors' shared
 headings has no outline item. **Keyword integration is at most 3** if the primary changed at H3 and
 the new primary fails the override reading check (section 5), or if a snippet target or heading
-targets a query not in the keyword table.
+targets a query not in the keyword table, or if the primary cannot appear verbatim in the meta
+title, H1 and OG title (a primary in another language than the brief, for example).
 
 | Criterion | The question | A 3 looks like | A 5 looks like |
 |---|---|---|---|
@@ -81,7 +82,7 @@ research brief's rubric. Score each pass or fail with one line of evidence.
 |---|---|---|
 | W1 | **Length budget** | `check_brief.py --type writer` shows no length warning or error: at or under the soft target (the higher of 2,000 and 85 x items), never above the hard ceiling (1.5 x soft). Brief-rules section 17.1 |
 | W2 | **Nothing lost against the research brief** | `--pair` is clean: keywords, volumes, totals, on-page values, headings, word counts, FAQs and snippet lines identical; every TODO (human) kept; every table stake and strategic opportunity still visible as an item or guideline (list each beside its writer item, as for the table-stakes score) |
-| W3 | **Readable in five minutes** | A writer reading only this Doc knows the angle, the outline with budgets, the keywords and where they go, the on-page values, the FAQs, the do's and don'ts and the CTA, without opening the research brief. Summary at most about 150 words; one-line angles; 2 to 4 imperative guidelines; one-line FAQ guidelines |
+| W3 | **Readable in five minutes** | A writer reading only this Doc knows the angle, the outline with budgets, the keywords and where they go, the on-page values, the FAQs, the do's and don'ts and the CTA, without opening the research brief. Summary at most about 150 words; one-line angles; 2 to 4 imperative guidelines; one-line FAQ guidelines; do-not-target and brand strings in one `**Do not target:**` line, not rows |
 | W4 | **No research clutter** | No competitor table, gap evidence, Reasoning or Covered by lines, scores, ranks, SERP detail or source bank; competitor names and URLs appear only where a guideline needs a source |
 | W5 | **No new claims** | Every compressed line says what the research line said: no new number, source, claim or keyword, no rounding, no softened or sharpened angle |
 
@@ -118,10 +119,12 @@ judged separately against the correctness criteria and the rubric.
 - **Claims:** every product, medical, legal or financial claim is supported by the client's materials or a source URL read in this run (listed in the Fact and source bank), or marked `[CITE: ...]` / `**TODO (human):** ...`. More than a handful of `[CITE]` markers means the research was skipped: search before shipping.
 - **Snippet bets:** when SERP features were not observed (Ahrefs or web-search fallback), each snippet target says it is an answer-first bet (at most 2); when the export shows no featured snippet but an AI Overview, each says "AI Overview answer block; no featured snippet observed" (at most 2); a featured snippet observed needs no label. Every target query was pulled.
 - **Cannibalisation override:** when a new page was chosen over an existing client page, the primary keyword is the distinct sub-intent, not the existing page's head term. Override primary is not a synonym, abbreviation expansion, translation or transliteration of the existing head term, and the override touched only terms the client page ranks or gets impressions for.
+- **Override primary in the market language, SERP pulled:** the override primary is in the market's search language (a foreign-language PAA is a Question row at most) and its own SERP was pulled before H3 approval (it is a query in the export).
 - **Keyword sourcing without a volume tool:** every keyword row comes from a user string, client GSC, SurgeOS tracked keywords, or the export's PAA or related searches; no model-chosen seed in the table unless observed.
 - **Competitor claims:** every weakness ("it lacks X") matches the page text read; Covered by lists only pages read in this run.
 - **Length vs required items:** a user total below about 120 words an item was raised at H4; no table stake dropped silently.
-- **Medical and finance:** a legal or compliance TODO on promotion and CTA wording is present.
+- **Medical and finance:** a legal or compliance TODO on promotion and CTA wording is present, in the brief's language (the Hebrew line in a Hebrew brief).
+- **Hebrew Doc direction:** a Hebrew Doc was uploaded as HTML from `md_to_html.py --lang he`, and the `--verify` run on its HTML export shows RTL and a word count within 3% of the Markdown.
 - **Meta hook matches the intent** of the query.
 - **Brand rules:** banned terms absent, preferred terms used, guardrails honoured.
 - **Standing recommendation changed?** Then the brief says so (house rule 5).

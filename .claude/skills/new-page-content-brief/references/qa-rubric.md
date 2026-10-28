@@ -125,6 +125,7 @@ judged separately against the correctness criteria and the rubric.
 - **Length vs required items:** a user total below about 120 words an item was raised at H4; no table stake dropped silently.
 - **Medical and finance:** a legal or compliance TODO on promotion and CTA wording is present, in the brief's language (the Hebrew line in a Hebrew brief).
 - **Hebrew Doc direction:** a Hebrew Doc was uploaded as HTML from `md_to_html.py --lang he`, and the `--verify` run on its HTML export shows RTL and a word count within 3% of the Markdown.
+- **Doc equals the source:** every Doc's `--verify` passed its text diff (0 differing words) and, with a brand font, shows the font; the HTML was passed unchanged (no hand-shortened styles, no retyped text); a failed Doc is renamed "SUPERSEDED (verify failed) ..." beside a corrected, verified Doc.
 - **Meta hook matches the intent** of the query.
 - **Brand rules:** banned terms absent, preferred terms used, guardrails honoured.
 - **Standing recommendation changed?** Then the brief says so (house rule 5).

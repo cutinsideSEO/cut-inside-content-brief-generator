@@ -101,7 +101,7 @@ banned-phrase list the brief gives the writer: a writer copies the brief's wordi
 | `scripts/score_competitors.py` | at step 2, after the SERP pulls |
 | `references/qa-rubric.md` | before step 8 (self-check) |
 | `scripts/check_brief.py` | at step 8, on both briefs (`--type research`, `--type writer --pair`) |
-| `scripts/md_to_html.py` | at step 9: Markdown to HTML for the Doc upload (always for Hebrew, `--lang he`), and `--verify` on the Doc's HTML export |
+| `scripts/md_to_html.py` | at step 9: Markdown to HTML for the Doc upload (always for Hebrew, `--lang he`; upload its output unchanged), and `--verify` (text diff, font, RTL, word count) on every Doc's HTML export |
 | `evals/qa-log.md` | never at run time; maintenance only (QA rounds) |
 
 ## Step 0: Ask first (one message)
@@ -353,8 +353,11 @@ Before this step, read `references/qa-rubric.md`.
    - **Hebrew (RTL) briefs always upload as HTML, never Markdown** (Markdown import loses right-to-left): `python scripts/md_to_html.py writer-brief.md writer-brief.html --lang he`, then `textContent` = the HTML, `contentMimeType` = `text/html`. Same for the research brief.
    - **English** may upload the Markdown (`contentMimeType` = `text/markdown`) or the converter's HTML.
    - **A client brand document rule** in the brain (font, direction, logo) goes through the converter: `--font "<font>"`, `--rtl`, `--logo <PNG or JPG https URL>` (SVG does not import: then a visible TODO line). Name the rule at H4.
-3. Verify each Doc on read-back: export it with Drive `download_file_content` (`exportMimeType` = `text/html`), save it, and run `python scripts/md_to_html.py writer-brief.md --verify export.html --lang he` (or `--lang en`). It compares the Doc's word count with the Markdown's (must be within 3%: a larger gap means the conversion dropped text, often angle brackets) and, for Hebrew, confirms `dir="rtl"` or right alignment. Also check with `read_file_content`: headings present, tables rendered, no `{{`, no em-dash, the writer brief's link to the research brief opens, and each Doc's "TODO (human)" count equals its Markdown file's. A broken Doc: fix the source, then replace its content with `update_file` (or ask before trashing it); never leave a renamed broken copy in the folder. If Drive is unavailable, hand the user both Markdown files (and the HTML for Hebrew).
-4. Never share a Doc, change its permissions or touch a client-visible system before H5. Never share the research brief with the client unless the person asks.
+   - **Pass the converter output exactly.** `textContent` is the file's content as written: never edit converter output by hand, never shorten its styles, drop attributes, or retype, re-encode or summarise its text. To change anything, fix the Markdown and convert again. The output is already compact (one style block, about 1.25 x the Markdown). Hand-shortened font styles made Docs drop the font, and a retyped 6,000-word brief came back with one Hebrew letter changed.
+   - **Payload too large for one call:** the research and writer briefs always go in separate calls. If one HTML file is still too large to pass whole, split that brief's Markdown at a `##` heading near the middle into two files, convert each, and create two Docs titled "<title> | research (part 1/2)" and "(part 2/2)", each naming the other in its first line. Never trim markup or text to fit.
+3. **Verify every Doc after upload, always** (each part of a split brief against its own Markdown file): export it with Drive `download_file_content` (`exportMimeType` = `text/html`), save the decoded export unchanged, and run `python scripts/md_to_html.py writer-brief.md --verify export.html --lang he --font "<font>"` (`--lang en` for English; `--font` only when a brand rule set one). It fails on: a word count more than 3% off; no RTL markers (Hebrew); the requested font on no text block; and any word that differs in a normalised text diff of the Markdown's visible text against the Doc's, printing the first 20 differences with context and the kind (heading, cell, keyword, number, url, prose). It tolerates only whitespace, invisible marks, quote and dash variants and edge punctuation (listed in the script header). Also check with `read_file_content`: tables rendered, no `{{`, no em-dash, the writer brief's link to the research brief opens, and each Doc's "TODO (human)" count equals its Markdown file's.
+4. **A failed verify:** never patch the Doc by hand. Fix the cause (convert again from the Markdown, pass the file exactly), create a corrected Doc with the same title in the same folder and verify it; then rename the failed Doc with `update_file` to "SUPERSEDED (verify failed) <title>" (never trash or delete it unless the person asks), point the writer brief's research link at the corrected Doc, and report both links and the failing verify line at H6. If Drive is unavailable, hand the user both Markdown files (and the HTML for Hebrew).
+5. Never share a Doc, change its permissions or touch a client-visible system before H5. Never share the research brief with the client unless the person asks.
 
 ## Step 10: Final message
 
@@ -366,6 +369,7 @@ Writer brief: <link>   (<w1> words; budget soft <s>, hard <h>)
 Research brief: <link> (<w2> words; internal, input for blog-article-draft)
 Self-check: intent <n>/5, table stakes <n>/5, opportunities <n>/5, keywords <n>/5, advantage <n>/5; writer brief checks pass
 check_brief.py: research clean, writer + pair clean (0 errors, <w> warnings reviewed)
+Doc verify (md_to_html.py --verify): writer PASS, research PASS (or: SUPERSEDED <link>, corrected <link>)
 Open markers: <t> TODO (human), <c> [CITE]; <n> claims sourced in the Fact and source bank
 Cost: SERP export <jobId> $<cost> (<q> queries, depth 20; or reused, $0); <k> crawls (<ids>); DataForSEO fallback $<summed cost> (<q2> SERPs, <p> page reads, or none); Ahrefs <n> browser exports, 0 API units
 Not measured: <for example: keyword difficulty, backlinks of ranking pages, the client's GA4 Key Events>
@@ -414,6 +418,7 @@ topic, one brief per topic, never one brief covering several topics.
 | Numbers or strings drift between the two briefs | Copy keywords, volumes, totals, on-page values, headings, word counts and FAQs verbatim; `--pair` errors on any difference |
 | Writer brief as long as the research brief | Distil to the section 17 budget; reasoning and evidence stay in the research brief, linked |
 | Hebrew Doc renders left to right | RTL briefs upload as HTML from `md_to_html.py --lang he`; `--verify` the HTML export |
+| Doc differs from the converter output (styles shortened, a letter retyped, `$...-$` text swallowed) | Pass the file content exactly; too large: split into part 1/2 Docs, never trim; `--verify` diffs every word and checks the font; on a fail create a corrected Doc and rename the failed one "SUPERSEDED (verify failed) ..." |
 | Angle-bracket text vanishes in the Doc | [square brackets] for placeholders; `check_brief.py` errors on `<word>`; compare word counts at read-back |
 | Override primary in another language, or never pulled | Primary in the market's search language; pull its SERP before H3 approval |
 | Writer keyword table full of do-not-target rows | One `**Do not target:**` line under the writer table; rows stay in the research brief |

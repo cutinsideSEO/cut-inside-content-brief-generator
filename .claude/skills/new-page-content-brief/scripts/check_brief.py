@@ -51,7 +51,12 @@ Checks (ERROR fails the brief, WARNING is advice)
     5  Keyword table: Primary keyword present, in title / H1 / OG title / slug, volume;
        in a Hebrew brief, a Primary with no Hebrew letter (warning: the primary
        must be in the market's search language; a foreign-language PAA may only
-       be a Question row)
+       be a Question row); every '**Do not target:**' / '**לא לטרגט:**' paragraph
+       (one per existing client page, wrapped lines included) that lacks the
+       quoted strings, the full URL, its position and date range, the different
+       question this article answers, or the link-once instruction with its
+       anchor (warning; a brand paragraph needs only the strings and "brand
+       terms" / "מונחי מותג")
     6  banned title, meta description and AI-cliche phrases
     7  Article structure: totals, per-item bullets, word count sum, snippet targets;
        when the Search intent section says SERP features were not observed
@@ -80,8 +85,11 @@ Checks (ERROR fails the brief, WARNING is advice)
        H1, OG title, OG description), an outline heading or its Word count, or
        an FAQ question differs between the two briefs (an "Existing page (do
        not target)" or "Brand (excluded)" row of the research brief may instead
-       appear in the writer brief's one-line '**Do not target:**' summary under
-       the keyword table, HE '**לא לטרגט:**', string copied exactly); WARNING when the title
+       appear in a quoted list of the writer brief's '**Do not target:**'
+       paragraphs under the keyword table, HE '**לא לטרגט:**', string copied
+       exactly; only quoted list members count, so neither the quoted anchor
+       after "anchor" / "עוגן" nor a string quoted again inside the reason
+       does); WARNING when the title
        lines do not follow "<writer title> | research", a snippet target line
        differs, the writer brief has fewer TODO (human) lines, or a research
        table stake or strategic opportunity has under 50% token overlap with
@@ -206,6 +214,14 @@ ANGLE_RE = re.compile(r"<([A-Za-z][^<>\n]{0,80})>")
 AUTOLINK_RE = re.compile(r"^(?:https?|mailto|ftp):", re.I)
 DNT_RE = re.compile(r"^\s*(?:[-*+]\s+)?\*\*\s*(?:Do not target|לא לטרגט)\s*:?\s*\*\*\s*:?\s*(.*)$", re.I)
 COLLAPSIBLE_TYPES = ("existing page", "brand", "עמוד קיים", "מותג")
+# the quoted anchor inside a Do not target paragraph is not a do-not-target string
+ANCHOR_QUOTE_RE = re.compile(r"(?:\banchor|העוגן|עוגן)\s+[\"“”][^\"“”]*[\"“”]", re.I)
+DNT_QUOTED_RE = re.compile(r"[\"“”][^\"“”]+[\"“”]")
+DNT_BRAND_RE = re.compile(r"brand terms|מונחי מותג", re.I)
+DNT_URL_RE = re.compile(r"https?://\S+", re.I)
+DNT_POS_RE = re.compile(r"(?:position|מיקום)[^0-9\n]{0,40}\d", re.I)
+DNT_LINK_RE = re.compile(r"(?:\blink\b|לקשר)[^\n]*(?:\banchor|העוגן|עוגן)", re.I)
+DNT_SUBINTENT_RE = re.compile(r"different question|שאלה אחרת", re.I)
 NOT_OBSERVED_RE = re.compile(r"not observed|לא נצפו", re.I)
 BET_RE = re.compile(r"\bbets?\b|הימור", re.I)
 NO_FS_RE = re.compile(r"no featured snippet|לא נצפה featured snippet|אין featured snippet", re.I)
@@ -298,6 +314,61 @@ def fmt_lines(nums, limit=15):
 def strip_fmt(text):
     """Remove markdown bold and backticks and trim."""
     return re.sub(r"\*\*|__|`", "", text).strip()
+
+
+def dnt_paragraphs(lines, in_fence, start, end):
+    """Every '**Do not target:**' paragraph in lines[start:end] as (line number, text).
+
+    A paragraph starts at the bold label and runs over its wrapped continuation lines, up to a blank
+    line, a table row, a heading, a list item or the next label. Several paragraphs (one per existing
+    client page, plus one for brand terms) are all returned."""
+    out = []
+    i = start
+    while i < end:
+        m = DNT_RE.match(lines[i]) if not in_fence[i] else None
+        if not m:
+            i += 1
+            continue
+        parts = [m.group(1)]
+        j = i + 1
+        while j < end and lines[j].strip() and not in_fence[j] and not DNT_RE.match(lines[j]) \
+                and not re.match(r"^\s*(?:\||#|[-*+]\s|\d+[.)]\s)", lines[j]):
+            parts.append(lines[j])
+            j += 1
+        out.append((i + 1, " ".join(" ".join(strip_fmt(p).split()) for p in parts).strip()))
+        i = j
+    return out
+
+
+def dnt_list_strings(text):
+    """The do-not-target strings of one paragraph: quoted list members, each followed by ',', ';', '.', ':',
+    another quote or the paragraph end. The quoted anchor, and a string quoted again inside the reason
+    ('position 1 for "x" in the export'), do not count."""
+    t = ANCHOR_QUOTE_RE.sub(" ", text)
+    out = []
+    for m in DNT_QUOTED_RE.finditer(t):
+        rest = t[m.end():].lstrip()
+        if not rest or rest[0] in ",;.:\"\u201c\u201d":
+            out.append(" ".join(m.group(0)[1:-1].split()))
+    return out
+
+
+def dnt_missing_parts(text):
+    """What a Do not target paragraph lacks against the plain-language format (empty list: complete)."""
+    missing = []
+    if not dnt_list_strings(text):
+        missing.append("the quoted strings")
+    if DNT_BRAND_RE.search(text) and not DNT_URL_RE.search(text):
+        return missing
+    if not DNT_URL_RE.search(text):
+        missing.append("the existing page's full URL")
+    if not DNT_POS_RE.search(text):
+        missing.append("its position with the date range")
+    if not DNT_SUBINTENT_RE.search(text):
+        missing.append("the different question this article answers")
+    if not DNT_LINK_RE.search(text):
+        missing.append("the link-once instruction with its anchor")
+    return missing
 
 
 def split_row(line):
@@ -621,9 +692,17 @@ def analyse(path, kind, lang_opt):
                     kw = strip_fmt(cells[1]) if len(cells) > 1 else ""
                     vol = strip_fmt(cells[2]) if len(cells) > 2 else ""
                     primaries.append((ln, kw, vol))
-        dnt = [DNT_RE.match(lines[i]).group(1) for i in range(r[0], r[1])
-               if not in_fence[i] and DNT_RE.match(lines[i])]
-        info["dnt"] = " ".join(" ".join(strip_fmt(t).split()) for t in dnt)
+        dnt_paras = dnt_paragraphs(lines, in_fence, r[0], r[1])
+        info["dnt"] = " ".join(t for _ln, t in dnt_paras)
+        info["dnt_strings"] = [q for _ln, t in dnt_paras for q in dnt_list_strings(t)]
+        for ln, t in dnt_paras:
+            missing = dnt_missing_parts(t)
+            if missing:
+                rep.warn(ln, "'**Do not target:**' paragraph does not say %s: each existing-page paragraph gives the "
+                         "quoted strings, why (the client URL with its Search Console average position and date range, "
+                         "or its SERP export position and date), and what to do (the different question this article "
+                         "answers, and link once with the anchor \"...\"); a brand paragraph says \"brand terms, not "
+                         "topic demand\" (brief-rules section 17.2)" % ", ".join(missing))
         if not primaries:
             rep.error(sections["keywords"][0] + 1, "Keyword table has no Primary row")
         else:
@@ -971,8 +1050,13 @@ def norm_text(text):
     return " ".join((text or "").split())
 
 
-def dnt_has(dnt, kw):
-    """Is keyword kw listed, exactly, in the writer brief's 'Do not target' line?"""
+def dnt_has(dnt, kw, strings=None):
+    """Is keyword kw listed, exactly, in the writer brief's 'Do not target' paragraphs?
+
+    strings: the quoted list members (dnt_list_strings); when the paragraphs quote anything, only those
+    count. An unquoted legacy list falls back to a whole-word search of the text."""
+    if strings:
+        return kw in strings
     if not dnt:
         return False
     if any(q[0] + kw + q[1] in dnt for q in ('""', "\u201c\u201d", "''", "\u201d\u201d")):
@@ -991,13 +1075,14 @@ def pair_checks(writer, research, rep):
     wk = {k["keyword"]: k for k in writer["keywords"]}
     rk = {k["keyword"]: k for k in research["keywords"]}
     dnt = writer.get("dnt", "")
+    dnt_strings = writer.get("dnt_strings") or []
     for kw in rk:
         if kw not in wk:
             collapsible = rk[kw].get("type", "").startswith(COLLAPSIBLE_TYPES)
-            if collapsible and dnt_has(dnt, kw):
+            if collapsible and dnt_has(dnt, kw, dnt_strings):
                 continue
             rep.error(None, "pair: keyword '%s' is in the research brief but not in the writer brief%s (strings must match exactly)"
-                      % (kw, " (neither in the keyword table nor in its '**Do not target:**' line)" if collapsible else ""))
+                      % (kw, " (neither in the keyword table nor quoted in its '**Do not target:**' paragraphs)" if collapsible else ""))
         elif norm_text(wk[kw]["volume"]) != norm_text(rk[kw]["volume"]):
             rep.error(wk[kw]["line"], "pair: volume for '%s' differs (writer %s, research %s)"
                       % (kw, wk[kw]["volume"], rk[kw]["volume"]))

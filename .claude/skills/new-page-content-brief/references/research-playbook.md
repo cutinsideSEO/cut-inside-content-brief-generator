@@ -341,7 +341,7 @@ Clicks are less affected but carry the same caveat when compared across the brea
 respect the `dataNotes`, `compareNote` and `rangeNote` that SurgeOS returns with a result: when one
 says two periods are not comparable, do not compare them.
 
-1. The client's own position per query from the SERP export (`client` set): a top-10 position for the primary query flags a refresh; a lower one, cannibalisation risk.
+1. The client's own position per query from the SERP export (`client` set): a top-10 position for the primary query or the topic's head term flags a refresh; position 11 to 30, cannibalisation risk.
 2. `gsc_query_page` for the primary keyword on the client's property, a closed window of the last 3 full months: which client URL gets impressions, at what position.
 3. `search_gsc_queries` with the topic's stem (contains or regex): queries the client already ranks for nearby.
 4. `search_gsc_pages` for URLs containing the topic's slug words.
@@ -351,8 +351,8 @@ says two periods are not comparable, do not compare them.
 | Finding | Action |
 |---|---|
 | No client page on the topic | New page; continue |
-| A client page in the top 10 for the primary query | Refresh, not a new page: flag at H3 |
-| A client page covers the topic, ranks below 10 | Cannibalisation risk: the person decides at H3. If they choose a new page, re-choose the primary for the distinct sub-intent (SKILL.md step 3): only for the terms that page ranks or gets impressions for (export or `gsc_query_page`), and never a synonym or translation of its head term |
+| A client page in the top 10 for the primary query or the head term (Search Console average position <= 10 over the last 3 clean full months, or top 10 in the export) | Refresh, not a new page: recommend `existing-article-content-refresh` at H3 and end the run, unless the person explicitly asks for a separate page on a named distinct sub-intent (then the override below) |
+| A client page covers the topic, ranks only lower (11 to 30) | Cannibalisation risk: the person decides at H3. If they choose a new page, re-choose the primary for the distinct sub-intent (SKILL.md step 3): only for the terms that page ranks or gets impressions for (export or `gsc_query_page`), and never a synonym or translation of its head term |
 | Client pages on adjacent topics | Internal link candidates (section 12) |
 
 ## 12. Internal link candidates (step 2.9)

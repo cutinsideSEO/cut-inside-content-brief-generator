@@ -30,7 +30,11 @@ definition page, explainer with a position, listicle, comparison table, tool), *
 observed** (per query, from the pull, never guessed), and the **source and date** of the pulls.
 
 **Stop rule (v0.1):** only informational (including mixed, for its informational slice) proceeds.
-Any other verdict, or a client page already ranking top 10, stops at H3 with the evidence.
+Any other verdict stops at H3 with the evidence. A client page in the top 10 for the primary query
+or the topic's head term (Search Console average position <= 10 over the last 3 clean full months,
+or top 10 in the SERP export) routes to a refresh with `existing-article-content-refresh` and ends
+the run at H3, unless the person explicitly asks for a separate page on a named distinct sub-intent
+(SKILL.md step 3).
 
 ## 2. Page goal and target audience
 
@@ -103,7 +107,7 @@ one line naming what was excluded or flagged (the client's own URLs, forums, Wik
 Constraints:
 
 - "Use the exact keywords provided. Do not add, change, or remove any keywords from the list." Exported lists are trimmed only for topic fit, and the trim is stated. "Exact" means the strings stay unchanged; it does not mean the user's term must stay primary.
-- **Cannibalisation override.** When a client page already covers the topic and the person chooses a new page with a distinct angle (SKILL.md step 3), re-choose the primary keyword for the distinct sub-intent, so the new page does not target the existing page's head term. Keep every user string exactly; retype the old head term as Secondary or "Existing page (do not target)" (its note names the existing URL and says to link to it, not compete with it). Show the change (old primary, new primary, why) at H3. Apply it only to the terms the existing client page actually ranks or gets impressions for (export position or GSC, last 3 full months); other user strings keep their type. The new primary names the distinct sub-intent ("X vs Y", "how to do X with Y"), never a synonym, abbreviation expansion, translation or transliteration of the existing head term. If no user string expresses the sub-intent, use an observed query (PAA, related search, client GSC query) as primary and say so at H3. If the new primary was not a query in the export, its SERP is pulled before H3 approval (SKILL.md step 3).
+- **Cannibalisation override.** It runs only in two cases (SKILL.md step 3): a client page ranks only lower (position 11 to 30) for the topic and the person chooses a new page with a distinct angle; or a client page ranks in the top 10 for the primary query or the head term (which routes to a refresh by default) and the person explicitly asks for a separate page on a named distinct sub-intent ("I want a separate page for X"). Never offer the override yourself in the top-10 case. When it runs, re-choose the primary keyword for the distinct sub-intent, so the new page does not target the existing page's head term. Keep every user string exactly; retype the old head term as Secondary or "Existing page (do not target)" (its note names the existing URL, its Search Console average position and date range or its SERP export position and date, the different question the new page answers, and the anchor to link to it once; the writer brief turns these rows into the plain-language paragraph of section 17.6). Show the change (old primary, new primary, why) at H3. Apply it only to the terms the existing client page actually ranks or gets impressions for (export position or GSC, last 3 full months); other user strings keep their type. The new primary names the distinct sub-intent ("X vs Y", "how to do X with Y"), never a synonym, abbreviation expansion, translation or transliteration of the existing head term. If no user string expresses the sub-intent, use an observed query (PAA, related search, client GSC query) as primary and say so at H3. If the new primary was not a query in the export, its SERP is pulled before H3 approval (SKILL.md step 3).
 - **The primary is in the market's search language,** as people in that market type it: Hebrew script for an Israeli Hebrew brief, or a mixed Latin and Hebrew form actually seen in the user list or the client's GSC. A PAA question or related search in another language (an English PAA on a transliterated query, for example) may enter the table as a Question row at most, never as the primary: it cannot appear verbatim in a Hebrew title, H1 or OG title, and nobody can track its rank. If no market-language observed string expresses the sub-intent, offer at H3 to pull up to 3 market-language phrasings and keep the one whose located SERP returns market-language pages on that sub-intent ("seed, SERP observed, volume not measured"). `scripts/check_brief.py` warns when a Hebrew brief's primary has no Hebrew letter.
 - **The informational head term stays primary.** An informational page chasing a bigger transactional head term loses to retail and cannibalises the commercial page. Commercial terms become "Commercial (route, do not target)" rows whose note says which page they route to (an internal link), and they do not shape the outline.
 - **Brand and navigational terms** (a brand name, a product name, a site name) are typed "Brand (excluded)": brand demand is not topic demand. They are excluded from scoring and targeting.
@@ -449,7 +453,7 @@ brief is always built and checked first; the writer brief adds nothing to it.
 |---|---|
 | Header, relevant links | Title (without " \| research"), date, market, a "Research brief" line with the research Doc's link. Relevant links: only the target URL if the writer needs it, inside the summary or CTA |
 | Brief at a glance, Search intent and SERP, Strategy and goals, Content gap analysis, Accuracy and brand guardrails | One **Strategy summary** of at most about 150 words: intent and format; what wins the SERP (no URLs, scores or ranks); our angle in 1 to 2 sentences; the 3 strongest gaps we exploit; the key guardrails |
-| Keyword strategy | Primary, Secondary, Question and Commercial rows as in the research brief: same strings and volumes; columns Type, Keyword, Monthly searches, Placement (the placement half of the note). "Existing page (do not target)" and "Brand (excluded)" rows collapse into one line under the table: `**Do not target:** "string", "string"; link "anchor" to URL` (Hebrew `**לא לטרגט:**`), every string copied exactly and quoted (`--pair` accepts it there). Then one source line. Global volume, the rationale and the full do-not-target rows stay in the research brief |
+| Keyword strategy | Primary, Secondary, Question and Commercial rows as in the research brief: same strings and volumes; columns Type, Keyword, Monthly searches, Placement (the placement half of the note). "Existing page (do not target)" and "Brand (excluded)" rows become plain-language `**Do not target:**` paragraphs under the table (Hebrew `**לא לטרגט:**`), one per existing client page plus one for brand terms, in the wording of section 17.6; every string copied exactly and quoted (`--pair` accepts it there). Then one source line. Global volume, the rationale and the full do-not-target rows stay in the research brief |
 | Competitive analysis | Nothing (linked) |
 | On-page SEO | Same six values and Chars; no Reasoning column |
 | Article structure | Same total and FAQ allowance; every item, same prefix, heading and word count; a one-line angle; 2 to 4 imperative guidelines; Snippet target (verbatim, label included) and Resources only where present. No Keywords, Covered by or Reasoning lines |
@@ -526,3 +530,54 @@ Overview detail; page goal and audience reasoning; swap test; technical notes; S
 the Fact and source bank. The research brief is the input for machine writing
 (`blog-article-draft`) and the record a strategist reviews; it is shared with a client only when
 the person asks.
+
+### 17.6 Do not target paragraphs (plain language)
+
+The owner could not read a line like `**Do not target:** "x", "y"; anchor "z" to [URL].` in QA
+(2026-10-29): it says what but not why or what to do. So the writer brief gives one short paragraph
+per existing client page (and one for brand terms), in the brief's language, built only from the
+research brief's rows (no new numbers). Each says:
+
+- **What:** the exact strings, each quoted and copied character for character, as a comma-separated list right after the label (`--pair` matches these list members only: neither the quoted anchor nor a string quoted again inside the reason counts).
+- **Why:** the client page that already ranks, as a full URL, with its Search Console average position for these strings and the date range (the last 3 clean full months); when GSC has no row for it, its SERP export position and the export date. Strings with different positions: give the range ("8.4 to 9.8"). For brand terms: "brand terms, not topic demand".
+- **What to do:** the different question this article answers (the new sub-intent), not to repeat that page's content, and one link to it with the anchor.
+
+English, existing client page:
+
+```
+**Do not target:** "<string>", "<string>". <client> already ranks for these with <full URL> (Search Console average position <n>, <YYYY-MM-DD> to <YYYY-MM-DD>). This article answers a different question: <the new sub-intent>. Do not repeat that page's content; link to it once with the anchor "<anchor>".
+```
+
+When GSC has no row for the page, the bracket reads `(position <n> in the SERP export of <YYYY-MM-DD>)`.
+
+English, brand terms:
+
+```
+**Do not target:** "<string>", "<string>". These are brand terms, not topic demand: do not use them as keywords or in headings.
+```
+
+Hebrew, existing client page:
+
+```
+**לא לטרגט:** "<מחרוזת>", "<מחרוזת>". האתר של <לקוח> כבר מדורג על המונחים האלה עם <כתובת מלאה> (מיקום ממוצע ב-Search Console <n>, <YYYY-MM-DD> עד <YYYY-MM-DD>). המאמר הזה עונה על שאלה אחרת: <תת-הכוונה החדשה>. לא לחזור על התוכן של העמוד ההוא; לקשר אליו פעם אחת עם העוגן "<עוגן>".
+```
+
+When GSC has no row for the page, the bracket reads `(מיקום <n> בייצוא ה-SERP מ-<YYYY-MM-DD>)`.
+
+Hebrew, brand terms:
+
+```
+**לא לטרגט:** "<מחרוזת>", "<מחרוזת>". אלה מונחי מותג, לא ביקוש לנושא: לא להשתמש בהם כמילות מפתח או בכותרות.
+```
+
+The angle-bracket slots above are for this file only: in the brief they hold real values (the
+client's name, the full URL, the numbers, the sub-intent and the anchor). Keep the bold label
+exactly (`**Do not target:**` / `**לא לטרגט:**`) at the start of each paragraph: `check_brief.py`
+finds the paragraphs by it, reads wrapped lines up to the next blank line, and warns when one lacks
+the strings, the URL, the position, the different question or the link-once instruction.
+
+Example (writer brief, English; invented): `**Do not target:** "what is a heat pump", "heat pump
+meaning". <client> already ranks for these with https://www.example.com/what-is-a-heat-pump/
+(Search Console average position 6.2, 2026-07-01 to 2026-09-30). This article answers a different
+question: whether a heat pump pays back in a cold climate. Do not repeat that page's content; link
+to it once with the anchor "what a heat pump is".`

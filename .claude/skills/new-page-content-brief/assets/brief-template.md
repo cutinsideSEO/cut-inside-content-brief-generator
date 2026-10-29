@@ -75,6 +75,7 @@
 | Secondary | {{keyword}} | {{320}} | {{900}} | {{H2 of section 2}} |
 | Question | {{question keyword}} | {{90}} | {{n/a}} | {{FAQ 1; also the snippet query of section 1}} |
 | Commercial (route, do not target) | {{keyword}} | {{2,900}} | {{12,000}} | {{anchor to https://www.example.com/category/ in section 4}} |
+| Existing page (do not target) | {{keyword}} | {{90}} | {{n/a}} | {{https://www.example.com/existing-page/ ranks for it: Search Console average position 8.4, YYYY-MM-DD to YYYY-MM-DD (or SERP export position N, YYYY-MM-DD); this page answers [the new sub-intent] instead; link to it once with the anchor "[anchor]"}} |
 | Brand (excluded) | {{brand keyword}} | {{480}} | {{n/a}} | {{brand demand, not topic demand; not targeted}} |
 
 Source: {{tool and report}}, {{country}} and global volume, pulled {{YYYY-MM-DD}}.

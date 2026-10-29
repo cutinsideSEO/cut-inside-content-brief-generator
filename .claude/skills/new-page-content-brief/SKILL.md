@@ -24,6 +24,7 @@ description: >-
 > 2026-10-26: QA round 2 fixes (crawler cap, override primary, keyword sourcing without a volume tool, length vs required items, export price, AI Overview answer blocks, one pre-H1 message, transliteration merging, medical and finance compliance TODO, verified competitor weaknesses, Covered by read pages only, indexed sitemap URLs, Hebrew On Page SEO label, branded template at H4).
 > 2026-10-28: owner verdict: outputs split into a gold-length writer brief (human) and the full research brief (internal and machine writing); concise variant removed.
 > 2026-10-28: QA round 3 fixes (RTL HTML delivery, market-language primary, angle-bracket guard, Hebrew compliance line, collapsed do-not-target rows).
+> 2026-10-29: owner: do-not-target lines explain why and link; a client page in the top 10 for the head term routes to a refresh unless a separate page on a named sub-intent is requested.
 
 # New page content brief (informational, v0.1)
 
@@ -183,7 +184,7 @@ fallbacks, the per-page record and the market codes.
 4. **Score.** Write `serp_rows.csv` (columns `keyword,volume,url,rank`, one row per organic top-10 result per query, from the export; volume from the keyword list, since the export has none) and run:
    `python scripts/score_competitors.py serp_rows.csv --exclude-domain <client domain> --top 10`
    It prints a Markdown table of weighted scores (sum over keywords of volume x max(1, 21 - rank)) and accepts a JSON list instead of CSV; add `--json scores.json` to keep the result, `--priority-url <url>` for each page the user named, `--exclude-keyword <brand term>` for brand queries. Use its output, not your own arithmetic. With no measured volumes, pass `--rank-only` (every row weighted as volume 1); the script switches to it on its own, with a notice, when every volume is 0 or missing. Label such scores "rank-only score, volumes not measured" in the brief.
-5. **Flag, do not outline against:** the client's own URLs (excluded; a client page in the top 10 for the primary query means a refresh, flag it at H3), forums and UGC, Wikipedia, video results. They are intent signals, not competitors.
+5. **Flag, do not outline against:** the client's own URLs (excluded; a client page in the top 10 for the primary query or the topic's head term means a refresh, step 3), forums and UGC, Wikipedia, video results. They are intent signals, not competitors.
 6. **Read pages.** Priority pages first, then by score, at most 10. **WebFetch first** for every page (H2/H3 tree and body for the digest). Crawl with SurgeOS `request_crawl` only the pages WebFetch cannot read, or the top 3 when a reliable word count is needed for the length (step 5.1): **at most 3 competitor domains per brief**, one domain per crawl (a mixed list is rejected), mode `list`, priority 7 (playbook section 8.1). The crawler's daily write cap is shared by the whole agency: two briefs once used 18 of 20. Cap reached: WebFetch only, word counts labelled approximate. Record for each: H1 to H3, word count, and a 90 to 130 word digest in the five-part form. WebFetch refused but the crawl succeeded: use the crawl's fields and mark the digest partial. A page with neither is dropped as evidence; never describe a page you did not read or invent its content.
 7. **Top 3 ground truth.** Priority pages first, then the highest scores, until there are 3 real editorial pages read in full. Each must be on the topic (not an adjacent asset class, product or subject) and in the brief's market language, unless none exists. When you prefer a lower-scored page, say why in the brief.
 8. **Cannibalisation and site coverage.** The client's own position per query from the SERP export; SurgeOS `gsc_query_page` for the primary keyword and `search_gsc_queries` for the topic; the latest site crawl searched for topic pages (`get_crawl_pages` / `get_sitemap_urls` with `search`, free); a `site:` search. Recommending a topic the site already covers is a known miss.
@@ -216,10 +217,15 @@ Classify from the SERP you observed, not from the keyword. This is the stop rule
 | Mostly product, category, sign-up or landing pages | transactional | Stop at H3 and ask |
 | One brand's pages dominate | navigational | Stop at H3 and ask |
 | Forums, UGC, Wikipedia or video dominate | informational with weak editorial competition | Proceed; say so; outline against the editorial pages that do rank |
-| A client page ranks in the top 10 for the primary query | refresh, not a new page | Stop at H3; recommend `existing-article-content-refresh` unless the person decides otherwise |
-| A client page covers the topic but ranks lower | possible cannibalisation | Stop at H3; the person chooses: new page with a distinct angle, or a refresh |
+| A client page ranks in the top 10 for the primary query or the topic's head term (Search Console average position <= 10 over the last 3 clean full months, or top 10 in the SERP export) | refresh, not a new page | Stop at H3; recommend a refresh of that page with `existing-article-content-refresh` and end the run. Do not offer a new page |
+| A client page covers the topic but ranks only lower (position 11 to 30) | possible cannibalisation | Stop at H3; the person chooses: new page with a distinct angle, or a refresh |
 
-**Cannibalisation override.** When the person chooses a new page with a distinct angle (in either of the last two rows), re-choose the primary keyword for the distinct sub-intent so the new page does not target the existing page's head term. Keep every user string exactly; retype the old head term as Secondary or "Existing page (do not target)" as needed, and show the before and after at H3.
+"Clean" months are full months outside the GSC impressions logging error (step 2.9). In the
+top-10 row the run continues only when the person explicitly asks for a separate page on a named
+distinct sub-intent ("I want a separate page for X"); a general "go ahead" or "make the brief
+anyway" is not that request: restate the refresh recommendation and ask which sub-intent they mean.
+
+**Cannibalisation override.** It runs only after that explicit request (top-10 row) or when the person chooses a new page with a distinct angle (11 to 30 row). Re-choose the primary keyword for the distinct sub-intent, in the market's language, so the new page does not target the existing page's head term. Keep every user string exactly; retype the existing page's terms as Secondary or "Existing page (do not target)" as needed (the writer brief states them as the plain-language do-not-target paragraph, brief-rules section 17.6), link to the existing page, and show the before and after at H3.
 
 - Apply it only to the terms the existing client page actually ranks or gets impressions for (export position, or GSC `gsc_query_page` query x page, last 3 full months). Other user strings keep their type.
 - The new primary names the distinct sub-intent ("X vs Y", "how to do X with Y", a narrower question), never a synonym, abbreviation expansion, translation or transliteration of the existing page's head term.
@@ -244,7 +250,12 @@ the editorial angle and, later, the outline skeleton: those decide whether the a
 **Checkpoint H3:** show the intent verdict with its evidence, the keyword table, the competitor set
 (scored table plus what was flagged or excluded), the page goal, the audience and the editorial
 angle with its reasoning and swap test. The person approves or changes the angle (the strategist
-approves angle and outline). On a non-informational verdict or a refresh flag, stop here and ask.
+approves angle and outline). On a non-informational verdict, stop here and ask. On a refresh
+verdict (a client page in the top 10 for the primary query or the head term), show that page's URL
+with its Search Console average position and window (or export rank), recommend a refresh with
+`existing-article-content-refresh`, and end the run here: offer no new page. Continue only if the
+person explicitly asks for a separate page on a named distinct sub-intent; then run the
+cannibalisation override (step 3) and show its keyword table at H3.
 
 ## Step 5: Length, FAQ set and snippet plan
 
@@ -328,7 +339,7 @@ Before this step, read `references/brief-rules.md` section 17. Copy the blank
 - **Identical figures and strings.** Keyword strings and volumes, total word count and FAQ allowance, every on-page value, every outline heading with its prefix and word count, every FAQ question, and every snippet target line (label included) are copied character for character.
 - **Nothing lost.** Every table stake and strategic opportunity stays visible in the outline, as an item or a guideline; every `**TODO (human):**` line survives (those from dropped sections go to Writer notes); `[CITE]` and `[INTERNAL LINK]` markers stay with the text that carries them.
 - **What moves out:** competitor table, gap evidence, Reasoning and Covered by lines, keyword bullets, SERP detail, Fact and source bank, Sources and scope, technical notes. The header links to the research brief instead.
-- **Collapsed keyword rows:** "Existing page (do not target)" and "Brand (excluded)" rows become one line under the writer's keyword table, `**Do not target:** "string", "string"; link "anchor" to URL` (Hebrew `**לא לטרגט:**`), every string copied exactly and quoted; the research brief keeps them as rows. `--pair` accepts a string found in that line.
+- **Do-not-target paragraphs:** "Existing page (do not target)" and "Brand (excluded)" rows become plain-language paragraphs under the writer's keyword table, one per existing client page and one for brand terms, each starting with the bold label `**Do not target:**` (Hebrew `**לא לטרגט:**`): what (the strings, copied exactly and quoted), why ("<client> already ranks for these with <full URL> (Search Console average position <n>, <date range>)", or "brand terms, not topic demand") and what to do ("This article answers a different question: <the new sub-intent>. Do not repeat that page's content; link to it once with the anchor "<anchor>"."). Exact English and Hebrew wording: brief-rules section 17.6. The research brief keeps the full rows. `--pair` accepts a string quoted in those paragraphs and warns on a paragraph missing a part.
 - **Who writes (step 0, question 5):** sets the writer brief's tone and assumed knowledge (a freelancer new to the client gets the brand rules spelled out; an internal writer gets less). An internal strategist may also get the research brief; a machine writer (`blog-article-draft`) takes the research brief as its input.
 - **Length:** the budget in section 17 (soft target 2,000 words or 85 per outline item plus FAQ question, whichever is higher; hard ceiling 1.5 times that). Over it: compress guidelines and notes, never drop an item.
 
@@ -397,6 +408,7 @@ topic, one brief per topic, never one brief covering several topics.
 | Crawl list mixing competitor domains | One `request_crawl` per domain; a mixed list is rejected |
 | Brief keywords added to Search Visibility | Never, unless the person asks (recurring cost, writes into the client project) |
 | Client's own page in the competitor set | `--exclude-domain`; a top-10 client page flags a refresh |
+| New page offered while a client page is top 10 for the head term | Refresh verdict: recommend `existing-article-content-refresh` and end at H3; a new page only on an explicit request for a separate page on a named sub-intent |
 | Forums, Wikipedia or video dominate | Intent signal, not competitors to outline against |
 | Section budgets leave FAQs nothing | Explicit FAQ allowance; outline + FAQ = total |
 | Section angle restates the heading | Swap test on every angle before H4 |
@@ -421,4 +433,5 @@ topic, one brief per topic, never one brief covering several topics.
 | Doc differs from the converter output (styles shortened, a letter retyped, `$...-$` text swallowed) | Pass the file content exactly; too large: split into part 1/2 Docs, never trim; `--verify` diffs every word and checks the font; on a fail create a corrected Doc and rename the failed one "SUPERSEDED (verify failed) ..." |
 | Angle-bracket text vanishes in the Doc | [square brackets] for placeholders; `check_brief.py` errors on `<word>`; compare word counts at read-back |
 | Override primary in another language, or never pulled | Primary in the market's search language; pull its SERP before H3 approval |
-| Writer keyword table full of do-not-target rows | One `**Do not target:**` line under the writer table; rows stay in the research brief |
+| Writer keyword table full of do-not-target rows | `**Do not target:**` paragraphs under the writer table; rows stay in the research brief |
+| Cryptic do-not-target line (strings and an anchor, no reason) | One plain-language paragraph per existing page: strings, why (URL, Search Console position, window), what to do (the different question, link once with the anchor); brief-rules 17.6 |

@@ -21,7 +21,7 @@ redo it by hand): section order and headings, the keyword, competitor and on-pag
 limits, slug word count, outline labels and non-zero word counts, outline sum + FAQ allowance =
 total (1% tolerance), 1 to 3 distinct snippet queries, snippet targets labelled a bet when SERP
 features were not observed or an AI Overview answer block when no featured snippet was observed,
-snippet queries that are not in the keyword table (warning), the 40/50 first FAQ guideline, forbidden leftovers (`{{`, `}}`,
+snippet queries that are not in the keyword table (warning), a `**Do not target:**` paragraph missing its strings, URL, position, different question or link-once instruction (warning), the 40/50 first FAQ guideline, forbidden leftovers (`{{`, `}}`,
 `<topic>`, `<client>`, `<keyword>`, `[PLACEHOLDER`, `TBD`, `Lorem`), any HTML comment `<!--`
 (an error: comments vanish in the Google Doc, so a TODO must be a visible `**TODO (human):**`
 line), em-dashes, and English banned title, meta and phrase patterns. If the script is unavailable, do
@@ -43,6 +43,7 @@ these checks by hand from section 4 and say so in Sources and scope.
 | C10 | The intent verdict matches the observed SERP | The SERP record and the verdict table in SKILL.md step 3 |
 | C11 | No GSC impressions, CTR or position quoted from a window that overlaps the GSC impressions logging error (2025-05-13 to 2026-04-27) without the caveat; SurgeOS `dataNotes` / `compareNote` respected | Every GSC figure's window in the brief and in Sources and scope |
 | C12 | Every human TODO is a visible `**TODO (human):**` line, and the Doc's TODO count equals brief.md's | check_brief.py (no `<!--`); read-back count at step 9 |
+| C13 | A client page in the top 10 for the primary query or the head term (Search Console average position <= 10 over the last 3 clean full months, or top 10 in the SERP export) routed the run to a refresh at H3; a run that proceeds to a new page without the person's explicit request for a separate page on a named distinct sub-intent is a Fail | The cannibalisation record (export position, `gsc_query_page`) and the H3 exchange: the request names the sub-intent |
 
 Also never fail: no client name, URL or number from a different client; no em-dash; full absolute
 URLs in the links section.
@@ -82,9 +83,10 @@ research brief's rubric. Score each pass or fail with one line of evidence.
 |---|---|---|
 | W1 | **Length budget** | `check_brief.py --type writer` shows no length warning or error: at or under the soft target (the higher of 2,000 and 85 x items), never above the hard ceiling (1.5 x soft). Brief-rules section 17.1 |
 | W2 | **Nothing lost against the research brief** | `--pair` is clean: keywords, volumes, totals, on-page values, headings, word counts, FAQs and snippet lines identical; every TODO (human) kept; every table stake and strategic opportunity still visible as an item or guideline (list each beside its writer item, as for the table-stakes score) |
-| W3 | **Readable in five minutes** | A writer reading only this Doc knows the angle, the outline with budgets, the keywords and where they go, the on-page values, the FAQs, the do's and don'ts and the CTA, without opening the research brief. Summary at most about 150 words; one-line angles; 2 to 4 imperative guidelines; one-line FAQ guidelines; do-not-target and brand strings in one `**Do not target:**` line, not rows |
+| W3 | **Readable in five minutes** | A writer reading only this Doc knows the angle, the outline with budgets, the keywords and where they go, the on-page values, the FAQs, the do's and don'ts and the CTA, without opening the research brief. Summary at most about 150 words; one-line angles; 2 to 4 imperative guidelines; one-line FAQ guidelines; do-not-target and brand strings in `**Do not target:**` paragraphs, not rows |
 | W4 | **No research clutter** | No competitor table, gap evidence, Reasoning or Covered by lines, scores, ranks, SERP detail or source bank; competitor names and URLs appear only where a guideline needs a source |
 | W5 | **No new claims** | Every compressed line says what the research line said: no new number, source, claim or keyword, no rounding, no softened or sharpened angle |
+| W6 | **Do-not-target paragraphs explain themselves** | Every do-not-target group (one paragraph per existing client page) states the reason, the full URL with its Search Console average position and date range (or SERP export position and date), and the linking instruction (the different question this article answers, link once with the anchor); a brand group says "brand terms, not topic demand". Wording: brief-rules section 17.6; `check_brief.py` warns on a paragraph missing a part, and every value matches the research brief's rows |
 
 **Blind A/B in QA rounds:** compare the WRITER brief with the gold brief (the gold briefs are
 writer-facing documents; most had a longer research layer behind them). The research brief is
@@ -118,6 +120,7 @@ judged separately against the correctness criteria and the rubric.
 - **Guidelines advance the angle** and name concrete things (a table's columns, an example, a number with `[CITE]`), not "explain clearly".
 - **Claims:** every product, medical, legal or financial claim is supported by the client's materials or a source URL read in this run (listed in the Fact and source bank), or marked `[CITE: ...]` / `**TODO (human):** ...`. More than a handful of `[CITE]` markers means the research was skipped: search before shipping.
 - **Snippet bets:** when SERP features were not observed (Ahrefs or web-search fallback), each snippet target says it is an answer-first bet (at most 2); when the export shows no featured snippet but an AI Overview, each says "AI Overview answer block; no featured snippet observed" (at most 2); a featured snippet observed needs no label. Every target query was pulled.
+- **Refresh routing:** a client page in the top 10 for the primary query or the head term ended the run at H3 with a refresh recommendation, unless the person explicitly asked for a separate page on a named distinct sub-intent (C13).
 - **Cannibalisation override:** when a new page was chosen over an existing client page, the primary keyword is the distinct sub-intent, not the existing page's head term. Override primary is not a synonym, abbreviation expansion, translation or transliteration of the existing head term, and the override touched only terms the client page ranks or gets impressions for.
 - **Override primary in the market language, SERP pulled:** the override primary is in the market's search language (a foreign-language PAA is a Question row at most) and its own SERP was pulled before H3 approval (it is a query in the export).
 - **Keyword sourcing without a volume tool:** every keyword row comes from a user string, client GSC, SurgeOS tracked keywords, or the export's PAA or related searches; no model-chosen seed in the table unless observed.
